@@ -144,19 +144,21 @@ object AdaptConfig extends Utils {
   ){
   }
 
-  val plainFieldMapping: ConfigFieldMapping = new ConfigFieldMapping { def apply(fieldName: String) = fieldName }
+  val lowercaseFieldMapping: ConfigFieldMapping = new ConfigFieldMapping {
+    def apply(fieldName: String): String = fieldName.toLowerCase
+  }
 
-  private implicit val _hint1  = ProductHint[RuntimeConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
-  private implicit val _hint2  = ProductHint[EnvironmentConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
-  private implicit val _hint3  = ProductHint[AdmConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
+  private implicit val _hint1  = ProductHint[RuntimeConfig](fieldMapping = lowercaseFieldMapping, allowUnknownKeys = false)
+  private implicit val _hint2  = ProductHint[EnvironmentConfig](fieldMapping = lowercaseFieldMapping, allowUnknownKeys = false)
+  private implicit val _hint3  = ProductHint[AdmConfig](fieldMapping = lowercaseFieldMapping, allowUnknownKeys = false)
   private implicit val _hint4  = new EnumCoproductHint[DataModelProduction]
-  private implicit val _hint5  = ProductHint[TestConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
+  private implicit val _hint5  = ProductHint[TestConfig](fieldMapping = lowercaseFieldMapping, allowUnknownKeys = false)
   private implicit val _hint6  = CoproductHint.default[IngestUnit]
-  private implicit val _hint7  = ProductHint[LinearIngest](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
-  private implicit val _hint8  = ProductHint[Range](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
-  private implicit val _hint9  = ProductHint[IngestHost](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
-  private implicit val _hint10 = ProductHint[IngestConfig](fieldMapping = plainFieldMapping, allowUnknownKeys = false)
-  private implicit val _hint11 = ProductHint[AdaptConfig](plainFieldMapping, allowUnknownKeys = false)
+  private implicit val _hint7  = ProductHint[LinearIngest](fieldMapping = lowercaseFieldMapping, allowUnknownKeys = false)
+  private implicit val _hint8  = ProductHint[Range](fieldMapping = lowercaseFieldMapping, allowUnknownKeys = false)
+  private implicit val _hint9  = ProductHint[IngestHost](fieldMapping = lowercaseFieldMapping, allowUnknownKeys = false)
+  private implicit val _hint10 = ProductHint[IngestConfig](fieldMapping = lowercaseFieldMapping, allowUnknownKeys = false)
+  private implicit val _hint11 = ProductHint[AdaptConfig](lowercaseFieldMapping, allowUnknownKeys = false)
   private implicit val _hint12 = new EnumCoproductHint[DataProvider] {
     override def fieldValue(name: String): String = name
   }
@@ -196,14 +198,14 @@ object AdaptConfig extends Utils {
           for {
             // prevent extra fields
             _ <- cur.asMap.right.flatMap { kvs =>
-              kvs.keySet.diff(Set("type", "topicName", "namespace")).toList match {
+              kvs.keySet.diff(Set("type", "topicname", "namespace")).toList match {
                 case Nil => Right(())
                 case key :: _ => Left(ConfigReaderFailures(ConvertFailure(UnknownKey(key), cur)))
               }
             }
 
             // expected fields
-            topicName <- cur.atPath("topicName").right.flatMap(ConfigReader[KakfaTopicName].from)
+            topicName <- cur.atPath("topicname").right.flatMap(ConfigReader[KakfaTopicName].from)
             namespace <- cur.atPath("namespace").right.flatMap(ConfigReader[Namespace].from)
             range <- cur.atPath("range").right.toOption
               .fold[Either[ConfigReaderFailures, Range]](Right(Range()))(ConfigReader[Range].from)
