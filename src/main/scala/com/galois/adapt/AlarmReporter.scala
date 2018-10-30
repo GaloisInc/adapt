@@ -14,12 +14,17 @@ import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 
 import scala.concurrent.duration._
 import akka.event.{Logging, LoggingAdapter}
+import com.galois.adapt.NoveltyDetection.PpmTreeNodeAlarm
 //import com.galois.adapt.Application.system
 //import com.galois.adapt.NoveltyDetection.{Alarm, NamespacedUuidDetails}
-import spray.json.{JsNumber, JsObject, JsString, JsValue}
+import spray.json._//{JsNumber, JsObject, JsString, JsValue}
+import spray.json.DefaultJsonProtocol._
+
 import com.typesafe.scalalogging.LazyLogging
 
 import scala.concurrent.Future
+
+import ApiJsonProtocol._
 
 case class ProcessDetails(processName:String, pid:Option[Int])
 
@@ -29,53 +34,138 @@ case class ProcessDetails(processName:String, pid:Option[Int])
 //case object summary extends AlarmNamespace
 //case object defaultNamespace extends AlarmNamespace
 
-case class AlarmSummary(
-                       treeInfo: String,
-                       alarmString: String,
-                       namespace: String = "default"
-                       ) {
-
+case class MetaData(runID:String, alarmCategory:String){
   def toJson:JsValue = {
     JsObject(
-      "Metadata" -> JsObject(
-        "Namespace" -> JsString(namespace.toString)
-      ),
-      "Alarm" -> JsObject(
-        "Type" -> JsString(this.treeInfo),
-        "AlarmInfo" -> JsString(this.alarmString)
-        //      "globalProbability" -> JsNumber(this.globalProbability),
-        //      "count" -> JsNumber(this.count),
-        //      "siblingPop" -> JsNumber(this.siblingPop),
-        //      "parentCount" -> JsNumber(this.parentCount),
-        //      "depthOfLocalProbabilityCalculation" -> JsNumber(this.depthOfLocalProbabilityCalculation)
-      )
+      "RunID" -> JsString(runID),
+      "AlarmCategory" -> JsString(alarmCategory)
     )
   }
-
 }
 
-case class AddAlarmSummary(a: AlarmSummary)
+trait AlarmData{
+  def toJson:JsValue
+}
+
+//summary
+case class DetailedAlarmData (summary:String) extends AlarmData{
+  def toJson:JsValue = {
+    JsObject("Summary" -> JsString(summary))
+  }
+}
+
+
+case class ConciseAlarmData(
+  treeInfo: String,
+  hostName: String,
+  key: List[String],
+  timestamp:Long,
+  localProbThreshold:Float,
+  ppmTreeNodeAlarms: List[PpmTreeNodeAlarm]
+//  localProb: Float,
+//  globalProb: Float,
+//  count: Int,
+//  siblingPop: Int,
+//  parentCount: Int,
+//  depthOfLocalProbabilityCalculation: Int
+  )extends AlarmData{
+  def toJson:JsValue = {
+    val delim = "∫"
+
+    JsObject(
+      "Hostname" -> JsString(this.hostName),
+      "Tree" -> JsString(this.treeInfo),
+      "ShortSummary" -> JsString(this.key.reduce(_ +s" $delim "+ _)),
+      "Timestamp" -> JsNumber(this.timestamp),
+      "LocalProbThreshold" -> JsNumber(this.localProbThreshold),
+      "ppmTreeNodeAlarms" -> this.ppmTreeNodeAlarms.toJson
+    )
+  }
+}
+
+case class Message(
+                    data:AlarmData,
+                    metadata:MetaData
+                       ) {
+
+  def toJson: JsValue = {
+    JsObject(
+      "Metadata" -> metadata.toJson,
+      "Alarm" -> data.toJson
+    )
+  }
+}
+
+case object Message{
+  implicit val executionContext = Application.system.dispatcher
+
+  def conciseMessagefromAnAlarm(treeName:String, hostName:String, a: AnAlarm, setProcessDetails: Set[ProcessDetails], localProbThreshold:Float):Message = {
+    //key
+    val key: List[String] = a.key
+    //details:(timestamp, System.currentTimeMillis, alarm, setNamespacedUuidDetails, Map.empty[String,Int]): (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])
+    val ppmTreeNodeAlarms: List[NoveltyDetection.PpmTreeNodeAlarm] = a.details._3
+
+    val summaries: Set[Future[TreeRepr]] = setProcessDetails.map(processDetails => PpmSummarizer.summarize(processDetails.processName, None, processDetails.pid))
+    summaries.map { summary =>
+      summary.map { tree =>
+        val s = tree.toString(0)
+
+        //if (alarmConfig.logging.enabled) reportLog(a, summary);
+        //      if (alarmConfig.console.enabled) reportConsole(key.fold(treeStr)(_ + _));
+        //if (alarmConfig.splunk.enabled) reportSplunk(a, summary);
+        //if (alarmConfig.gui.enabled) collectAlarms(a, summary);
+      }
+    }
+    Message(
+      ConciseAlarmData(treeName, hostName, key, a.details._1, localProbThreshold, ppmTreeNodeAlarms),
+      MetaData("default", "concise"))
+  }
+
+  def summaryMessagefromAnAlarm(treeName:String, a: AnAlarm, processDetails:ProcessDetails):Message = {
+    //key
+    val key: List[String] = a.key
+    //details:(timestamp, System.currentTimeMillis, alarm, setNamespacedUuidDetails, Map.empty[String,Int]): (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])
+    val ppmTreeNodeAlarms: List[NoveltyDetection.PpmTreeNodeAlarm] = a.details._3
+
+    val summary: Future[TreeRepr] = PpmSummarizer.summarize(processDetails.processName, None, processDetails.pid)
+    summary.map{tree =>
+      val s = tree.toString(0)
+
+      //if (alarmConfig.logging.enabled) reportLog(a, summary);
+      //      if (alarmConfig.console.enabled) reportConsole(key.fold(treeStr)(_ + _));
+      //if (alarmConfig.splunk.enabled) reportSplunk(a, summary);
+      //if (alarmConfig.gui.enabled) collectAlarms(a, summary);
+    }
+    Message(
+      DetailedAlarmData(""),
+      MetaData("default", "concise"))
+  }
+}
+
+case class AddAlarmSummary(a: Message)
 case class FlushAlarmSummaries()
 
 class SplunkActor(splunkHecClient:SplunkHecClient) extends Actor {
 
-  var alarmSummaryBuffer:List[AlarmSummary] = List.empty[AlarmSummary]
+  var alarmSummaryBuffer:List[Message] = List.empty[Message]
 
   def receive = {
     case FlushAlarmSummaries => flush()
     case AddAlarmSummary(a) => Add(a)
   }
 
+  val jsonAst = List(1).toJson
+
   def flush() = {
     //todo: retry on failure
     alarmSummaryBuffer.map(reportSplunk)
     alarmSummaryBuffer = List.empty
   }
-  def Add(a:AlarmSummary) = {
+  def Add(a:Message) = {
     alarmSummaryBuffer = a::alarmSummaryBuffer
   }
 
-  def reportSplunk(a: AlarmSummary) = {
+  def reportSplunk(a: Message) = {
     splunkHecClient.sendEvent(a.toJson)(Application.system.dispatcher)
   }
 
@@ -89,13 +179,11 @@ class SplunkActor(splunkHecClient:SplunkHecClient) extends Actor {
 //experiment prefix [run number]
 //summarized for process and summarized for process /\ pid
 // sometimes the processname is <unnamed>, handle that!
-
+//add data timestamp: a._3
 
 
 object AlarmReporter extends LazyLogging {
-
   implicit val executionContext = Application.system.dispatcher
-
   //val log: LoggingAdapter = Logging.getLogger(system, logSource = this)
   val alarmConfig = AdaptConfig.alarmConfig
   var allAlarms = List.empty[AnAlarm]
@@ -126,38 +214,24 @@ object AlarmReporter extends LazyLogging {
   //type Alarm = List[(String, Float, Float, Int, Int, Int, Int)]
   //println(alarmConfig)
 
-  def reportLog(a: AlarmSummary) = {
+  def reportLog(a: Message) = {
     //log.info(a.toString)
   }
 
-  def reportConsole(a: AlarmSummary) = {
+  def reportConsole(a: Message) = {
     println(a)
   }
 
-  
+
   //  def collectAlarms(a: AlarmSummary) = {
 //    allAlarms = a::AlarmSummary
 //  }
 
 
-  def report(treeName:String, a: AnAlarm, processDetails:ProcessDetails) = {
+  def report(treeName:String, hostName:String, a: AnAlarm, setProcessDetails: Set[ProcessDetails], localProbThreshold:Float) = {
 
-    //key
-    val key: List[String] = a.key
-    //details:(timestamp, System.currentTimeMillis, alarm, setNamespacedUuidDetails, Map.empty[String,Int]): (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])
-    val alarm: List[NoveltyDetection.PpmTreeNodeAlarm] = a.details._3
+    val alarmSummary = Message.conciseMessagefromAnAlarm(treeName, hostName, a, setProcessDetails, localProbThreshold)
 
-    val summary: Future[TreeRepr] = PpmSummarizer.summarize(processDetails.processName, None, processDetails.pid)
-    summary.map{tree =>
-      val s = tree.toString(0)
-
-      //if (alarmConfig.logging.enabled) reportLog(a, summary);
-//      if (alarmConfig.console.enabled) reportConsole(key.fold(treeStr)(_ + _));
-      //if (alarmConfig.splunk.enabled) reportSplunk(a, summary);
-      //if (alarmConfig.gui.enabled) collectAlarms(a, summary);
-    }
-
-    val alarmSummary = AlarmSummary(treeName, key.reduce(_ + ":" + _))
     if (alarmConfig.console.enabled) reportConsole(alarmSummary);
     if (alarmConfig.logging.enabled) reportLog(alarmSummary);
     if (alarmConfig.splunk.enabled) {
