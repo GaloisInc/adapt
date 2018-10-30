@@ -50,7 +50,7 @@ object NoveltyDetection {
   val execDeleteTypes = Set[EventType](EVENT_EXECUTE, EVENT_UNLINK)
   val march1Nanos = 1519862400000000L
 
-  case class NamespacedUuidDetails(extendedUuid: NamespacedUuid, name: Option[String] = None, pid: Option[String] = None)
+  case class NamespacedUuidDetails(extendedUuid: NamespacedUuid, name: Option[String] = None, pid: Option[Int] = None)
 }
 
 case object AlarmExclusions {
@@ -127,9 +127,11 @@ case class PpmDefinition[DataShape](
   }
 
   //process name and pid/uuid
-  def getProcessDetailsFromAlarm(a:Alarm, setNamespacedUuidDetails:Set[NamespacedUuidDetails], timestamp:Long):ProcessDetails = {
-    name match {
-      case default => ProcessDetails("Unknown Process", Some(0))
+  def getProcessDetailsFromAlarm(setNamespacedUuidDetails: Set[NamespacedUuidDetails]): Set[ProcessDetails] = {
+    setNamespacedUuidDetails.filter { d =>
+      d.pid.isDefined && d.name.isDefined
+    }.map { d =>
+      ProcessDetails(d.name.get, d.pid)
     }
   }
 
@@ -150,7 +152,7 @@ case class PpmDefinition[DataShape](
 
       def thresholdAllows: Boolean = ! ( (a._1.last.localProb > localProbThreshold) && shouldApplyThreshold )
 
-      val processDetails = (getProcessDetailsFromAlarm _).tupled(a)
+      val processDetails = getProcessDetailsFromAlarm(setNamespacedUuidDetails)
       //report the alarm
       if (thresholdAllows) AlarmReporter.report(name, newAlarm, processDetails)
     }
@@ -665,7 +667,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-               NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid.toString)),
+               NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid)),
                NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
@@ -680,7 +682,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
@@ -695,7 +697,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
@@ -713,7 +715,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         }
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress.getOrElse("no_address_from_CDM")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
@@ -731,7 +733,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         }}.getOrElse(List("<no_file_path_node>")).dropRight(1)
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
@@ -746,7 +748,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         d => List(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}"))
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
@@ -776,9 +778,9 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         d._2._2.map(_.path).getOrElse("<no_path>")   // Child process second
       )),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.get.path),Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.get.path),Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.get.path), d._3._1 match {
-          case o: AdmSubject => Some(o.cid.toString)
+          case o: AdmSubject => Some(o.cid)
           case _ => None
         })) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
@@ -856,7 +858,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         )
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
@@ -891,7 +893,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         )
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
@@ -934,7 +936,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         )
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
           d._3._1 match {
             case o: AdmSrcSinkObject => s" : ${o.srcSinkType}"
@@ -981,7 +983,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         )
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path).getOrElse("AdmNetFlow")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
@@ -1034,7 +1036,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
       ),
       d => Set(
         NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid, d._2._2.map(_.path), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid, d._2._2.map(_.path), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid, d._3._2.map(_.path))
       ) ++ d._2._2.map(n => NamespacedUuidDetails(n.uuid, Some(n.path), None)).toSet,
 //        ++ d._3._2.map(n => NamespacedUuidDetails(n.uuid, Some(n.path), None)).toSet,  // Don't need/will never be a path node from a netflow.

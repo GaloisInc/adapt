@@ -143,21 +143,23 @@ object AlarmReporter extends LazyLogging {
 
 
 
-  def report(treeName:String, a: AnAlarm, processDetails:ProcessDetails) = {
+  def report(treeName:String, a: AnAlarm, setProcessDetails: Set[ProcessDetails]) = {
 
     //key
     val key: List[String] = a.key
     //details:(timestamp, System.currentTimeMillis, alarm, setNamespacedUuidDetails, Map.empty[String,Int]): (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])
     val alarm: List[NoveltyDetection.PpmTreeNodeAlarm] = a.details._3
 
-    val summary: Future[TreeRepr] = PpmSummarizer.summarize(processDetails.processName, None, processDetails.pid)
-    summary.map{tree =>
-      val s = tree.toString(0)
+    val summaries: Set[Future[TreeRepr]] = setProcessDetails.map(processDetails => PpmSummarizer.summarize(processDetails.processName, None, processDetails.pid))
+    summaries.map { summary =>
+      summary.map { tree =>
+        val s = tree.toString(0)
 
-      //if (alarmConfig.logging.enabled) reportLog(a, summary);
-//      if (alarmConfig.console.enabled) reportConsole(key.fold(treeStr)(_ + _));
-      //if (alarmConfig.splunk.enabled) reportSplunk(a, summary);
-      //if (alarmConfig.gui.enabled) collectAlarms(a, summary);
+        //if (alarmConfig.logging.enabled) reportLog(a, summary);
+        //      if (alarmConfig.console.enabled) reportConsole(key.fold(treeStr)(_ + _));
+        //if (alarmConfig.splunk.enabled) reportSplunk(a, summary);
+        //if (alarmConfig.gui.enabled) collectAlarms(a, summary);
+      }
     }
 
     val alarmSummary = AlarmSummary(treeName, key.reduce(_ + ":" + _))

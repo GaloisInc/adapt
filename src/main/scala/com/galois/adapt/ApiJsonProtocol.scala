@@ -50,7 +50,7 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val extendedUuidDetails: RootJsonFormat[NamespacedUuidDetails] = new RootJsonFormat[NamespacedUuidDetails] {
     override def write(eUuid: NamespacedUuidDetails): JsValue = {
       val JsObject(payload) = extendedUuid.write(eUuid.extendedUuid)
-      JsObject(payload + ("name" -> JsString(eUuid.name.getOrElse(""))) + ("pid" -> JsString(eUuid.pid.getOrElse(""))))
+      JsObject(payload + ("name" -> JsString(eUuid.name.getOrElse(""))) + ("pid" -> JsString(eUuid.pid.map(_.toString).getOrElse(""))))
     }
 
     override def read(json: JsValue): NamespacedUuidDetails = {
@@ -61,7 +61,8 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
       }
       val pidOpt = json.asJsObject.getFields("pid") match {
         case Seq(JsString("")) => None
-        case Seq(JsString(jsPID)) => Some(jsPID)
+        case Seq(JsNumber(jsPID)) => Some(jsPID.toInt)
+        case _ => None
       }
       NamespacedUuidDetails(eUuid, name, pidOpt)
     }
