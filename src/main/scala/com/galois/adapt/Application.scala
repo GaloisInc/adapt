@@ -359,28 +359,28 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 
         for (((host, source), i) <- hostSources.zipWithIndex) {
           val broadcast = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
-          (source.via(printCounter(host.hostName, statusActor, 0)) via debug.debugBuffer(s"[${host.hostName}] before ER")) ~>
-            (erMap(host.hostName) via debug.debugBuffer(s"[${host.hostName}] after ER")) ~>
+          (source.via(printCounter(host.hostName, statusActor, 0)) via debug.debugBuffer(s"[${host.hostName}] 0 before ER")) ~>
+            (erMap(host.hostName) via debug.debugBuffer(s"[${host.hostName}] 1 after ER")) ~>
             broadcast.in
 
-          (broadcast.out(0) via debug.debugBuffer(s"[${host.hostName}] before PPM state accumulator")) ~>
-            (PpmFlowComponents.ppmStateAccumulator via debug.debugBuffer(s"[${host.hostName}] before PPM sink")) ~>
+          (broadcast.out(0) via debug.debugBuffer(s"[${host.hostName}] 3 before PPM state accumulator")) ~>
+            (PpmFlowComponents.ppmStateAccumulator via debug.debugBuffer(s"[${host.hostName}] 4 before PPM sink")) ~>
             Sink.actorRefWithAck[CompletedESO](ppmManagerActors(host.hostName), InitMsg, Ack, CompleteMsg)
 
-          (broadcast.out(1) via debug.debugBuffer(s"[${host.hostName}] before ADM merge")) ~>
+          (broadcast.out(1) via debug.debugBuffer(s"[${host.hostName}] 2 before ADM merge")) ~>
             mergeAdm.in(i)
         }
 
         val broadcastAdm = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
-        (mergeAdm.out via debug.debugBuffer(s"after ADM merge")) ~>
-          (betweenHostDedup via debug.debugBuffer(s"after cross-host deduplicate")) ~>
+        (mergeAdm.out via debug.debugBuffer(s"0 after ADM merge")) ~>
+          (betweenHostDedup via debug.debugBuffer(s"~ 1 after cross-host deduplicate")) ~>
           broadcastAdm.in
 
-        (broadcastAdm.out(0) via debug.debugBuffer(s"before cross-host PPM state accumulator")) ~>
+        (broadcastAdm.out(0) via debug.debugBuffer(s"~ 3 before cross-host PPM state accumulator")) ~>
           (PpmFlowComponents.ppmStateAccumulator via debug.debugBuffer(s"before cross-host PPM sink")) ~>
           Sink.actorRefWithAck[CompletedESO](ppmManagerActors(hostNameForAllHosts), InitMsg, Ack, CompleteMsg)
 
-        (broadcastAdm.out(1) via debug.debugBuffer(s"before DB sink")) ~>
+        (broadcastAdm.out(1) via debug.debugBuffer(s"~ 2 before DB sink")) ~>
           DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
 
         ClosedShape
