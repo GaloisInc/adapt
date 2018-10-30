@@ -1064,14 +1064,19 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         )
       }.toOption
 
-      val partialMap2 = mutable.Map.empty[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]]
+      var partialMap2 = Map.empty[HostName, mutable.Map[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]]]
 
       override def observe(observation: PartialShape): Unit = if (incomingFilter(observation)) {
         getJoinCondition(observation) match {
           case None => log.error(s"Something unexpected passed the filter for CrossHostProcessCommunication: $observation")
           case Some(joinValue) =>
 
-            val previousSameDirObservations = partialMap2.getOrElse(joinValue, Map.empty[List[ExtractedValue], Set[NamespacedUuidDetails]])
+            val existingThisHost = partialMap2.getOrElse(observation._1.hostName, mutable.Map.empty[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]])
+            if ( ! partialMap2.contains(observation._2._1.hostName)) partialMap2 = partialMap2 + (observation._2._1.hostName -> existingThisHost)
+            val existingOtherHosts = (partialMap2 - observation._1.hostName).values
+              .foldLeft[Map[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]]](Map.empty)(_ ++ _)
+
+            val previousSameDirObservations = existingThisHost.getOrElse(joinValue, Map.empty[List[ExtractedValue], Set[NamespacedUuidDetails]])
             val observedIds = uuidCollector(observation)
 
             val sendRecOpt = joinValue.sendRec match {
@@ -1080,15 +1085,15 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
                 val theseIds = previousSameDirObservations.get(theseDiscs).fold(observedIds) { previousIds => observedIds ++ previousIds }
                 val thisSendObs = Map(theseDiscs -> theseIds)
                 val allSendObs = previousSameDirObservations ++ thisSendObs
-                partialMap2(joinValue) = allSendObs
-                partialMap2.get(joinValue.invert).map(thisSendObs -> _)
+                existingThisHost(joinValue) = allSendObs  // Update mutable Map in place
+                existingOtherHosts.get(joinValue.invert).map(thisSendObs -> _)
               case Receiving =>
                 val theseDiscs = discriminators(1)(observation)
                 val theseIds = previousSameDirObservations.get(theseDiscs).fold(observedIds) { previousIds => observedIds ++ previousIds }
                 val thisRecObs = Map(theseDiscs -> theseIds)
                 val allRecObs = previousSameDirObservations ++ thisRecObs
-                partialMap2(joinValue) = allRecObs
-                partialMap2.get(joinValue.invert).map(_ -> thisRecObs)
+                existingThisHost(joinValue) = allRecObs  // Update mutable Map in place
+                existingOtherHosts.get(joinValue.invert).map(_ -> thisRecObs)
             }
 
             sendRecOpt.foreach { obs =>
