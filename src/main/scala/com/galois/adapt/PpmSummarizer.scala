@@ -114,7 +114,8 @@ object PpmSummarizer {
     )
   }
   case object DiscardedEvents extends AbstractionOne {
-    val events: Set[EventType] = Set(
+    val events: Set[EventType] = Set() // Throw away everything below...
+    (
       EVENT_LSEEK,
       EVENT_WAIT,
       EVENT_UNIT,
@@ -174,6 +175,12 @@ object PpmSummarizer {
         .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map {result => hostName -> result.repr.truncate(1).withoutQNodes}
       }
     ).map(_.toMap)
+  }
+
+  def mostNovelActions(maxCount: Int, processName: String, hostName: HostName, pid: Option[Int] = None): Future[List[String]] = {
+    implicit val timeout = Timeout(30 seconds)
+    (Application.ppmManagerActors(hostName) ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList))
+      .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{r => r.repr.mostNovelKeys(maxCount) }
   }
 
 

@@ -95,7 +95,7 @@ object Application extends App {
   // Mutable state that gets updated during ingestion
   var failedStatements: List[(Int, String)] = Nil
 
-  val handler: ErrorHandler = runFlow match {
+  val errorHandler: ErrorHandler = runFlow match {
     case "accept" => new ErrorHandler {
       override def handleError(offset: Long, error: Throwable): Unit = {
         failedStatements = (offset.toInt, error.getMessage) :: failedStatements
@@ -105,7 +105,7 @@ object Application extends App {
   }
 
   val cdmSources: Map[HostName, (IngestHost, Source[(Namespace,CDM19), NotUsed])] = ingestConfig.hosts.map { host: IngestHost =>
-    host.hostName -> (host, host.toCdmSource(handler))
+    host.hostName -> (host, host.toCdmSource(errorHandler))
   }.toMap
 
   val erMap: Map[HostName, Flow[(String,CurrentCdm), Either[ADM, EdgeAdm2Adm], NotUsed]] = runFlow match {
