@@ -214,6 +214,7 @@ object AlarmReporter extends LazyLogging {
   val t1 = 1 second
   val t2 = 10 seconds
   val maxBufferLen = 100
+  val runID = "testRun"
 
   val alarmConfig: AdaptConfig.AlarmsConfig = AdaptConfig.alarmConfig
   val splunkHecClient: SplunkHecClient = new SplunkHecClient(alarmConfig.splunk.token, alarmConfig.splunk.host, alarmConfig.splunk.port)
@@ -233,7 +234,7 @@ object AlarmReporter extends LazyLogging {
 
   def report(treeName:String, hostName:String, a: AnAlarm, setProcessDetails: Set[ProcessDetails], localProbThreshold:Float) = {
 
-    val alarmSummary = Message.conciseMessagefromAnAlarm(treeName, hostName, a, setProcessDetails, localProbThreshold)
+    val alarmSummary = Message.conciseMessagefromAnAlarm(treeName, hostName, a, setProcessDetails, localProbThreshold, runID)
 
     if (alarmConfig.console.enabled) println(alarmSummary.toString);
     if (alarmConfig.logging.enabled) logger.info(alarmSummary.toString);

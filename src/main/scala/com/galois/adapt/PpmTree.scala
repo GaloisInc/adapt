@@ -160,7 +160,7 @@ case class PpmDefinition[DataShape](
 
       val processDetails = (getProcessDetailsFromAlarm _).tupled(a)
       //report the alarm
-      if (thresholdAllows) AlarmReporter.report(this.name, this.hostName, newAlarm, processDetails, localProbThreshold)
+      if (thresholdAllows) AlarmReporter.report(this.name, this.hostName, newAlarm, Set(processDetails), localProbThreshold)
     }
   }
 
