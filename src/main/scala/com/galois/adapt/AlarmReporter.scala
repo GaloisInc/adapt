@@ -161,6 +161,10 @@ class AlarmReporterActor(runID:String, maxbufferlength:Long, splunkHecClient:Spl
   }
 
   //todo: verify any truncation of alarms and ... in the treeRepr.toString
+  //todo: check empty list being sent as the first two alarms
+  //todo: handle errors if the ppmSummarizer can't find anything
+  //todo: handle <no_subject_path_node>
+  //todo: Should we generate summaries with and without pid?
   def generateSummaryAndSend = {
 
     val summariesF: Set[Future[String]] = processRefSet.map{ processDetails =>
