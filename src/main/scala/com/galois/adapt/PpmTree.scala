@@ -1593,5 +1593,8 @@ case class AlarmLocalProbabilityAccumulator(hostname: String, initialLocalProbab
         accLPCount <= percentileOfTotal
     }.lastOption.map(_._1).getOrElse(1F)
 
+    println(s"THRESHOLD LOG, $hostname: $count novelties collected.")
+    println(s"THRESHOLD LOG, $hostname: $threshold is current local probability threshold.")
+
   }
 }
