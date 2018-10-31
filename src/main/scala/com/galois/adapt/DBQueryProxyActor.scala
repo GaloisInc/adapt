@@ -178,17 +178,17 @@ object DBQueryProxyActor {
     .collect { case (_, cdm: DBNodeable[_]) => cdm }
     .groupedWithin(1000, 1 second)
     .map(WriteCdmToDB.apply)
-    .toMat(Sink.actorRefWithAck(graphActor, InitMsg, Ack, completionMsg))(Keep.right)
+    .toMat(Sink.actorRefWithAck[WriteCdmToDB](graphActor, InitMsg, Ack, completionMsg))(Keep.right)
 
   def graphActorCdm19WriteSink(graphActor: ActorRef, completionMsg: Any = CompleteMsg)(implicit timeout: Timeout): Sink[(String,CDM19), NotUsed] = Flow[(String,CDM19)]
     .collect { case (_, cdm: DBNodeable[_]) => cdm }
     .groupedWithin(1000, 1 second)
     .map(WriteCdmToDB.apply)
-    .toMat(Sink.actorRefWithAck(graphActor, InitMsg, Ack, completionMsg))(Keep.right)
+    .toMat(Sink.actorRefWithAck[WriteCdmToDB](graphActor, InitMsg, Ack, completionMsg))(Keep.right)
 
   def graphActorAdmWriteSink(graphActor: ActorRef, completionMsg: Any = CompleteMsg): Sink[Either[ADM,EdgeAdm2Adm], NotUsed] = Flow[Either[ADM,EdgeAdm2Adm]]
     .groupedWithin(1000, 1 second)
     .map(WriteAdmToDB.apply)
     .buffer(4, OverflowStrategy.backpressure)
-    .toMat(Sink.actorRefWithAck(graphActor, InitMsg, Ack, completionMsg))(Keep.right)
+    .toMat(Sink.actorRefWithAck[WriteAdmToDB](graphActor, InitMsg, Ack, completionMsg))(Keep.right)
 }

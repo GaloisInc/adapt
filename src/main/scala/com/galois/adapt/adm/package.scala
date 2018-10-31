@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 import java.util
 import java.util.{Arrays, Comparator, UUID}
 
+import com.galois.adapt.AdaptConfig.HostName
 import com.galois.adapt.cdm19._
 import org.mapdb.{DataInput2, DataOutput2, Serializer}
 import org.mapdb.serializer.GroupSerializer
@@ -122,6 +123,8 @@ package object adm {
     val uuid: AdmUUID                  // The current UUID
     val originalCdmUuids: Seq[CdmUUID] // The UUIDs of all the CDM nodes that were merged to produce this node
 
+    def getHostName: Option[HostName]
+
     def toMap: Map[String, Any]        // A property map (keys are constant for a given type
   }
 
@@ -149,8 +152,11 @@ package object adm {
     deviceType: Option[String],
     inputType: Option[String],
 
+    hostName: HostName,
     provider: String
   ) extends ADM with DBWritable {
+
+    def getHostName: Option[HostName] = Some(hostName)
 
     val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
 
@@ -187,8 +193,11 @@ package object adm {
     cid: Int,
     startTimestampNanos: Long,
 
+    hostName: HostName,
     provider: String
   ) extends ADM with DBWritable {
+
+    def getHostName: Option[HostName] = Some(hostName)
 
     val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
 
@@ -216,6 +225,8 @@ package object adm {
    ) extends ADM with DBWritable {
     val uuid = AdmUUID(DeterministicUUID(path), provider)
     val originalCdmUuids: Seq[CdmUUID] = Nil
+
+    def getHostName: Option[HostName] = None
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -365,10 +376,13 @@ package object adm {
      fileObjectType: FileObjectType,
      size: Option[Long],
 
+     hostName: HostName,
      provider: String
   ) extends ADM with DBWritable {
 
     val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
+
+    def getHostName: Option[HostName] = Some(hostName)
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -406,6 +420,8 @@ package object adm {
 
     val uuid = AdmUUID(DeterministicUUID(localAddress.toString + localPort.toString + remoteAddress.toString + remotePort.toString), provider)
 
+    def getHostName: Option[HostName] = None
+
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";")
@@ -434,6 +450,8 @@ package object adm {
     val uuid = AdmUUID(DeterministicUUID(address), "")
     override val originalCdmUuids: Seq[CdmUUID] = List.empty
 
+    def getHostName: Option[HostName] = None
+
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
@@ -453,6 +471,8 @@ package object adm {
 
     val uuid = AdmUUID(DeterministicUUID(port.toString), "")
     override val originalCdmUuids: Seq[CdmUUID] = List.empty
+
+    def getHostName: Option[HostName] = None
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -475,10 +495,13 @@ package object adm {
 
     srcSinkType: SrcSinkType,
 
+    hostName: String,
     provider: String
   ) extends ADM with DBWritable {
 
     val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
+
+    def getHostName: Option[HostName] = Some(hostName)
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -508,6 +531,7 @@ package object adm {
     principalType: PrincipalType = PRINCIPAL_LOCAL,
     username: Option[String] = None,
 
+    hostName: String,
     provider: String
   ) extends ADM with DBWritable {
 
@@ -515,6 +539,8 @@ package object adm {
       DeterministicUUID(userId + groupIds.sorted.mkString("") + principalType.toString + username + provider),
       provider
     )
+
+    def getHostName: Option[HostName] = Some(hostName)
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -548,10 +574,13 @@ package object adm {
 
     programPoint: Option[String] = None,
 
+    hostName: String,
     provider: String
   ) extends ADM with DBWritable {
 
     val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
+
+    def getHostName: Option[HostName] = Some(hostName)
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -579,6 +608,8 @@ package object adm {
 
     provider: String
   ) extends ADM with DBWritable {
+
+    def getHostName: Option[HostName] = Some(hostName)
 
     val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
 
@@ -610,6 +641,8 @@ package object adm {
   final case class AdmSynthesized(
     originalCdmUuids: Seq[CdmUUID]
   ) extends ADM with DBWritable {
+
+    def getHostName: Option[HostName] = None
 
     val uuid = {
       val original = originalCdmUuids.sorted

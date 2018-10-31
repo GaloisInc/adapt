@@ -50,7 +50,7 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val extendedUuidDetails: RootJsonFormat[NamespacedUuidDetails] = new RootJsonFormat[NamespacedUuidDetails] {
     override def write(eUuid: NamespacedUuidDetails): JsValue = {
       val JsObject(payload) = extendedUuid.write(eUuid.extendedUuid)
-      JsObject(payload + ("name" -> JsString(eUuid.name.getOrElse(""))) + ("pid" -> JsString(eUuid.pid.getOrElse(""))))
+      JsObject(payload + ("name" -> JsString(eUuid.name.getOrElse(""))) + ("pid" -> JsString(eUuid.pid.map(_.toString).getOrElse(""))))
     }
 
     override def read(json: JsValue): NamespacedUuidDetails = {
@@ -61,7 +61,8 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
       }
       val pidOpt = json.asJsObject.getFields("pid") match {
         case Seq(JsString("")) => None
-        case Seq(JsString(jsPID)) => Some(jsPID)
+        case Seq(JsNumber(jsPID)) => Some(jsPID.toInt)
+        case _ => None
       }
       NamespacedUuidDetails(eUuid, name, pidOpt)
     }
@@ -87,16 +88,16 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val cdmHostIdentifier = jsonFormat2(HostIdentifier.apply)
 
   // ADM nodes
-  implicit val admEvent = jsonFormat(AdmEvent.apply, "originalCdmUuids", "eventType", "earliestTimestampNanos", "latestTimestampNanos", "deviceType", "inputType", "provider")
-  implicit val admSubject = jsonFormat(AdmSubject.apply, "originalCdmUuids", "subjectTypes", "cid", "startTimestampNanos", "provider")
+  implicit val admEvent = jsonFormat(AdmEvent.apply, "originalCdmUuids", "eventType", "earliestTimestampNanos", "latestTimestampNanos", "deviceType", "inputType", "hostName", "provider")
+  implicit val admSubject = jsonFormat(AdmSubject.apply, "originalCdmUuids", "subjectTypes", "cid", "startTimestampNanos", "hostName", "provider")
   implicit val admPathNode = jsonFormat(AdmPathNode.apply, "path", "provider")
-  implicit val admFileObject = jsonFormat(AdmFileObject.apply, "originalCdmUuids", "fileObjectType", "size", "provider")
+  implicit val admFileObject = jsonFormat(AdmFileObject.apply, "originalCdmUuids", "fileObjectType", "size", "hostName", "provider")
   implicit val admNetFlowObject = jsonFormat(AdmNetFlowObject.apply, "originalCdmUuids", "localAddress", "localPort", "remoteAddress", "remotePort", "provider")
   implicit val admAddress = jsonFormat(AdmAddress.apply _, "address")
   implicit val admPort = jsonFormat(AdmPort.apply _, "port")
-  implicit val admSrcSinkObject = jsonFormat(AdmSrcSinkObject.apply, "originalCdmUuids", "srcSinkType", "provider")
-  implicit val admPrincipal = jsonFormat(AdmPrincipal.apply, "originalCdmUuids", "userId", "groupIds", "principalType", "username", "provider")
-  implicit val admProvenanceTagNode = jsonFormat(AdmProvenanceTagNode.apply, "originalCdmUuids", "programPoint", "provider")
+  implicit val admSrcSinkObject = jsonFormat(AdmSrcSinkObject.apply, "originalCdmUuids", "srcSinkType", "hostName", "provider")
+  implicit val admPrincipal = jsonFormat(AdmPrincipal.apply, "originalCdmUuids", "userId", "groupIds", "principalType", "username", "hostName", "provider")
+  implicit val admProvenanceTagNode = jsonFormat(AdmProvenanceTagNode.apply, "originalCdmUuids", "programPoint", "hostName", "provider")
   implicit val admHost = jsonFormat(AdmHost.apply, "originalCdmUuids", "hostName", "hostIdentifiers", "osDetails", "hostType", "interfaces", "provider")
   implicit val admSynthesized = jsonFormat(AdmSynthesized.apply _, "originalCdmUuids")
 

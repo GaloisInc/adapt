@@ -49,16 +49,8 @@ object NoveltyDetection {
   val netFlowTypes = readAndWriteTypes ++ Set(EVENT_CONNECT, EVENT_ACCEPT)
   val execDeleteTypes = Set[EventType](EVENT_EXECUTE, EVENT_UNLINK)
   val march1Nanos = 1519862400000000L
-  val (pathDelimiterRegexPattern, pathDelimiterChar) = Application.instrumentationSource match {
-    case "faros" | "fivedirections" | "marple" => ("""\\""", """\""")
-    case _                                     => ("""/""" ,   "/")
-  }
-  val sudoOrPowershellComparison: String => Boolean = Application.instrumentationSource match {
-    case "faros" | "fivedirections" | "marple" => (s: String) => s.toLowerCase.contains("powershell")
-    case _                                                    => (s: String) => s.toLowerCase == "sudo"
-  }
 
-  case class NamespacedUuidDetails(extendedUuid: NamespacedUuid, name: Option[String] = None, pid: Option[String] = None)
+  case class NamespacedUuidDetails(extendedUuid: NamespacedUuid, name: Option[String] = None, pid: Option[Int] = None)
 }
 
 case object AlarmExclusions {
@@ -135,9 +127,11 @@ case class PpmDefinition[DataShape](
   }
 
   //process name and pid/uuid
-  def getProcessDetailsFromAlarm(a:Alarm, setNamespacedUuidDetails:Set[NamespacedUuidDetails], timestamp:Long):ProcessDetails = {
-    name match {
-      case default => ProcessDetails("Unknown Process", Some(0))
+  def getProcessDetailsFromAlarm(setNamespacedUuidDetails: Set[NamespacedUuidDetails]): Set[ProcessDetails] = {
+    setNamespacedUuidDetails.filter { d =>
+      d.pid.isDefined && d.name.isDefined
+    }.map { d =>
+      ProcessDetails(d.name.get, d.pid)
     }
   }
 
@@ -158,9 +152,9 @@ case class PpmDefinition[DataShape](
 
       def thresholdAllows: Boolean = ! ( (a._1.last.localProb > localProbThreshold) && shouldApplyThreshold )
 
-      val processDetails = (getProcessDetailsFromAlarm _).tupled(a)
+      val processDetails = getProcessDetailsFromAlarm(setNamespacedUuidDetails)
       //report the alarm
-      if (thresholdAllows) AlarmReporter.report(this.name, this.hostName, newAlarm, Set(processDetails), localProbThreshold)
+      if (thresholdAllows) AlarmReporter.report(this.name, this.hostName, newAlarm, processDetails, localProbThreshold)
     }
   }
 
@@ -543,7 +537,15 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
 }
 
 
-class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor =>
+class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends Actor with ActorLogging { thisActor =>
+
+  val (pathDelimiterRegexPattern, pathDelimiterChar) = if (isWindows) ("""\\""", """\""") else ("""/""" ,   "/")
+  val sudoOrPowershellComparison: String => Boolean = if (isWindows) {
+    _.toLowerCase.contains("powershell")
+  } else {
+    _.toLowerCase == "sudo"
+  }
+
   import NoveltyDetection._
 
   val cdmSanityTrees = List(
@@ -560,7 +562,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
           }
         })
       ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Event].uuid, Application.instrumentationSource))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Event].uuid, source))),
       _.asInstanceOf[cdm18.Event].timestampNanos,
       shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
@@ -578,7 +580,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
           }
         })
       ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Subject].uuid, Application.instrumentationSource))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Subject].uuid, source))),
       _ => 0L,
       shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
@@ -595,7 +597,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
           }
         })
       ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.NetFlowObject].uuid, Application.instrumentationSource))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.NetFlowObject].uuid, source))),
       _ => 0L,
       shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName)
@@ -613,7 +615,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
           }
         })
       ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.FileObject].uuid, Application.instrumentationSource))),
+      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.FileObject].uuid, source))),
       _ => 0L,
       shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName)
@@ -665,7 +667,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-               NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid.toString)),
+               NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid)),
                NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
@@ -680,7 +682,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
@@ -695,12 +697,12 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
-      shouldApplyThreshold = true
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "ProcessesWithNetworkActivity",
@@ -713,7 +715,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         }
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress.getOrElse("no_address_from_CDM")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
@@ -731,7 +733,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         }}.getOrElse(List("<no_file_path_node>")).dropRight(1)
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
@@ -746,12 +748,12 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d => List(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}"))
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
-      shouldApplyThreshold = true
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "SudoIsAsSudoDoes",
@@ -776,8 +778,11 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         d._2._2.map(_.path).getOrElse("<no_path>")   // Child process second
       )),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.get.path)),
-        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.get.path))) ++
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.get.path),Some(d._2._1.cid)),
+        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.get.path), d._3._1 match {
+          case o: AdmSubject => Some(o.cid)
+          case _ => None
+        })) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
@@ -853,12 +858,12 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         )
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
-      shouldApplyThreshold = true
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName) with PartialPpm[String] {
 
       def getJoinCondition(observation: DataShape) =
@@ -888,12 +893,12 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         )
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
-      shouldApplyThreshold = true
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName) with PartialPpm[String] {
 
       def getJoinCondition(observation: DataShape) =
@@ -931,7 +936,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         )
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
           d._3._1 match {
             case o: AdmSrcSinkObject => s" : ${o.srcSinkType}"
@@ -978,7 +983,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         )
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path).getOrElse("AdmNetFlow")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
@@ -1031,7 +1036,7 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
       ),
       d => Set(
         NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid, d._2._2.map(_.path), Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._2._1.uuid, d._2._2.map(_.path), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid, d._3._2.map(_.path))
       ) ++ d._2._2.map(n => NamespacedUuidDetails(n.uuid, Some(n.path), None)).toSet,
 //        ++ d._3._2.map(n => NamespacedUuidDetails(n.uuid, Some(n.path), None)).toSet,  // Don't need/will never be a path node from a netflow.
@@ -1064,14 +1069,19 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
         )
       }.toOption
 
-      val partialMap2 = mutable.Map.empty[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]]
+      var partialMap2 = Map.empty[HostName, mutable.Map[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]]]
 
       override def observe(observation: PartialShape): Unit = if (incomingFilter(observation)) {
         getJoinCondition(observation) match {
           case None => log.error(s"Something unexpected passed the filter for CrossHostProcessCommunication: $observation")
           case Some(joinValue) =>
 
-            val previousSameDirObservations = partialMap2.getOrElse(joinValue, Map.empty[List[ExtractedValue], Set[NamespacedUuidDetails]])
+            val existingThisHost = partialMap2.getOrElse(observation._1.hostName, mutable.Map.empty[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]])
+            if ( ! partialMap2.contains(observation._2._1.hostName)) partialMap2 = partialMap2 + (observation._2._1.hostName -> existingThisHost)
+            val existingOtherHosts = (partialMap2 - observation._1.hostName).values
+              .foldLeft[Map[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]]](Map.empty)(_ ++ _)
+
+            val previousSameDirObservations = existingThisHost.getOrElse(joinValue, Map.empty[List[ExtractedValue], Set[NamespacedUuidDetails]])
             val observedIds = uuidCollector(observation)
 
             val sendRecOpt = joinValue.sendRec match {
@@ -1080,15 +1090,15 @@ class PpmManager(hostName: HostName) extends Actor with ActorLogging { thisActor
                 val theseIds = previousSameDirObservations.get(theseDiscs).fold(observedIds) { previousIds => observedIds ++ previousIds }
                 val thisSendObs = Map(theseDiscs -> theseIds)
                 val allSendObs = previousSameDirObservations ++ thisSendObs
-                partialMap2(joinValue) = allSendObs
-                partialMap2.get(joinValue.invert).map(thisSendObs -> _)
+                existingThisHost(joinValue) = allSendObs  // Update mutable Map in place
+                existingOtherHosts.get(joinValue.invert).map(thisSendObs -> _)
               case Receiving =>
                 val theseDiscs = discriminators(1)(observation)
                 val theseIds = previousSameDirObservations.get(theseDiscs).fold(observedIds) { previousIds => observedIds ++ previousIds }
                 val thisRecObs = Map(theseDiscs -> theseIds)
                 val allRecObs = previousSameDirObservations ++ thisRecObs
-                partialMap2(joinValue) = allRecObs
-                partialMap2.get(joinValue.invert).map(_ -> thisRecObs)
+                existingThisHost(joinValue) = allRecObs  // Update mutable Map in place
+                existingOtherHosts.get(joinValue.invert).map(_ -> thisRecObs)
             }
 
             sendRecOpt.foreach { obs =>
