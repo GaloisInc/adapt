@@ -109,12 +109,20 @@ case object Message{
     )
   }
 
-  def summaryMessagefromAnAlarm(treeRepr:String, runID: String):Message = {
+  def summaryMessagefromAnAlarm(m:String, runID: String):Message = {
 
     Message(
-      DetailedAlarmData(treeRepr),
-      MetaData(runID, "summary"))
+      DetailedAlarmData(m),
+      MetaData(runID, "detailed"))
   }
+
+  def novelMessagefromAnAlarm(m:String, runID: String):Message = {
+
+    Message(
+      DetailedAlarmData(m),
+      MetaData(runID, "novel"))
+  }
+
 }
 
 // alarm cateogories: realtime, batched summaries: Process name+pid,batched summaries: Process name
@@ -152,14 +160,28 @@ class AlarmReporterActor(runID:String, maxbufferlength:Long, splunkHecClient:Spl
     case SendConciseAlarm(a) => reportSplunk(List(Message.conciseMessagefromAnAlarm(a, runID, genAlarmID())))
   }
 
+  //todo: verify any truncation of alarms and ... in the treeRepr.toString
   def generateSummaryAndSend = {
 
     val summariesF: Set[Future[String]] = processRefSet.map{ processDetails =>
-      {PpmSummarizer.summarize(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map(_.toString)}
+      {
+        PpmSummarizer.summarize(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map(_.readableString)
+      }
+    }
+    val mostNovelF: Set[Future[List[String]]] = processRefSet.map{ processDetails =>
+      {
+        PpmSummarizer.mostNovelActions(20, processDetails.processName, processDetails.hostName, processDetails.pid)
+      }
     }
 
-    val messages: Set[Future[Message]] = summariesF.map{_.map{ s => Message.summaryMessagefromAnAlarm(s, runID)}}
-    Future.sequence(messages).map(m => reportSplunk(m.toList))
+    val detailedMessages: Set[Future[Message]] = summariesF.map{_.map{s => Message.summaryMessagefromAnAlarm(s, runID)}}
+    Future.sequence(detailedMessages).map(m => reportSplunk(m.toList))
+
+    val novelMessages: Set[Future[Message]] = mostNovelF.map{_.map{ nm => Message.summaryMessagefromAnAlarm(nm.toString, runID)}}
+    Future.sequence(novelMessages).map(m => reportSplunk(m.toList))
+
+
+    //todo: deletes the set without checking if the reportSplunk succeeded. Add error handling above
     processRefSet = Set.empty
   }
 
