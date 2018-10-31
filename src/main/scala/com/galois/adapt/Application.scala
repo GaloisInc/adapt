@@ -249,6 +249,9 @@ object Application extends App {
     Await.result(httpServer, 10 seconds)
   }
 
+  //instantiate AlarmReporter actor
+  AlarmReporter
+
   runFlow match {
 
     case "accept" =>

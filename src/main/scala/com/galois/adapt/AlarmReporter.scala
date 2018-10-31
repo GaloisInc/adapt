@@ -178,8 +178,6 @@ class AlarmReporterActor(runID:String, maxbufferlength:Long, splunkHecClient:Spl
   //todo: handle <no_subject_path_node>
   //todo: Should we generate summaries with and without pid?
 
-
-  //todo: full tree.readablestring
   def generateSummaryAndSend = {
 
     val summariesF: Set[(ProcessDetails, Future[String])] = processRefSet.map{ processDetails =>
@@ -197,17 +195,17 @@ class AlarmReporterActor(runID:String, maxbufferlength:Long, splunkHecClient:Spl
     val mostNovelF: Set[(ProcessDetails, Future[String])] = processRefSet.map{ processDetails =>
       {
         val l: Future[List[String]] = PpmSummarizer.mostNovelActions(20, processDetails.processName, processDetails.hostName, processDetails.pid)
-        (processDetails,l.map(_.reduce(_ + "\n" + _)))
+        (processDetails,l.map(_.fold("")(_ + "\n" + _)))
       }
     }
 
     val summaryMessages: Set[Future[Message]] = summariesF.map{case (p,sf) => sf.map{s => Message.summaryMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, s, runID)}}
     Future.sequence(summaryMessages).map(m => reportSplunk(m.toList))
 
-    val activityMessages:Set[Future[Message]] = completeTreeRepr.map{case (p,sf) => sf.map{s => Message.activityMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, s, runID)}}
+    val activityMessages:Set[Future[Message]] = completeTreeRepr.map{case (p,af) => af.map{a => Message.activityMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, a, runID)}}
     Future.sequence(activityMessages).map(m => reportSplunk(m.toList))
 
-    val novelMessages: Set[Future[Message]] = mostNovelF.map{case (p, nmf) => nmf.map{nm => Message.novelMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, nm, runID)}}
+    val novelMessages: Set[Future[Message]] = mostNovelF.map{case (p,nmf) => nmf.map{nm => Message.novelMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, nm, runID)}}
     Future.sequence(novelMessages).map(m => reportSplunk(m.toList))
 
 
@@ -249,7 +247,6 @@ case class ReceivedAlarm(
 object AlarmReporter extends LazyLogging {
   implicit val executionContext = system.dispatcher
 
-  //todo: get this from ???
   val runID = Application.randomIdentifier
   val alarmConfig: AdaptConfig.AlarmsConfig = AdaptConfig.alarmConfig
   val splunkConfig = AdaptConfig.alarmConfig.splunk
