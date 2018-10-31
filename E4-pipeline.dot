@@ -1,0 +1,36 @@
+digraph E4 {
+  splines=true
+  edge [ fontcolor=blue, fontsize=10 ];
+
+  "Host 1" -> "ER 1" [label="[Host 1] before ER"]
+  "Host 2" -> "ER 2" [label="[Host 2] before ER"]
+  "Host 3" -> "ER 3" [label="[Host 3] before ER"]
+
+  fork1 [label="", shape=point]
+  fork2 [label="", shape=point]
+  fork3 [label="", shape=point]
+
+  "ER 1" -> fork1 [label="[Host 1] after ER"]
+  "ER 2" -> fork2 [label="[Host 2] after ER"]
+  "ER 3" -> fork3 [label="[Host 3] after ER"]
+
+  fork1 -> "PPM accumulator 1" [label="[Host 1] before PPM state accumulator"]
+  fork2 -> "PPM accumulator 2" [label="[Host 2] before PPM state accumulator"]
+  fork3 -> "PPM accumulator 3" [label="[Host 3] before PPM state accumulator"]
+
+  "PPM accumulator 1" -> "PPM sink 1" [label="[Host 1] before PPM sink"]
+  "PPM accumulator 2" -> "PPM sink 2" [label="[Host 2] before PPM sink"]
+  "PPM accumulator 3" -> "PPM sink 3" [label="[Host 3] before PPM sink"]
+
+  fork1 -> "ADM merge" [label="[Host 1] before ADM merge"]
+  fork2 -> "ADM merge" [label="[Host 2] before ADM merge"]
+  fork3 -> "ADM merge" [label="[Host 3] before ADM merge"]
+
+  fork4 [label="", shape=point]
+
+  "ADM merge" -> "Deduplicate" [label="after ADM merge"]
+  "Deduplicate" -> fork4 [label="after cross-host deduplicate"]
+  fork4 -> "PPM accumulator" [label="before cross-host PPM state accumulator"]
+  "PPM accumulator" -> "PPM sink" [label="before cross-host PPM sink"]
+  fork4 -> "Neo4j" [label="before DB sink"]
+}

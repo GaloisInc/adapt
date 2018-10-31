@@ -616,7 +616,7 @@ package object adm {
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
 
-      "hostname" -> hostName,
+      "hostName" -> hostName,
       "hostIdentifiers" -> hostIdentifiers.map(_.toString).mkString(";"),
       "hostType" -> hostType.toString,
       "interfaces" -> interfaces.map(_.toString).mkString(";"),
@@ -628,7 +628,7 @@ package object adm {
 
     def toMap = Map(
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
-      "hostname" -> hostName,
+      "hostName" -> hostName,
       "hostIdentifiers" -> hostIdentifiers.map(_.toString).mkString(";"),
       "osDetails" -> osDetails,
       "hostType" -> hostType.toString,
