@@ -194,9 +194,10 @@ class AlarmReporterActor(runID:String, maxbufferlength:Long, splunkHecClient:Spl
       }
     }
 
-    val mostNovelF: Set[(ProcessDetails, Future[List[String]])] = processRefSet.map{ processDetails =>
+    val mostNovelF: Set[(ProcessDetails, Future[String])] = processRefSet.map{ processDetails =>
       {
-        (processDetails,PpmSummarizer.mostNovelActions(20, processDetails.processName, processDetails.hostName, processDetails.pid))
+        val l: Future[List[String]] = PpmSummarizer.mostNovelActions(20, processDetails.processName, processDetails.hostName, processDetails.pid)
+        (processDetails,l.map(_.reduce(_ + "\n" + _)))
       }
     }
 
@@ -206,7 +207,7 @@ class AlarmReporterActor(runID:String, maxbufferlength:Long, splunkHecClient:Spl
     val activityMessages:Set[Future[Message]] = completeTreeRepr.map{case (p,sf) => sf.map{s => Message.activityMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, s, runID)}}
     Future.sequence(activityMessages).map(m => reportSplunk(m.toList))
 
-    val novelMessages: Set[Future[Message]] = mostNovelF.map{case (p, nmf) => nmf.map{nm => Message.novelMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, nm.toString, runID)}}
+    val novelMessages: Set[Future[Message]] = mostNovelF.map{case (p, nmf) => nmf.map{nm => Message.novelMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, nm, runID)}}
     Future.sequence(novelMessages).map(m => reportSplunk(m.toList))
 
 
