@@ -168,6 +168,12 @@ object PpmSummarizer {
       .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{r => summarize(r.repr) }
   }
 
+  def fullTree(processName: String, hostName: Option[HostName], pid: Option[Int]): Future[TreeRepr] = {
+    implicit val timeout = Timeout(30 seconds)
+    (Application.ppmManagerActors(hostName.getOrElse(Application.hostNameForAllHosts)) ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList))
+      .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{r => r.repr }
+  }
+
   def summarizableProcesses: Future[Map[HostName, TreeRepr]] = {
     implicit val timeout = Timeout(30 seconds)
     Future.sequence(
