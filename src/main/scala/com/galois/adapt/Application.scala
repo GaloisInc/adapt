@@ -139,7 +139,12 @@ object Application extends App {
 
   val seenEdgesMaps: Map[HostName, Array[AlmostSet[EdgeAdm2Adm]]] = mapProxy.seenEdgesShardsMap
   val seenNodesMaps: Map[HostName, Array[AlmostSet[AdmUUID]]] = mapProxy.seenNodesShardsMap
-  val shardCount: Array[Int] = Array.fill(admConfig.uuidRemapperShards)(0)
+  val uuidRemapperShardCounts: Map[HostName, Array[Long]] = hostNames.map(
+    _ -> Array.fill(admConfig.uuidRemapperShards)(0L)
+  ).toMap
+  val dedupShardCounts: Map[HostName, Array[Long]] = (hostNameForAllHosts :: hostNames).map(
+    _ -> Array.fill(admConfig.uuidRemapperShards)(0L)
+  ).toMap
 
   // Mutable state that gets updated during ingestion
   var failedStatements: List[(Int, String)] = Nil
@@ -166,10 +171,11 @@ object Application extends App {
         cdm2cdmMaps(host.hostName),
         cdm2admMaps(host.hostName),
         blockedEdgesMaps(host.hostName),
-        shardCount,
+        uuidRemapperShardCounts(host.hostName),
         log,
         seenNodesMaps(host.hostName),
-        seenEdgesMaps(host.hostName)
+        seenEdgesMaps(host.hostName),
+        dedupShardCounts(host.hostName)
       )
     }.toMap
   }
@@ -179,7 +185,8 @@ object Application extends App {
     DeduplicateNodesAndEdges.apply(
       admConfig.uuidRemapperShards,
       seenNodesMaps(hostNameForAllHosts),
-      seenEdgesMaps(hostNameForAllHosts)
+      seenEdgesMaps(hostNameForAllHosts),
+      dedupShardCounts(hostNameForAllHosts)
     )
   }
 

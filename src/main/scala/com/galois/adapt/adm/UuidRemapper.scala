@@ -74,7 +74,7 @@ object UuidRemapper {
       cdm2cdms: Array[AlmostMap[CdmUUID, CdmUUID]],  // Mapping for CDM uuids that have been mapped onto other CDM uuids
       cdm2adms: Array[AlmostMap[CdmUUID, AdmUUID]],  // Mapping for CDM uuids that have been mapped onto ADM uuids
       blockedEdges: Array[mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])]],
-      shardCount: Array[Int],
+      shardCount: Array[Long],
 
       ignoreEvents: Boolean,
       log: LoggingAdapter,

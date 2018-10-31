@@ -6,11 +6,16 @@ import akka.NotUsed
 import akka.stream.{FlowShape, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, GraphDSL, Merge, MergePreferred, Partition}
 import com.galois.adapt.MapSetUtils.AlmostSet
-import com.galois.adapt.adm.EntityResolution.{blockedEdgesCount, blockingNodes}
+import scala.collection.mutable.{Set => MutableSet}
 
 import scala.collection.mutable.{Map => MutableMap}
 
 object DeduplicateNodesAndEdges {
+
+  // This is just for logging state held onto by `deduplicate` - these values are not crucial to the deduplicate
+  // functionality (check out where they are used)
+  var blockedEdgesCount: Long = 0
+  val blockingNodes: MutableSet[UUID] = MutableSet.empty[UUID]
 
   type OrderAndDedupFlow = Flow[Either[ADM, EdgeAdm2Adm], Either[ADM, EdgeAdm2Adm], NotUsed]
 
@@ -18,11 +23,12 @@ object DeduplicateNodesAndEdges {
       numShards: Int,
 
       seenNodesSets: Array[AlmostSet[AdmUUID]],
-      seenEdgesSets: Array[AlmostSet[EdgeAdm2Adm]]
+      seenEdgesSets: Array[AlmostSet[EdgeAdm2Adm]],
+      deduplicateShardCount: Array[Long]
   ): OrderAndDedupFlow = if (numShards == 0) {
     DeduplicateNodesAndEdges.unsharded(seenNodesSets(0), seenEdgesSets(0))
   } else {
-    DeduplicateNodesAndEdges.sharded(numShards, seenNodesSets, seenEdgesSets)
+    DeduplicateNodesAndEdges.sharded(numShards, seenNodesSets, seenEdgesSets, deduplicateShardCount)
   }
 
 
@@ -57,7 +63,9 @@ object DeduplicateNodesAndEdges {
       numShards: Int,
 
       seenNodesMaps: Array[AlmostSet[AdmUUID]],
-      seenEdgesMaps: Array[AlmostSet[EdgeAdm2Adm]]
+      seenEdgesMaps: Array[AlmostSet[EdgeAdm2Adm]],
+
+      deduplicateShardCount: Array[Long]
   ): OrderAndDedupFlow = Flow.fromGraph[Either[ADM, EdgeAdm2Adm], Either[ADM, EdgeAdm2Adm], NotUsed](GraphDSL.create() {
     implicit b =>
     import GraphDSL.Implicits._
@@ -100,6 +108,7 @@ object DeduplicateNodesAndEdges {
 
     for (i <- 0 until numShards) {
       partitionShards.out(i) ~>
+        Flow.fromFunction[Either[ADM, EdgeEndpointCheck], Either[ADM, EdgeEndpointCheck]](x => { deduplicateShardCount(i) += 1; x }) ~>
         oneShard(seenNodesMaps(i), seenEdgesMaps(i), MutableMap.empty) ~>
         mergeShards.in(i)
     }
