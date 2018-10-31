@@ -111,11 +111,6 @@ case object Message{
     summaries.map { summary =>
       summary.map { tree =>
         val s = tree.toString(0)
-
-        //if (alarmConfig.logging.enabled) reportLog(a, summary);
-        //      if (alarmConfig.console.enabled) reportConsole(key.fold(treeStr)(_ + _));
-        //if (alarmConfig.splunk.enabled) reportSplunk(a, summary);
-        //if (alarmConfig.gui.enabled) collectAlarms(a, summary);
       }
     }
     Message(
@@ -124,7 +119,6 @@ case object Message{
   }
 
   def summaryMessagefromAnAlarm(treeName:String, a: AnAlarm, processDetails:ProcessDetails, runID: String):Message = {
-    //key
     val key: List[String] = a.key
     //details:(timestamp, System.currentTimeMillis, alarm, setNamespacedUuidDetails, Map.empty[String,Int]): (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])
     val ppmTreeNodeAlarms: List[NoveltyDetection.PpmTreeNodeAlarm] = a.details._3
@@ -132,11 +126,6 @@ case object Message{
     val summary: Future[TreeRepr] = PpmSummarizer.summarize(processDetails.processName, None, processDetails.pid)
     summary.map{tree =>
       val s = tree.toString(0)
-
-      //if (alarmConfig.logging.enabled) reportLog(a, summary);
-      //      if (alarmConfig.console.enabled) reportConsole(key.fold(treeStr)(_ + _));
-      //if (alarmConfig.splunk.enabled) reportSplunk(a, summary);
-      //if (alarmConfig.gui.enabled) collectAlarms(a, summary);
     }
     Message(
       DetailedAlarmData(""),
@@ -144,18 +133,16 @@ case object Message{
   }
 }
 
-
-
-//topic name
 // alarm cateogories: realtime, batched summaries: Process name+pid,batched summaries: Process name
-//experiment prefix [run number]
-//summarized for process and summarized for process /\ pid
+// summarized for process and summarized for process /\ pid
 // sometimes the processname is <unnamed>, handle that!
 
 
 /*
 * Valid Messages for the AlarmReporterActor
-* */
+*
+*/
+
 // Adds a concise alarm to the buffer
 case class AddConciseAlarm(a: Message)
 // Skip the concise alarm alarm buffer and send the message
@@ -169,8 +156,6 @@ case object SendDetailedMessages
 //todo: Make this an object??
 class AlarmReporterActor(maxBufferLen:Int, splunkHecClient:SplunkHecClient, alarmConfig: AdaptConfig.AlarmsConfig) extends Actor with ActorLogging{
   implicit val executionContext = Application.system.dispatcher
-  //val log: LoggingAdapter = Logging.getLogger(system, logSource = this)
-
   var alarmSummaryBuffer:List[Message] = List.empty[Message]
 
   def receive = {
