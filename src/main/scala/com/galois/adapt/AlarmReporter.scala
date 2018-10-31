@@ -204,7 +204,7 @@ class AlarmReporterActor(runID:String, maxbufferlength:Long, splunkHecClient:Spl
     Future.sequence(summaryMessages).map(m => reportSplunk(m.toList))
 
     val activityMessages:Set[Future[Message]] = completeTreeRepr.map{case (p,sf) => sf.map{s => Message.activityMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, s, runID)}}
-    Future.sequence(summaryMessages).map(m => reportSplunk(m.toList))
+    Future.sequence(activityMessages).map(m => reportSplunk(m.toList))
 
     val novelMessages: Set[Future[Message]] = mostNovelF.map{case (p, nmf) => nmf.map{nm => Message.novelMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, nm.toString, runID)}}
     Future.sequence(novelMessages).map(m => reportSplunk(m.toList))
