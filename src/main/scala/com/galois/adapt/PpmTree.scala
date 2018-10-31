@@ -25,6 +25,7 @@ import AdaptConfig._
 import Application.hostNameForAllHosts
 import spray.json._
 import ApiJsonProtocol._
+import scala.annotation.tailrec
 
 //type AnAlarm = (List[String], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
 case class AnAlarm (key:List[String], details:(Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
@@ -55,7 +56,7 @@ object NoveltyDetection {
 
 case object AlarmExclusions {
   val cadets = Set("ld-elf.so.1", "local", "bounce", "master", "pkg", "top", "mlock", "cleanup", "qmgr", "smtpd", "trivial-rewrite", "head")
-  val clearscope = Set("system_server", "proc", "com.android.email", "com.android.inputmethod.latin", "com.android.browser", "com.android.camera2", "com.android.launcher3", "com.android.smspush", "com.android.quicksearchbox", "com.android.gallery3d", "android.process.media", "com.android.music")
+  val clearscope = Set("system_server", "proc", "com.android.inputmethod.latin", "com.android.camera2", "com.android.launcher3", "com.android.smspush", "com.android.quicksearchbox", "com.android.gallery3d", "android.process.media", "com.android.music")
   val fivedirections = Set("\\windows\\system32\\svchost.exe", "\\program files\\tightvnc\\tvnserver.exe", "mscorsvw.exe")
   val marple= Set()
   val theia = Set("qt-opensource-linux-x64-5.10.1.run", "/usr/lib/postgresql/9.1/bin/postgres", "whoopsie", "Qt5.10.1", "5.10.1", "/bin/dbus-daemon", "/usr/sbin/console-kit-daemon")
@@ -766,7 +767,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
-      shouldApplyThreshold = true
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "ParentChildProcesses",
@@ -810,7 +811,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
-      shouldApplyThreshold = true,
+      shouldApplyThreshold = false,
       alarmFilter = _ => false
     )(thisActor.context, context.self, hostName)
 
@@ -1234,7 +1235,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
       ).failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
 
 
-      sender() ! Ack
+//      sender() ! Ack
 
 
     case (_, cdm: CurrentCdm) =>
@@ -1396,6 +1397,11 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
       children.toList.sortBy(r => 1F - r.localProb).par.map(_.toString(passedDepth + 1)).mkString("\n", "", "")
   }
 
+  def readableString: String = simpleStrings(-1).drop(1).mkString("\n")
+  def simpleStrings(passedDepth: Int = 0): List[String] =
+    s"${(0 until (4 * passedDepth)).map(_ => " ").mkString("") + (if (children.isEmpty) s"- ${count} count${if (count>=2)"s"} of:" else "with:")} $key" ::
+      children.toList.sortBy(r => 1F - r.localProb).flatMap(_.simpleStrings(passedDepth + 1))
+
   def toFlat: List[(Int, ExtractedValue, Float, Float, Int)] = (depth, key, localProb, globalProb, count) :: children.toList.flatMap(_.toFlat)
 
   def writeToFile(filePath: String): Unit = {
@@ -1410,8 +1416,11 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
 
   // Combinators for summarization:
 
-  def leafNodes: List[(List[ExtractedValue], Float, Float, Int)] = {
-    def leafNodesRec(children: Set[TreeRepr], nameAcc: List[ExtractedValue] = Nil): List[(List[ExtractedValue], Float, Float, Int)] =
+  type LocalProb = Float
+  type GlobalProb = Float
+
+  def leafNodes: List[(List[ExtractedValue], LocalProb, GlobalProb, Int)] = {
+    def leafNodesRec(children: Set[TreeRepr], nameAcc: List[ExtractedValue] = Nil): List[(List[ExtractedValue], LocalProb, GlobalProb, Int)] =
       children.toList.flatMap {
         case TreeRepr(_, nextKey, lp, gp, cnt, c) if c.isEmpty => List((nameAcc :+ nextKey, lp, gp, cnt))
         case next => leafNodesRec(next.children, nameAcc :+ next.key)
@@ -1430,6 +1439,11 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
       case (childAcc, newChild) => childAcc.find(_.key == newChild.key).fold(childAcc + newChild){ case existingChild => (childAcc - existingChild) + existingChild.merge(newChild)} }
     this.copy(count = count + other.count, children = newChildren)
   }
+
+  def mergeAndEliminateChildren(atDepth: Int = 1): TreeRepr =
+    if (depth <= 0) this
+    else if (depth == 1) this.copy(children = children.foldLeft(TreeRepr.empty){case (a,b) => b.merge(a, true)}.children)
+    else this.copy(children = children.map(_.mergeAndEliminateChildren(depth - 1)))
 
   def withoutQNodes: TreeRepr = this.copy(children = this.children.collect{ case c if c.key != "_?_" => c.withoutQNodes } )
 
@@ -1452,7 +1466,7 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
     renormalizeProbabilities(this)
   }
 
-  type PpmElement = (List[ExtractedValue], Float, Float, Int)
+  type PpmElement = (List[ExtractedValue], LocalProb, GlobalProb, Int)
 
   def extractMostNovel: (PpmElement, TreeRepr) = {
     def findMostNovel(repr: TreeRepr): PpmElement = repr.leafNodes.minBy(_._2)
@@ -1474,6 +1488,32 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
     val mostNovel = findMostNovel(this)
     mostNovel -> subtractMostNovel(this, mostNovel._1, mostNovel._4).renormalizeProbs()
   }
+
+  @tailrec
+  final def extractMostNovel(count: Int = 1, acc: List[PpmElement] = Nil): List[PpmElement] =
+    Try(this.extractMostNovel) match {
+      case Failure(_) => acc.reverse
+      case Success(_) if count == 0 => acc.reverse
+      case Success((novel, next)) => next.extractMostNovel(count - 1, novel :: acc)
+    }
+
+  @tailrec
+  final def extractBelowLocalProb(localProbThreshold: Float, acc: List[PpmElement] = Nil): List[PpmElement] =
+    Try(this.extractMostNovel) match {
+      case Failure(_) => acc.reverse
+      case Success(_) if localProb > localProbThreshold => acc.reverse
+      case Success((novel, next)) => next.extractBelowLocalProb(localProbThreshold, novel :: acc)
+    }
+
+  @tailrec
+  final def extractBelowGlobalProb(globalProbThreshold: Float, acc: List[PpmElement] = Nil): List[PpmElement] =
+    Try(this.extractMostNovel) match {
+      case Failure(_) => acc.reverse
+      case Success(_) if globalProb > globalProbThreshold => acc.reverse
+      case Success((novel, next)) => next.extractBelowGlobalProb(globalProbThreshold, novel :: acc)
+    }
+
+  def mostNovelKeys(count: Int = 1, delimiter: String = " ∫ "): List[String] = extractMostNovel(count).map(_._1.mkString(delimiter))
 }
 
 case object TreeRepr {

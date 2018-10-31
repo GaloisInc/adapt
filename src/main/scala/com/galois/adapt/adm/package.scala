@@ -387,7 +387,8 @@ package object adm {
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
-      "fileObjectType" -> fileObjectType.toString
+      "fileObjectType" -> fileObjectType.toString,
+      "hostName" -> hostName
     ) ++
       size.fold[List[(String,Any)]](Nil)(v => List("size" -> v)) ++
       (if (provider.isEmpty) { Nil } else { List("provider" -> provider) })
@@ -396,7 +397,8 @@ package object adm {
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
       "fileObjectType" -> fileObjectType.toString,
       "size" -> size.getOrElse(""),
-      "provider" -> provider
+      "provider" -> provider,
+      "hostName" -> hostName
     )
   }
 
@@ -506,14 +508,16 @@ package object adm {
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
-      "srcSinkType" -> srcSinkType.toString
+      "srcSinkType" -> srcSinkType.toString,
+      "hostName" -> hostName
     ) ++
       (if (provider.isEmpty) { Nil } else { List("provider" -> provider) })
 
     def toMap = Map(
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
       "srcSinkType" -> srcSinkType.toString,
-      "provider" -> provider
+      "provider" -> provider,
+      "hostName" -> hostName
     )
   }
 
@@ -546,7 +550,8 @@ package object adm {
       "uuid" -> uuid.uuid,
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
       "userId" -> userId,
-      "principalType" -> principalType.toString
+      "principalType" -> principalType.toString,
+      "hostName" -> hostName
     ) ++
       (if (groupIds.nonEmpty) List("groupIds" -> groupIds.mkString(",")) else Nil) ++
       username.fold[List[(String,Any)]](Nil)(v => List("username" -> v)) ++
@@ -558,7 +563,8 @@ package object adm {
       "principalType" -> principalType,
       "groupIds" -> groupIds.toList.sorted.mkString(";"),
       "username" -> username.getOrElse(""),
-      "provider" -> provider
+      "provider" -> provider,
+      "hostName" -> hostName
     )
   }
 
@@ -584,7 +590,8 @@ package object adm {
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
-      "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";")
+      "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
+      "hostName" -> hostName
     ) ++
       programPoint.fold[List[(String,Any)]](Nil)(p => List("programPoint" -> p)) ++
       (if (provider.isEmpty) { Nil } else { List("provider" -> provider) })
@@ -593,7 +600,8 @@ package object adm {
     def toMap = Map(
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
       "programPoint" -> programPoint.getOrElse(""),
-      "provider" -> provider
+      "provider" -> provider,
+      "hostName" -> hostName
     )
   }
 
@@ -616,7 +624,7 @@ package object adm {
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
 
-      "hostname" -> hostName,
+      "hostName" -> hostName,
       "hostIdentifiers" -> hostIdentifiers.map(_.toString).mkString(";"),
       "hostType" -> hostType.toString,
       "interfaces" -> interfaces.map(_.toString).mkString(";"),
@@ -628,7 +636,7 @@ package object adm {
 
     def toMap = Map(
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
-      "hostname" -> hostName,
+      "hostName" -> hostName,
       "hostIdentifiers" -> hostIdentifiers.map(_.toString).mkString(";"),
       "osDetails" -> osDetails,
       "hostType" -> hostType.toString,
