@@ -51,21 +51,61 @@ object UuidRemapper {
    * Sharded variant                                                                     *
    ***************************************************************************************/
 
+  private def uuidPartition1(u: UUID): Int =
+    Math.abs(u.getLeastSignificantBits * 7 ^ u.getMostSignificantBits * 31).intValue()
+
+  private def uuidPartition2(uuid: UUID): Int = {
+
+    val msb = uuid.getMostSignificantBits
+    val lsb = uuid.getLeastSignificantBits
+
+    val buf: Array[Long] = Array(
+      (msb >> 56) & 0xff,
+      (msb >> 48) & 0xff,
+      (msb >> 40) & 0xff,
+      (msb >> 32) & 0xff,
+      (msb >> 24) & 0xff,
+      (msb >> 16) & 0xff,
+      (msb >>  8) & 0xff,
+      (msb >>  0) & 0xff,
+
+      (lsb >> 56) & 0xff,
+      (lsb >> 48) & 0xff,
+      (lsb >> 40) & 0xff,
+      (lsb >> 32) & 0xff,
+      (lsb >> 24) & 0xff,
+      (lsb >> 16) & 0xff,
+      (lsb >>  8) & 0xff,
+      (lsb >>  0) & 0xff
+    )
+
+    var crc: Long = 0xFFFF
+    for (pos <- 0 until 16) {
+      crc ^= buf(pos)
+
+      for (i <- 0 until 8) {
+        if ((crc & 0x0001) != 0) {
+          crc >>= 1
+          crc ^= 0xA001
+        } else {
+          crc >>= 1
+        }
+      }
+    }
+
+    crc.intValue()
+  }
+
   // Figure out which shard a piece of info should be routed to
   def partitioner(numShards: Int): UuidRemapperInfo => Int = {
-    def uuidPartition(u: UUID): Int =
-      (Math.abs(u.getLeastSignificantBits * 7 + u.getMostSignificantBits * 31) % numShards).intValue()
-
-    {
-      case AnAdm(adm) => uuidPartition(adm.uuid.uuid)
-      case AnEdge(EdgeCdm2Cdm(src, _, _)) => uuidPartition(src.uuid)
-      case AnEdge(EdgeCdm2Adm(src, _, _)) => uuidPartition(src.uuid)
-      case AnEdge(EdgeAdm2Cdm(_, _, tgt)) => uuidPartition(tgt.uuid)
-      case AnEdge(EdgeAdm2Adm(src, _, _)) => uuidPartition(src.uuid)
-      case CdmMerge(cdm, _) => uuidPartition(cdm.uuid)
-      case Cdm2Adm(cdm, _) => uuidPartition(cdm.uuid)
-      case JustTime => 0 // doesn't matter what this is
-    }
+    case AnAdm(adm) => uuidPartition2(adm.uuid.uuid) % numShards
+    case AnEdge(EdgeCdm2Cdm(src, _, _)) => uuidPartition2(src.uuid) % numShards
+    case AnEdge(EdgeCdm2Adm(src, _, _)) => uuidPartition2(src.uuid) % numShards
+    case AnEdge(EdgeAdm2Cdm(_, _, tgt)) => uuidPartition2(tgt.uuid) % numShards
+    case AnEdge(EdgeAdm2Adm(src, _, _)) => uuidPartition2(src.uuid) % numShards
+    case CdmMerge(cdm, _) => uuidPartition2(cdm.uuid) % numShards
+    case Cdm2Adm(cdm, _) => uuidPartition2(cdm.uuid) % numShards
+    case JustTime => 0 // doesn't matter what this is
   }
 
   def sharded(
