@@ -1232,7 +1232,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
       ).failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
 
 
-      sender() ! Ack
+//      sender() ! Ack
 
 
     case (_, cdm: CurrentCdm) =>

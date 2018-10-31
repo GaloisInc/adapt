@@ -363,9 +363,12 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
             (erMap(host.hostName) via debug.debugBuffer(s"[${host.hostName}] 1 after ER")) ~>
             broadcast.in
 
+          val hostPpmActorRef = ppmManagerActors(host.hostName)
           (broadcast.out(0) via debug.debugBuffer(s"[${host.hostName}] 3 before PPM state accumulator")) ~>
             (PpmFlowComponents.ppmStateAccumulator via debug.debugBuffer(s"[${host.hostName}] 4 before PPM sink")) ~>
-            Sink.actorRefWithAck[CompletedESO](ppmManagerActors(host.hostName), InitMsg, Ack, CompleteMsg)
+            Sink.foreach[CompletedESO](hostPpmActorRef ! _)
+//            Sink.actorRefWithAck[CompletedESO](ppmManagerActors(host.hostName), InitMsg, Ack, CompleteMsg)
+            Sink.ignore
 
           (broadcast.out(1) via debug.debugBuffer(s"[${host.hostName}] 2 before ADM merge")) ~>
             mergeAdm.in(i)
@@ -376,11 +379,13 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
           (betweenHostDedup via debug.debugBuffer(s"~ 1 after cross-host deduplicate")) ~>
           broadcastAdm.in
 
+        val crossHostPpmActorRef = ppmManagerActors(hostNameForAllHosts)
         (broadcastAdm.out(0) via debug.debugBuffer(s"~ 3 before cross-host PPM state accumulator")) ~>
-          (PpmFlowComponents.ppmStateAccumulator via debug.debugBuffer(s"before cross-host PPM sink")) ~>
-          Sink.actorRefWithAck[CompletedESO](ppmManagerActors(hostNameForAllHosts), InitMsg, Ack, CompleteMsg)
+          (PpmFlowComponents.ppmStateAccumulator via debug.debugBuffer(s"~ 4 before cross-host PPM sink")) ~>
+          Sink.foreach[CompletedESO](crossHostPpmActorRef ! _)
+ //         Sink.actorRefWithAck[CompletedESO](ppmManagerActors(hostNameForAllHosts), InitMsg, Ack, CompleteMsg)
 
-        (broadcastAdm.out(1) via debug.debugBuffer(s"~ 2 before DB sink")) ~>
+        (broadcastAdm.out(1) via debug.debugBuffer(s"~ 2 before DB sink")).via(printCounter("DB counter", statusActor)) ~>
           DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
 
         ClosedShape
