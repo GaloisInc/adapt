@@ -251,7 +251,7 @@ object AdaptConfig extends Utils {
          */
 
       hostName: HostName,
-      parallelIngests: Set[LinearIngest],
+      parallel: Set[LinearIngest],
 
       loadlimit: Option[Long] = None
   ) {
@@ -264,7 +264,7 @@ object AdaptConfig extends Utils {
       .toString
       .toLowerCase
 
-    def toCdmSource(handler: ErrorHandler = ErrorHandler.print): Source[(Namespace,CDM19), NotUsed] = parallelIngests
+    def toCdmSource(handler: ErrorHandler = ErrorHandler.print): Source[(Namespace,CDM19), NotUsed] = parallel
       .toList
       .foldLeft(Source.empty[(Namespace,CDM19)])((acc, li: LinearIngest) => acc.merge(li.toCdmSource(handler, updateHost _)))
       .take(loadlimit.getOrElse(Long.MaxValue))
@@ -278,12 +278,14 @@ object AdaptConfig extends Utils {
   }
 
   case class Range(
-      startInclusive: Long = 0,
-      endExclusive:   Long = Long.MaxValue
+    startInclusive: Long = 0,
+    endExclusive:   Long = Long.MaxValue
+//    var shouldIngest: Boolean = true
   ) {
     def applyToSource[Out, Mat](source: Source[Out, Mat]): Source[Out, Mat] = source
       .take(endExclusive)
       .drop(startInclusive)
+//      .takeWhile(_ => shouldIngest)
 
     /// Variant of [applyToSource] that prints out helpful "Skipping past" messages
     def applyToSourceMessage[Out, Mat](source: Source[Out, Mat], every: Long = 100000): Source[Out, Mat] = source
@@ -306,14 +308,14 @@ object AdaptConfig extends Utils {
   // Largest sequential ingest
   case class LinearIngest(
     range: Range = Range(),
-    sequentialUnits: List[IngestUnit]
+    sequential: List[IngestUnit]
   ) {
     def toCdmSource(
         handler: ErrorHandler,
         check: DataProvider => Unit = { _ => }
     ): Source[(Namespace,CDM19), NotUsed] = {
       val croppedRange: Source[Lazy[(Try[CDM19], Namespace)], NotUsed] = range.applyToSourceMessage(
-        sequentialUnits.foldLeft(Source.empty[Lazy[(Try[CDM19], Namespace)]])((acc, iu) => acc.concat(iu.toCdmSourceTry(check)))
+        sequential.foldLeft(Source.empty[Lazy[(Try[CDM19], Namespace)]])((acc, iu) => acc.concat(iu.toCdmSourceTry(check)))
       )
 
       // Only now do we actually force the parsing of the CDM19 (ie. purge the `Lazy`)

@@ -276,8 +276,8 @@ object Application extends App {
       assert(cdmSources.size == 1, "Cannot run tests for more than once host at a time")
       val (host, cdmSource) = cdmSources.head._2
 
-      assert(host.parallelIngests.size == 1, "Cannot run tests for more than one linear ingest stream")
-      val li = host.parallelIngests.head
+      assert(host.parallel.size == 1, "Cannot run tests for more than one linear ingest stream")
+      val li = host.parallel.head
 
       cdmSource
         .via(printCounter("CDM events", statusActor, li.range.startInclusive))
@@ -505,8 +505,8 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       assert(cdmSources.size == 1, "Cannot produce event matrix for more than once host at a time")
       val (host, cdmSource) = cdmSources.head._2
 
-      assert(host.parallelIngests.size == 1, "Cannot produce event matrix for more than one linear ingest stream")
-      val li = host.parallelIngests.head
+      assert(host.parallel.size == 1, "Cannot produce event matrix for more than one linear ingest stream")
+      val li = host.parallel.head
 
       cdmSource
         .via(printCounter("CDM", statusActor, li.range.startInclusive))
@@ -550,8 +550,8 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
             assert(cdmSources.size == 1, "Cannot produce CSVs for more than once host at a time")
             val (host, cdmSource) = cdmSources.head._2
 
-            assert(host.parallelIngests.size == 1, "Cannot produce CSVs for more than one linear ingest stream")
-            val li = host.parallelIngests.head
+            assert(host.parallel.size == 1, "Cannot produce CSVs for more than one linear ingest stream")
+            val li = host.parallel.head
 
             cdmSource
               .via(printCounter("DB Writer", statusActor, li.range.startInclusive, 10000))
@@ -585,8 +585,8 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       assert(cdmSources.size == 1, "Cannot get valuebytes for more than once host at a time")
       val (host, cdmSource) = cdmSources.head._2
 
-      assert(host.parallelIngests.size == 1, "Cannot get valuebytes for more than one linear ingest stream")
-      val li = host.parallelIngests.head
+      assert(host.parallel.size == 1, "Cannot get valuebytes for more than one linear ingest stream")
+      val li = host.parallel.head
 
       cdmSource
         .collect{ case (_, e: Event) if e.parameters.nonEmpty => e}
@@ -608,8 +608,8 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       assert(cdmSources.size == 1, "Cannot check for unique UUIDs for more than once host at a time")
       val (host, cdmSource) = cdmSources.head._2
 
-      assert(host.parallelIngests.size == 1, "Cannot check for unique UUIDs for more than one linear ingest stream")
-      val li = host.parallelIngests.head
+      assert(host.parallel.size == 1, "Cannot check for unique UUIDs for more than one linear ingest stream")
+      val li = host.parallel.head
 
       cdmSource
         .via(printCounter("UniqueUUIDs", statusActor, li.range.startInclusive))
@@ -637,8 +637,8 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       assert(cdmSources.size == 1, "Cannot run novelty flow for more than once host at a time")
       val (host, cdmSource) = cdmSources.head._2
 
-      assert(host.parallelIngests.size == 1, "Cannot run novelty flow for more than one linear ingest stream")
-      val li = host.parallelIngests.head
+      assert(host.parallel.size == 1, "Cannot run novelty flow for more than one linear ingest stream")
+      val li = host.parallel.head
 
       cdmSource
         .via(printCounter("Novelty", statusActor, li.range.startInclusive))
