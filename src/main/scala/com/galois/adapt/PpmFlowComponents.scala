@@ -47,7 +47,7 @@ object PpmFlowComponents {
 //            println(s"Saving state in PpmComponents...")
 //            saveMapToDisk("events", events, ppmConfig.components.events)
 //            saveMapToDisk("everything", everything, ppmConfig.components.everything)
-//            saveMapToDisk("pathNodes", pathNodes, ppmConfig.components.pathnodes)
+//            saveMapToDisk("pathNodes", pathNodes, ppmConfig.componescheduler.schedulescheduler.schedulescheduler.schedulents.pathnodes)
 //            saveMapToDisk("pathNodeUses", pathNodeUses, ppmConfig.components.pathnodeuses)
 //            saveMapToDisk("releaseQueue", releaseQueue, ppmConfig.components.releasequeue)
 //          }

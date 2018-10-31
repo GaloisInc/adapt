@@ -127,11 +127,11 @@ case class PpmDefinition[DataShape](
   }
 
   //process name and pid/uuid
-  def getProcessDetailsFromAlarm(setNamespacedUuidDetails: Set[NamespacedUuidDetails]): Set[ProcessDetails] = {
+  def getProcessDetails(setNamespacedUuidDetails: Set[NamespacedUuidDetails]): Set[ProcessDetails] = {
     setNamespacedUuidDetails.filter { d =>
       d.pid.isDefined && d.name.isDefined
     }.map { d =>
-      ProcessDetails(d.name.get, d.pid)
+      ProcessDetails(d.name.get, d.pid, hostName)
     }
   }
 
@@ -152,7 +152,7 @@ case class PpmDefinition[DataShape](
 
       def thresholdAllows: Boolean = ! ( (a._1.last.localProb > localProbThreshold) && shouldApplyThreshold )
 
-      val processDetails = getProcessDetailsFromAlarm(setNamespacedUuidDetails)
+      val processDetails = getProcessDetails(setNamespacedUuidDetails)
       //report the alarm
       if (thresholdAllows) AlarmReporter.report(this.name, this.hostName, newAlarm, processDetails, localProbThreshold)
     }

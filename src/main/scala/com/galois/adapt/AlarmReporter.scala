@@ -17,7 +17,6 @@ import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import scala.concurrent.duration._
 import akka.event.{Logging, LoggingAdapter}
 import com.galois.adapt.NoveltyDetection.PpmTreeNodeAlarm
-//import com.galois.adapt.Application.system
 //import com.galois.adapt.NoveltyDetection.{Alarm, NamespacedUuidDetails}
 import spray.json._//{JsNumber, JsObject, JsString, JsValue}
 import spray.json.DefaultJsonProtocol._
@@ -25,10 +24,10 @@ import spray.json.DefaultJsonProtocol._
 import com.typesafe.scalalogging.LazyLogging
 
 import scala.concurrent.Future
-
+import Application.system
 import ApiJsonProtocol._
 
-case class ProcessDetails(processName:String, pid:Option[Int])
+case class ProcessDetails(processName:String, pid:Option[Int], hostName:String)
 
 
 //trait AlarmNamespace
@@ -63,13 +62,8 @@ case class ConciseAlarmData(
                              key: List[String],
                              timestamp:Long,
                              localProbThreshold:Float,
-                             ppmTreeNodeAlarms: List[PpmTreeNodeAlarm]
-                             //  localProb: Float,
-                             //  globalProb: Float,
-                             //  count: Int,
-                             //  siblingPop: Int,
-                             //  parentCount: Int,
-                             //  depthOfLocalProbabilityCalculation: Int
+                             ppmTreeNodeAlarms: List[PpmTreeNodeAlarm],
+                             alarmID:Long
                            )extends AlarmData{
   def toJson:JsValue = {
     val delim = "∫"
@@ -80,7 +74,8 @@ case class ConciseAlarmData(
       "shortSummary" -> JsString(this.key.reduce(_ +s" $delim "+ _)),
       "timestamp" -> JsNumber(this.timestamp),
       "localProbThreshold" -> JsNumber(this.localProbThreshold),
-      "ppmTreeNodeAlarms" -> JsArray((this.ppmTreeNodeAlarms.map(_.toJson)).toVector)
+      "ppmTreeNodeAlarms" -> JsArray((this.ppmTreeNodeAlarms.map(_.toJson)).toVector),
+      "alarmID" -> JsNumber(this.alarmID)
     )
   }
 }
@@ -99,36 +94,25 @@ case class Message(
 }
 
 case object Message{
-  implicit val executionContext = Application.system.dispatcher
+  implicit val executionContext = system.dispatcher
 
-  def conciseMessagefromAnAlarm(treeName:String, hostName:String, a: AnAlarm, setProcessDetails: Set[ProcessDetails], localProbThreshold:Float, runID: String):Message = {
+  def conciseMessagefromAnAlarm(receivedAlarm: ReceivedAlarm, runID:String, alarmID:Long):Message = {
     //key
-    val key: List[String] = a.key
+    val key: List[String] = receivedAlarm.a.key
     //details:(timestamp, System.currentTimeMillis, alarm, setNamespacedUuidDetails, Map.empty[String,Int]): (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])
-    val ppmTreeNodeAlarms: List[NoveltyDetection.PpmTreeNodeAlarm] = a.details._3
+    val ppmTreeNodeAlarms: List[NoveltyDetection.PpmTreeNodeAlarm] = receivedAlarm.a.details._3
 
-    val summaries: Set[Future[TreeRepr]] = setProcessDetails.map(processDetails => PpmSummarizer.summarize(processDetails.processName, None, processDetails.pid))
-    summaries.map { summary =>
-      summary.map { tree =>
-        val s = tree.toString(0)
-      }
-    }
     Message(
-      ConciseAlarmData(treeName, hostName, key, a.details._1, localProbThreshold, ppmTreeNodeAlarms),
-      MetaData(runID, "concise"))
+      //todo: Fix alarmID
+      ConciseAlarmData(receivedAlarm.treeName, receivedAlarm.hostName, key, receivedAlarm.a.details._1, receivedAlarm.localProbThreshold, ppmTreeNodeAlarms, alarmID),
+      MetaData(runID, "concise")
+    )
   }
 
-  def summaryMessagefromAnAlarm(treeName:String, a: AnAlarm, processDetails:ProcessDetails, runID: String):Message = {
-    val key: List[String] = a.key
-    //details:(timestamp, System.currentTimeMillis, alarm, setNamespacedUuidDetails, Map.empty[String,Int]): (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])
-    val ppmTreeNodeAlarms: List[NoveltyDetection.PpmTreeNodeAlarm] = a.details._3
+  def summaryMessagefromAnAlarm(treeRepr:String, runID: String):Message = {
 
-    val summary: Future[TreeRepr] = PpmSummarizer.summarize(processDetails.processName, None, processDetails.pid)
-    summary.map{tree =>
-      val s = tree.toString(0)
-    }
     Message(
-      DetailedAlarmData(""),
+      DetailedAlarmData(treeRepr),
       MetaData(runID, "summary"))
   }
 }
@@ -137,37 +121,46 @@ case object Message{
 // summarized for process and summarized for process /\ pid
 // sometimes the processname is <unnamed>, handle that!
 
-
 /*
 * Valid Messages for the AlarmReporterActor
 *
 */
 
 // Adds a concise alarm to the buffer
-case class AddConciseAlarm(a: Message)
+case class AddConciseAlarm(a: ReceivedAlarm)
 // Skip the concise alarm alarm buffer and send the message
-case class SendConciseAlarm(a: Message)
+case class SendConciseAlarm(a: ReceivedAlarm)
 // Flushes the Concise Alarm buffer
 case object FlushConciseMessages
 // Generate summaries and send
 case object SendDetailedMessages
 
 
-//todo: Make this an object??
-class AlarmReporterActor(maxBufferLen:Int, splunkHecClient:SplunkHecClient, alarmConfig: AdaptConfig.AlarmsConfig) extends Actor with ActorLogging{
-  implicit val executionContext = Application.system.dispatcher
+class AlarmReporterActor(runID:String, maxBufferLen:Int, splunkHecClient:SplunkHecClient, alarmConfig: AdaptConfig.AlarmsConfig) extends Actor with ActorLogging{
+  implicit val executionContext = system.dispatcher
+
   var alarmSummaryBuffer:List[Message] = List.empty[Message]
+  var processRefSet: Set[ProcessDetails] = Set.empty
+  var alarmCounter:Long = 0
+
+  def genAlarmID () = {alarmCounter += 1; alarmCounter}
 
   def receive = {
     case FlushConciseMessages => flush
     case SendDetailedMessages => generateSummaryAndSend
     case AddConciseAlarm(a) => addConciseAlarm(a)
-    case SendConciseAlarm(a) => reportSplunk(List(a))
+    case SendConciseAlarm(a) => reportSplunk(List(Message.conciseMessagefromAnAlarm(a, runID, genAlarmID())))
   }
 
-
   def generateSummaryAndSend = {
-    ???
+
+    val summariesF: Set[Future[String]] = processRefSet.map{ processDetails =>
+      {PpmSummarizer.summarize(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map(_.toString)}
+    }
+
+    val messages: Set[Future[Message]] = summariesF.map{_.map{ s => Message.summaryMessagefromAnAlarm(s, runID)}}
+    Future.sequence(messages).map(m => reportSplunk(m.toList))
+    processRefSet = Set.empty
   }
 
   def flush() = {
@@ -178,8 +171,10 @@ class AlarmReporterActor(maxBufferLen:Int, splunkHecClient:SplunkHecClient, alar
   }
 
   //todo: Process alarm instead of just add
-  def addConciseAlarm(a:Message) = {
-    alarmSummaryBuffer = a::alarmSummaryBuffer
+  def addConciseAlarm(a: ReceivedAlarm) = {
+    val conciseAlarm = Message.conciseMessagefromAnAlarm(a, runID, genAlarmID())
+    alarmSummaryBuffer = conciseAlarm::alarmSummaryBuffer
+    processRefSet |= a.processDetailsSet
 
     if(alarmSummaryBuffer.length > maxBufferLen){
       flush()
@@ -191,32 +186,39 @@ class AlarmReporterActor(maxBufferLen:Int, splunkHecClient:SplunkHecClient, alar
 
 }
 
+case class ReceivedAlarm(
+                          treeName:String,
+                          hostName:String,
+                          a: AnAlarm,
+                          processDetailsSet: Set[ProcessDetails],
+                          localProbThreshold:Float
+                        )
+
 object AlarmReporter extends LazyLogging {
-  implicit val executionContext = Application.system.dispatcher
+  implicit val executionContext = system.dispatcher
 
-  //todo: push this into application.conf
-  val t1 = 1 second
-  val t2 = 10 seconds
-  val maxBufferLen = 100
+  //todo: get this from ???
   val runID = "testRun"
-
   val alarmConfig: AdaptConfig.AlarmsConfig = AdaptConfig.alarmConfig
-  val splunkHecClient: SplunkHecClient = new SplunkHecClient(alarmConfig.splunk.token, alarmConfig.splunk.host, alarmConfig.splunk.port)
+  val splunkConfig = AdaptConfig.alarmConfig.splunk
+  val splunkHecClient: SplunkHecClient = new SplunkHecClient(splunkConfig.token, splunkConfig.host, splunkConfig.port)
 
-  val alarmReporterActor = Application.system.actorOf(Props(classOf[AlarmReporterActor], maxBufferLen, splunkHecClient, alarmConfig), "alarmReporter")
+  val alarmReporterActor = system.actorOf(Props(classOf[AlarmReporterActor], runID, splunkConfig.maxBufferLen, splunkHecClient, alarmConfig), "alarmReporter")
 
-  //val scheduleDetailedMessages = Application.system.scheduler.schedule(t1, t1, alarmReporterActor, SendDetailedMessages)
-  val scheduleConciseMessagesFlush = Application.system.scheduler.schedule(t2, t2, alarmReporterActor, FlushConciseMessages)
+  val t1 = splunkConfig.realtimeReportingPeriodSeconds seconds
+  val t2 = splunkConfig.detailedReportingPeriodSeconds seconds
+  val scheduleConciseMessagesFlush = system.scheduler.schedule(t1,t1,alarmReporterActor, FlushConciseMessages)
+  val scheduleDetailedMessages = system.scheduler.schedule(t1,t2,alarmReporterActor, SendDetailedMessages)
 
-  //Application.system.registerOnTermination(scheduleDetailedMessages.cancel())
-  Application.system.registerOnTermination(scheduleConciseMessagesFlush.cancel())
+  system.registerOnTermination(scheduleDetailedMessages.cancel())
+  system.registerOnTermination(scheduleConciseMessagesFlush.cancel())
 
-  def report(treeName:String, hostName:String, a: AnAlarm, setProcessDetails: Set[ProcessDetails], localProbThreshold:Float) = {
+  def report(treeName:String, hostName:String, a: AnAlarm, processDetailsSet: Set[ProcessDetails], localProbThreshold:Float) = {
 
-    val alarmSummary = Message.conciseMessagefromAnAlarm(treeName, hostName, a, setProcessDetails, localProbThreshold, runID)
+    val receivedAlarm = ReceivedAlarm(treeName, hostName, a, processDetailsSet, localProbThreshold)
 
-    if (alarmConfig.console.enabled) println(alarmSummary.toString);
-    if (alarmConfig.logging.enabled) logger.info(alarmSummary.toString);
-    if (alarmConfig.splunk.enabled) alarmReporterActor ! AddConciseAlarm(alarmSummary)
+    if (alarmConfig.console.enabled) println(receivedAlarm.toString);
+    if (alarmConfig.logging.enabled) logger.info(receivedAlarm.toString);
+    if (splunkConfig.enabled) alarmReporterActor ! AddConciseAlarm(receivedAlarm)
   }
 }
