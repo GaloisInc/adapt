@@ -56,7 +56,7 @@ object NoveltyDetection {
 
 case object AlarmExclusions {
   val cadets = Set("ld-elf.so.1", "local", "bounce", "master", "pkg", "top", "mlock", "cleanup", "qmgr", "smtpd", "trivial-rewrite", "head")
-  val clearscope = Set("system_server", "proc", "com.android.email", "com.android.inputmethod.latin", "com.android.browser", "com.android.camera2", "com.android.launcher3", "com.android.smspush", "com.android.quicksearchbox", "com.android.gallery3d", "android.process.media", "com.android.music")
+  val clearscope = Set("system_server", "proc", "com.android.inputmethod.latin", "com.android.camera2", "com.android.launcher3", "com.android.smspush", "com.android.quicksearchbox", "com.android.gallery3d", "android.process.media", "com.android.music")
   val fivedirections = Set("\\windows\\system32\\svchost.exe", "\\program files\\tightvnc\\tvnserver.exe", "mscorsvw.exe")
   val marple= Set()
   val theia = Set("qt-opensource-linux-x64-5.10.1.run", "/usr/lib/postgresql/9.1/bin/postgres", "whoopsie", "Qt5.10.1", "5.10.1", "/bin/dbus-daemon", "/usr/sbin/console-kit-daemon")
@@ -767,7 +767,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
-      shouldApplyThreshold = true
+      shouldApplyThreshold = false
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "ParentChildProcesses",
@@ -808,7 +808,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
-      shouldApplyThreshold = true,
+      shouldApplyThreshold = false,
       alarmFilter = _ => false
     )(thisActor.context, context.self, hostName)
 
