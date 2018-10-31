@@ -136,6 +136,8 @@ case class SplunkHecClient(token: String, host:String, port:Int) extends LazyLog
       case Success(res) => httpReqResponseHandler(res)
       case Failure(res) => logger.error(s"splunk message not sent: ${res}")
     }
+//    val f = responseFuture.map(res => "asd").recover{ case t: Throwable => t.printStackTrace(); t.getMessage}
+//    f
   }
 
 

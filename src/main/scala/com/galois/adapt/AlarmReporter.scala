@@ -206,7 +206,6 @@ class AlarmReporterActor(maxBufferLen:Int, splunkHecClient:SplunkHecClient, alar
 
 }
 
-
 object AlarmReporter extends LazyLogging {
   implicit val executionContext = Application.system.dispatcher
 
@@ -219,18 +218,13 @@ object AlarmReporter extends LazyLogging {
   val alarmConfig: AdaptConfig.AlarmsConfig = AdaptConfig.alarmConfig
   val splunkHecClient: SplunkHecClient = new SplunkHecClient(alarmConfig.splunk.token, alarmConfig.splunk.host, alarmConfig.splunk.port)
 
-  val alarmReporterActor = Application.system.actorOf(Props(classOf[AlarmReporterActor], maxBufferLen, splunkHecClient, alarmConfig))
+  val alarmReporterActor = Application.system.actorOf(Props(classOf[AlarmReporterActor], maxBufferLen, splunkHecClient, alarmConfig), "alarmReporter")
 
-  //todo: change to val
-  def scheduleDetailedMessages = Application.system.scheduler.schedule(t1, t1, alarmReporterActor, SendDetailedMessages)
-  //todo: change to val
-  def scheduleConciseMessagesFlush = Application.system.scheduler.schedule(t2, t2, alarmReporterActor, FlushConciseMessages)
+  val scheduleDetailedMessages = Application.system.scheduler.schedule(t1, t1, alarmReporterActor, SendDetailedMessages)
+  val scheduleConciseMessagesFlush = Application.system.scheduler.schedule(t2, t2, alarmReporterActor, FlushConciseMessages)
 
-  //todo: call de-init
-  def deinit() = {
-    scheduleDetailedMessages.cancel
-    scheduleConciseMessagesFlush.cancel
-  }
+  Application.system.registerOnTermination(scheduleDetailedMessages.cancel())
+  Application.system.registerOnTermination(scheduleConciseMessagesFlush.cancel())
 
   def report(treeName:String, hostName:String, a: AnAlarm, setProcessDetails: Set[ProcessDetails], localProbThreshold:Float) = {
 
@@ -240,5 +234,4 @@ object AlarmReporter extends LazyLogging {
     if (alarmConfig.logging.enabled) logger.info(alarmSummary.toString);
     if (alarmConfig.splunk.enabled) alarmReporterActor ! AddConciseAlarm(alarmSummary)
   }
-
 }
