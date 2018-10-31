@@ -136,7 +136,7 @@ case object FlushConciseMessages
 case object SendDetailedMessages
 
 
-class AlarmReporterActor(runID:String, maxBufferLen:Int, splunkHecClient:SplunkHecClient, alarmConfig: AdaptConfig.AlarmsConfig) extends Actor with ActorLogging{
+class AlarmReporterActor(runID:String, maxbufferlength:Long, splunkHecClient:SplunkHecClient, alarmConfig: AdaptConfig.AlarmsConfig) extends Actor with ActorLogging{
   implicit val executionContext = system.dispatcher
 
   var alarmSummaryBuffer:List[Message] = List.empty[Message]
@@ -176,7 +176,7 @@ class AlarmReporterActor(runID:String, maxBufferLen:Int, splunkHecClient:SplunkH
     alarmSummaryBuffer = conciseAlarm::alarmSummaryBuffer
     processRefSet |= a.processDetailsSet
 
-    if(alarmSummaryBuffer.length > maxBufferLen){
+    if(alarmSummaryBuffer.length > maxbufferlength){
       flush()
     }
   }
@@ -203,7 +203,7 @@ object AlarmReporter extends LazyLogging {
   val splunkConfig = AdaptConfig.alarmConfig.splunk
   val splunkHecClient: SplunkHecClient = new SplunkHecClient(splunkConfig.token, splunkConfig.host, splunkConfig.port)
 
-  val alarmReporterActor = system.actorOf(Props(classOf[AlarmReporterActor], runID, splunkConfig.maxBufferLen, splunkHecClient, alarmConfig), "alarmReporter")
+  val alarmReporterActor = system.actorOf(Props(classOf[AlarmReporterActor], runID, splunkConfig.maxbufferlength, splunkHecClient, alarmConfig), "alarmReporter")
 
   val t1 = splunkConfig.realtimeReportingPeriodSeconds seconds
   val t2 = splunkConfig.detailedReportingPeriodSeconds seconds

@@ -141,7 +141,7 @@ object AdaptConfig extends Utils {
                            token: String,
                            host:String,
                            port:Int,
-                           maxBufferLen:Long,
+                           maxbufferlength:Long,
                            realtimeReportingPeriodSeconds:Int,
                            detailedReportingPeriodSeconds:Int)
   case class AlarmsConfig(
