@@ -205,10 +205,10 @@ object AlarmReporter extends LazyLogging {
 
   val alarmReporterActor = Application.system.actorOf(Props(classOf[AlarmReporterActor], maxBufferLen, splunkHecClient, alarmConfig), "alarmReporter")
 
-  val scheduleDetailedMessages = Application.system.scheduler.schedule(t1, t1, alarmReporterActor, SendDetailedMessages)
+  //val scheduleDetailedMessages = Application.system.scheduler.schedule(t1, t1, alarmReporterActor, SendDetailedMessages)
   val scheduleConciseMessagesFlush = Application.system.scheduler.schedule(t2, t2, alarmReporterActor, FlushConciseMessages)
 
-  Application.system.registerOnTermination(scheduleDetailedMessages.cancel())
+  //Application.system.registerOnTermination(scheduleDetailedMessages.cancel())
   Application.system.registerOnTermination(scheduleConciseMessagesFlush.cancel())
 
   def report(treeName:String, hostName:String, a: AnAlarm, setProcessDetails: Set[ProcessDetails], localProbThreshold:Float) = {
