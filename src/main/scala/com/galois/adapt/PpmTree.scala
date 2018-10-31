@@ -136,13 +136,11 @@ case class PpmDefinition[DataShape](
     }
   }
 
-  def recordAlarm(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Long)], localProbThreshold: Float): Unit = alarmOpt.foreach { a =>
+  def recordAlarm(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Long)], localProbThreshold: Float): Unit = alarmOpt.foreach {
+    case (alarm, setNamespacedUuidDetails, timestamp) =>
     //(Key, localProbability, globalProbability, count, siblingPop, parentCount, depthOfLocalProbabilityCalculation)
     //case class AnAlarm (key:List[String], alarm:(Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
 
-    val alarm:Alarm = a._1
-    val setNamespacedUuidDetails:Set[NamespacedUuidDetails] = a._2
-    val timestamp:Long = a._3
     val key: List[ExtractedValue] = alarm.map(_.key)
     if (alarms contains key) adapt.Application.statusActor ! IncrementAlarmDuplicateCount
     else {
@@ -151,7 +149,7 @@ case class PpmDefinition[DataShape](
       val newAlarm = AnAlarm(key,alarmDetails)
       alarms = alarms + AnAlarm.unapply(newAlarm).get
 
-      def thresholdAllows: Boolean = ! ( (a._1.last.localProb > localProbThreshold) && shouldApplyThreshold )
+      def thresholdAllows: Boolean = ! ( (alarm.last.localProb > localProbThreshold) && shouldApplyThreshold )
 
       val processDetails = getProcessDetails(setNamespacedUuidDetails)
       //report the alarm

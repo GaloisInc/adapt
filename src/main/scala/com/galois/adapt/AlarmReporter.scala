@@ -224,7 +224,7 @@ object AlarmReporter extends LazyLogging {
   implicit val executionContext = system.dispatcher
 
   //todo: get this from ???
-  val runID = "testRun"
+  val runID = Application.randomIdentifier
   val alarmConfig: AdaptConfig.AlarmsConfig = AdaptConfig.alarmConfig
   val splunkConfig = AdaptConfig.alarmConfig.splunk
   val splunkHecClient: SplunkHecClient = new SplunkHecClient(splunkConfig.token, splunkConfig.host, splunkConfig.port)
