@@ -3,22 +3,18 @@ package com.galois.adapt
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import com.typesafe.scalalogging.LazyLogging
-import spray.json.{JsObject, JsString}
-
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
+import spray.json.{JsObject,JsString,JsValue}
 //[Ref: https://doc.akka.io/docs/akka-http/10.0.2/scala/http/common/http-model.html]
 import HttpMethods._
 import akka.http.scaladsl.model.headers.{BasicHttpCredentials, GenericHttpCredentials}
 import akka.util.ByteString
-//import HttpProtocols._
+
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
+
 import MediaTypes._
 import HttpCharsets._
 import StatusCodes._
-
-import akka.event.{Logging, LoggingAdapter}
-
-import spray.json.JsValue
 
 
 //[REF: https://doc.akka.io/docs/akka-http/10.0.2/scala/http/common/http-model.html https://doc.akka.io/docs/akka-http/current/common/uri-model.html]
@@ -49,29 +45,6 @@ import spray.json.JsValue
 
 case class EventMsg(eventData: JsValue, time:Long, host:String="localhost", source: String="localhost", sourcetype:String="json", index:String="default") {
 
-  //example:
-  //  {
-  //    "time": 1426279439, // epoch time
-  //    "host": "localhost",
-  //    "source": "datasource",
-  //    "sourcetype": "txt",
-  //    "index": "main",
-  //    "event": { "Hello world!" }
-  //  }
-
-//  implicit val eventJsonWriter = new JsonWriter[Event] {
-//    def write(event: Event): JsValue = {
-//      JsObject(
-//        "time" -> JsString(event.time.toString),
-//        "host" -> JsString(event.host),
-//        "source" -> JsString(event.source),
-//        "sourcetype" -> JsString(event.sourcetype),
-//        "index" -> JsString(event.index),
-//        "event" -> event.eventData
-//      )
-//    }
-//  }
-
   def toJson: JsValue = {
     JsObject(
       "time" -> JsString(this.time.toString),
@@ -82,8 +55,6 @@ case class EventMsg(eventData: JsValue, time:Long, host:String="localhost", sour
       "event" -> this.eventData
     )
   }
-
-
 }
 
 /*
@@ -100,7 +71,6 @@ case class EventMsg(eventData: JsValue, time:Long, host:String="localhost", sour
 
 case class SplunkHecClient(token: String, host:String, port:Int) extends LazyLogging{
   implicit val executionContext = Application.system.dispatcher
-  //uri:Uri = Uri("http://127.0.0.1:8088/services/collector/event/1.0")
   val homeUri =  Uri.from(scheme = "http", host=host, port=port, path = "/services/collector/event/1.0")
 
   def sendEvents(events:List[JsValue]) = {
@@ -110,12 +80,6 @@ case class SplunkHecClient(token: String, host:String, port:Int) extends LazyLog
 
     sendEventHttp(payLoad)
   }
-
-//  def sendEvent(event:JsValue)(implicit ec: ExecutionContext) = {
-//    sendEventHttp(EventMsg(event, System.currentTimeMillis).toJson.toString)
-//  }
-
-//  def createPayload(event:EventMsg) = event.toJson.toString
 
   def sendEventHttp(payLoad:String) = {
     //log.info("SplunkHttpMessage: " + event.toJson.toString)
@@ -149,7 +113,7 @@ case class SplunkHecClient(token: String, host:String, port:Int) extends LazyLog
     // Splunk's reponse for valid data:
     //[INFO] [09/14/2018 23:53:11.348] [default-akka.actor.default-dispatcher-5] [splunkHecClient$(akka://default)] HttpResponse(200 OK,List(Date: Fri, 14 Sep 2018 23:53:11 GMT, X-Content-Type-Options: nosniff, Vary: Authorization, Connection: Keep-Alive, X-Frame-Options: SAMEORIGIN, Server: Splunkd),HttpEntity.Strict(application/json,{"text":"Success","code":0}),HttpProtocol(HTTP/1.1))
 
-        case OK => logger.info(response.toString);println("SplunkHecClient:Message succesfully sent")
-        case _ => logger.error(s"splunk message malformed? Failed with: ${response}");println("SplunkHecClient:Splunk did not like the message!")
+        case OK => logger.info(response.toString)
+        case _ => logger.error(s"splunk message malformed? Failed with: ${response}");println("SplunkHecClient:Splunk rejected the message!")
       }
 }
