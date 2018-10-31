@@ -66,9 +66,6 @@ object Application extends App {
     case None =>
       println("Failed to find a config file to which to append information about this run.")
 
-      for ((k,v) <- summary)
-        println(s"  $k $v")
-
     case Some(configFilePath) =>
       val configFileWriter = new FileWriter(configFilePath, true)
 
@@ -80,6 +77,7 @@ object Application extends App {
 
       configFileWriter.close()
   }
+  println(s"Information identifying this run:\n  ${summary.map(x => s"  ${x._1} ${x._2}").mkString("\n")}")
 
 
   implicit val system = ActorSystem("production-actor-system")
