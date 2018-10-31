@@ -188,9 +188,9 @@ class AlarmReporterActor(runID:String, maxbufferlength:Long, splunkHecClient:Spl
       }
     }
 
-    val completeTreeRepr: Set[Future[String]] = processRefSet.map{ processDetails =>
+    val completeTreeRepr: Set[(ProcessDetails, Future[String])] = processRefSet.map{ processDetails =>
       {
-      ???
+        (processDetails,PpmSummarizer.fullTree(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map(_.readableString))
       }
     }
 
