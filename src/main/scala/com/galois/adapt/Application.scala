@@ -21,7 +21,7 @@ import com.galois.adapt.cdm19._
 
 import scala.collection.mutable
 import scala.concurrent.duration._
-import scala.concurrent.Await
+import scala.concurrent.{Await, ExecutionContext}
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
 import AdaptConfig._
@@ -348,26 +348,40 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       startWebServer()
       statusActor ! InitMsg
 
+      // Write out debug states
+      val debug = new StreamDebugger("e4|", 30 seconds, 10 seconds)
+
       RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
         import GraphDSL.Implicits._
 
         val hostSources = cdmSources.values.toSeq
         val mergeAdm = b.add(Merge[Either[ADM, EdgeAdm2Adm]](hostSources.size))
 
-
         for (((host, source), i) <- hostSources.zipWithIndex) {
           val broadcast = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
-          source.via(printCounter(host.hostName, statusActor, 0)) ~> erMap(host.hostName) ~> broadcast.in
+          (source.via(printCounter(host.hostName, statusActor, 0)) via debug.debugBuffer(s"[${host.hostName}] 0 before ER")) ~>
+            (erMap(host.hostName) via debug.debugBuffer(s"[${host.hostName}] 1 after ER")) ~>
+            broadcast.in
 
-          broadcast.out(0) ~> PpmFlowComponents.ppmStateAccumulator ~> Sink.actorRefWithAck[CompletedESO](ppmManagerActors(host.hostName), InitMsg, Ack, CompleteMsg)
-          broadcast.out(1) ~> mergeAdm.in(i)
+          (broadcast.out(0) via debug.debugBuffer(s"[${host.hostName}] 3 before PPM state accumulator")) ~>
+            (PpmFlowComponents.ppmStateAccumulator via debug.debugBuffer(s"[${host.hostName}] 4 before PPM sink")) ~>
+            Sink.actorRefWithAck[CompletedESO](ppmManagerActors(host.hostName), InitMsg, Ack, CompleteMsg)
+
+          (broadcast.out(1) via debug.debugBuffer(s"[${host.hostName}] 2 before ADM merge")) ~>
+            mergeAdm.in(i)
         }
 
         val broadcastAdm = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
-        mergeAdm.out ~> betweenHostDedup ~> broadcastAdm.in
+        (mergeAdm.out via debug.debugBuffer(s"0 after ADM merge")) ~>
+          (betweenHostDedup via debug.debugBuffer(s"~ 1 after cross-host deduplicate")) ~>
+          broadcastAdm.in
 
-        broadcastAdm.out(0) ~> PpmFlowComponents.ppmStateAccumulator ~> Sink.actorRefWithAck[CompletedESO](ppmManagerActors(hostNameForAllHosts), InitMsg, Ack, CompleteMsg)
-        broadcastAdm.out(1) ~> DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
+        (broadcastAdm.out(0) via debug.debugBuffer(s"~ 3 before cross-host PPM state accumulator")) ~>
+          (PpmFlowComponents.ppmStateAccumulator via debug.debugBuffer(s"before cross-host PPM sink")) ~>
+          Sink.actorRefWithAck[CompletedESO](ppmManagerActors(hostNameForAllHosts), InitMsg, Ack, CompleteMsg)
+
+        (broadcastAdm.out(1) via debug.debugBuffer(s"~ 2 before DB sink")) ~>
+          DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
 
         ClosedShape
       }).run()
@@ -582,4 +596,72 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       println(s"Unknown runflow argument $other. Quitting.")
       Runtime.getRuntime.halt(1)
   }
+}
+
+
+/**
+  * Utility for debugging which components are bottlenecks in a backpressured stream system. Instantiate one of these
+  * per stream system, then place [[debugBuffer]] between stages to find out whether the bottleneck is upstream (in
+  * which case the buffer will end up empty) or downstream (in which case the buffer will end up full).
+  *
+  * @param prefix prompt with which to start status update lines
+  * @param printEvery how frequently to print out status updates
+  * @param reportEvery how frequently should the debug buffers report their status to the [[StreamDebugger]]
+  */
+class StreamDebugger(prefix: String, printEvery: FiniteDuration, reportEvery: FiniteDuration)
+                    (implicit system: ActorSystem, ec: ExecutionContext) {
+
+  import java.util.concurrent.ConcurrentHashMap
+  import java.util.concurrent.atomic.AtomicInteger
+  import java.util.function.BiConsumer
+
+  val bufferCounts: ConcurrentHashMap[String, Long] = new ConcurrentHashMap()
+
+  system.scheduler.schedule(printEvery, printEvery, new Runnable {
+    override def run(): Unit = {
+      val listBuffer = mutable.ListBuffer.empty[(String, Long)]
+      bufferCounts.forEach(new BiConsumer[String, Long] {
+        override def accept(key: String, count: Long): Unit = listBuffer += (key -> count)
+      })
+      println(listBuffer
+        .sortBy(_._1)
+        .toList
+        .map { case (stage, count) => s"$prefix $stage: $count" }
+        .mkString(s"$prefix ==== START OF DEBUG REPORT ====\n", "\n", s"\n$prefix ==== END OF DEBUG REPORT ====\n")
+      )
+    }
+  })
+
+  /**
+    * Create a new debug buffer flow. This is just like a (backpressured) buffer flow, but it keeps track of how many
+    * items are in the buffer (possibly plus one) and reports this number periodically to the object on which this
+    * method is called.
+    *
+    * @param name what label to associate with this debug buffer (should be unique per [[StreamDebugger]]
+    * @param bufferSize size of the buffer being created
+    * @tparam T type of thing flowing through the buffer
+    * @return a buffer flow which periodically reports stats about how full its buffer is
+    */
+  def debugBuffer[T](name: String, bufferSize: Int = 10000): Flow[T,T,NotUsed] =
+    Flow.fromGraph(GraphDSL.create() {
+      implicit graph =>
+
+        import GraphDSL.Implicits._
+
+        val bufferCount: AtomicInteger = new AtomicInteger(0)
+
+        // Write the count out to the buffer count map regularly
+        system.scheduler.schedule(reportEvery, reportEvery, new Runnable {
+          override def run(): Unit = bufferCounts.put(name, bufferCount.get())
+        })
+
+        // Increment the count when entering the buffer, decrement it when exiting
+        val incrementCount = graph.add(Flow.fromFunction[T,T](x => { bufferCount.incrementAndGet(); x }))
+        val buffer = graph.add(Flow[T].buffer(bufferSize, OverflowStrategy.backpressure))
+        val decrementCount = graph.add(Flow.fromFunction[T,T](x => { bufferCount.decrementAndGet(); x }))
+
+        incrementCount.out ~> buffer ~> decrementCount
+
+        FlowShape(incrementCount.in, decrementCount.out)
+    })
 }
