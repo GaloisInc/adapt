@@ -82,12 +82,10 @@ case class PpmDefinition[DataShape](
   hostName: HostName
 ) extends LazyLogging {
 
+  val basePath: String = ppmConfig.basedir + name + "-" + hostName
 
-  val inputFilePath = Try(ppmConfig.basedir + name + ppmConfig.loadfilesuffix + ".csv").toOption
-  val outputFilePath =
-    if (ppmConfig.shouldsave)
-      Try(ppmConfig.basedir + name + ppmConfig.savefilesuffix + ".csv").toOption
-    else None
+  val inputFilePath  = Try(basePath + ppmConfig.loadfilesuffix + ".csv").toOption
+  val outputFilePath = Try(basePath + ppmConfig.savefilesuffix + ".csv").toOption.filter(_ => ppmConfig.shouldsave)
 
   val startingState =
       if (ppmConfig.shouldload)
@@ -99,11 +97,9 @@ case class PpmDefinition[DataShape](
 
   val tree = context.actorOf(Props(classOf[PpmNodeActor], name, alarmActor, startingState), name = name)
 
-  val inputAlarmFilePath  = Try(ppmConfig.basedir + name + ppmConfig.loadfilesuffix + "_alarm.json").toOption
-  val outputAlarmFilePath =
-    if (ppmConfig.shouldsave)
-      Try(ppmConfig.basedir + name + ppmConfig.savefilesuffix + "_alarm.json" + s"_$hostName").toOption
-    else None
+  val inputAlarmFilePath  = Try(basePath + ppmConfig.loadfilesuffix + "_alarm.json").toOption
+  val outputAlarmFilePath = Try(basePath + ppmConfig.savefilesuffix + "_alarm.json").toOption.filter(_ => ppmConfig.shouldsave)
+
   var alarms: Map[List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])] =
     if (ppmConfig.shouldload)
       inputAlarmFilePath.flatMap { fp =>
