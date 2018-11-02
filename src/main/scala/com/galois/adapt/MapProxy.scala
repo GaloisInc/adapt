@@ -43,15 +43,18 @@ class MapProxy(
       val db = maker.make()
 
       // On shutdown, expire everything to the on-disk map
-      Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
-        override def run(): Unit = {
-          println("Expiring MapDB contents to disk...")
-          mapdbCdm2AdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
-          mapdbCdm2CdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
-          db.close()
-          println("MapDB has been closed.")
-        }
-      }))
+
+      // This is now in Application.scala
+
+//      Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
+//        override def run(): Unit = {
+//          println("Expiring MapDB contents to disk...")
+//          mapdbCdm2AdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
+//          mapdbCdm2CdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
+//          db.close()
+//          println("MapDB has been closed.")
+//        }
+//      }))
 
       db
 
@@ -81,7 +84,7 @@ class MapProxy(
       .createOrOpen()
   }).toMap
 
-  private val mapdbCdm2CdmShardsMap: Map[HostName, Array[HTreeMap[Array[AnyRef],Array[AnyRef]]]] = numHosts.map(host => host -> Array.tabulate(numShards) { shardId =>
+  val mapdbCdm2CdmShardsMap: Map[HostName, Array[HTreeMap[Array[AnyRef],Array[AnyRef]]]] = numHosts.map(host => host -> Array.tabulate(numShards) { shardId =>
     memoryDb.hashMap(s"cdm2cdmShard$host$shardId")
       .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
@@ -111,7 +114,7 @@ class MapProxy(
       .createOrOpen()
   }).toMap
 
-  private val mapdbCdm2AdmShardsMap: Map[HostName, Array[HTreeMap[Array[AnyRef],Array[AnyRef]]]] = numHosts.map(host => host -> Array.tabulate(numShards) { shardId =>
+  val mapdbCdm2AdmShardsMap: Map[HostName, Array[HTreeMap[Array[AnyRef],Array[AnyRef]]]] = numHosts.map(host => host -> Array.tabulate(numShards) { shardId =>
     memoryDb.hashMap(s"cdm2admShard$host$shardId")
       .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))

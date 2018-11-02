@@ -171,7 +171,7 @@ case class PpmDefinition[DataShape](
     (tree ? PpmNodeActorGetAllCounts(List.empty)).mapTo[Future[PpmNodeActorGetAllCountsResult]].flatMap(identity).map(_.results)
   }
 
-  val saveEveryAndNoMoreThan = ppmConfig.saveintervalseconds.getOrElse(0L) * 1000  // convert seconds to milliseconds
+  val saveEveryAndNoMoreThan = 0L //ppmConfig.saveintervalseconds.getOrElse(0L) * 1000  // convert seconds to milliseconds
   val lastSaveCompleteMillis = new AtomicLong(0L)
   val isCurrentlySaving = new AtomicBoolean(false)
 
@@ -1157,15 +1157,19 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
     }
   }
 
-  override def postStop(): Unit = {
-    if ( ! didReceiveComplete && ppmConfig.shouldsave) {
-      didReceiveComplete = true
-      val ppmSaveFutures = ppmList.map(_.saveStateAsync())
-      if (iforestEnabled) saveIforestModel()
-      Await.ready(Future.sequence(ppmSaveFutures.seq), 603 seconds)
-    }
-    super.postStop()
-  }
+
+//  println(s"Setting shutdown hook to save PPM trees for $hostName, shouldsave: ${ppmConfig.shouldsave}")
+////  override def postStop(): Unit = {
+//    context.system.registerOnTermination{
+//      println(s"Post stop: $didReceiveComplete && ${ppmConfig.shouldsave}")
+//      if ( ! didReceiveComplete && ppmConfig.shouldsave) {
+//        didReceiveComplete = true
+//        val ppmSaveFutures = ppmList.map(_.saveStateAsync())
+//        if (iforestEnabled) saveIforestModel()
+//        Await.ready(Future.sequence(ppmSaveFutures.seq), 603 seconds)
+//      }
+//  //    super.postStop()
+//    }
 
   def ppm(name: String): Option[PpmDefinition[_]] = ppmList.find(_.name == name)
 
@@ -1280,23 +1284,18 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
       sender() ! Ack
 
     case SaveTrees(shouldConfirm) =>
-      ppmList.foreach(_.saveStateAsync())
+      val s = sender()
+      val saveFutures = ppmList.map(_.saveStateAsync())
       if (iforestEnabled) saveIforestModel()
-      if (shouldConfirm) sender ! Ack
+      if (shouldConfirm) Future.sequence(saveFutures.toList).onComplete(_ => s ! Ack )
 
     case CompleteMsg =>
       if ( ! didReceiveComplete) {
+        println(s"PPM Manager with hostName: $hostName is completing the stream.")
         didReceiveComplete = true
-
-        val ppmSaveFutures = ppmList.map{ ppm =>
-          ppm.saveStateAsync()
-  //        ppm.prettyString.map(println)
-  //        println(ppm.getAllCounts.toList.sortBy(_._1.mkString("/")).mkString("\n" + ppm.name + ":\n", "\n", "\n\n"))
-        }
+        val ppmSaveFutures = ppmList.map{ ppm => ppm.saveStateAsync() }
         if (iforestEnabled) saveIforestModel()
         Await.ready(Future.sequence(ppmSaveFutures.seq), 603 seconds)
-
-        println("Done")
       }
 
     case x =>

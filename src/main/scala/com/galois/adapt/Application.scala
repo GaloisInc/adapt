@@ -21,7 +21,7 @@ import com.galois.adapt.cdm19._
 
 import scala.collection.mutable
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
 import AdaptConfig._
@@ -77,7 +77,7 @@ object Application extends App {
 
       configFileWriter.close()
   }
-  println(s"Information identifying this run:\n  ${summary.map(x => s"  ${x._1} ${x._2}").mkString("\n")}")
+  println(s"Information identifying this run:\n${summary.map(x => s"  ${x._1} ${x._2}").mkString("\n")}")
 
 
   implicit val system = ActorSystem("production-actor-system")
@@ -117,8 +117,7 @@ object Application extends App {
   val scheduledLogging = system.scheduler.schedule(10.seconds, 10.seconds, statusActor, LogToDisk(logFile))
   system.registerOnTermination(scheduledLogging.cancel())
 
-  val ppmBaseDirPath = ppmConfig.basedir
-  val ppmBaseDirFile = new File(ppmBaseDirPath)
+  val ppmBaseDirFile = new File(ppmConfig.basedir)
   if ( ! ppmBaseDirFile.exists()) ppmBaseDirFile.mkdir()
 
   // Start up the database
@@ -189,13 +188,13 @@ object Application extends App {
       ingestConfig.hosts.map { host: IngestHost =>
         val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows)
         val ref = system.actorOf(props, s"ppm-actor-${host.hostName}")
-        ppmConfig.saveintervalseconds match {
-          case Some(i) if i > 0L =>
-            println(s"Saving PPM trees every $i seconds")
-            val cancellable = system.scheduler.schedule(i.seconds, i.seconds, ref, SaveTrees())
-            system.registerOnTermination(cancellable.cancel())
-          case _ => println("Not going to periodically save PPM trees.")
-        }
+//        ppmConfig.saveintervalseconds match {
+//          case Some(i) if i > 0L =>
+//            println(s"Saving PPM trees every $i seconds")
+//            val cancellable = system.scheduler.schedule(i.seconds, i.seconds, ref, SaveTrees())
+//            system.registerOnTermination(cancellable.cancel())
+//          case _ => println("Not going to periodically save PPM trees.")
+//        }
         host.hostName -> ref
       }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false), s"ppm-actor-$hostNameForAllHosts"))
         // TODO nichole:  what instrumentation source should I give to the `hostNameForAllHosts` PpmManager? This smells bad...
@@ -398,7 +397,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       statusActor ! InitMsg
 
       // Write out debug states
-      val debug = new StreamDebugger("e4|", 30 seconds, 10 seconds)
+      val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
 
       RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
         import GraphDSL.Implicits._
@@ -424,7 +423,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         }
 
         val broadcastAdm = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
-        (mergeAdm.out via debug.debugBuffer(s"0 after ADM merge")) ~>
+        (mergeAdm.out via debug.debugBuffer(s"~ 0 after ADM merge")) ~>
           (betweenHostDedup via debug.debugBuffer(s"~ 1 after cross-host deduplicate")) ~>
           broadcastAdm.in
 
@@ -650,6 +649,27 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       println(s"Unknown runflow argument $other. Quitting.")
       Runtime.getRuntime.halt(1)
   }
+
+
+  Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
+    override def run(): Unit = {
+      val patienceLevel = 120 minutes
+      implicit val timeout = Timeout(patienceLevel)
+
+      println(s"Saving PPM trees to disk...")
+      val saveF = if (ppmConfig.shouldsave)
+        ppmManagerActors.values.toList.foldLeft(Future.successful(Ack))((a,b) => a.flatMap(_ => (b ? SaveTrees(true)).mapTo[Ack.type]))
+      else Future.successful( Ack )
+
+      val shutdownF = saveF.flatMap{_ => system.terminate() }
+
+      println("Expiring MapDB contents to disk...")
+      mapProxy.mapdbCdm2AdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
+      mapProxy.mapdbCdm2CdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
+
+      Await.result(shutdownF, patienceLevel)
+    }
+  }))
 }
 
 
@@ -671,7 +691,7 @@ class StreamDebugger(prefix: String, printEvery: FiniteDuration, reportEvery: Fi
 
   val bufferCounts: ConcurrentHashMap[String, Long] = new ConcurrentHashMap()
 
-  system.scheduler.schedule(printEvery, printEvery, new Runnable {
+  val scheduledStreamBuffersReport = system.scheduler.schedule(printEvery, printEvery, new Runnable {
     override def run(): Unit = {
       val listBuffer = mutable.ListBuffer.empty[(String, Long)]
       bufferCounts.forEach(new BiConsumer[String, Long] {
@@ -681,10 +701,11 @@ class StreamDebugger(prefix: String, printEvery: FiniteDuration, reportEvery: Fi
         .sortBy(_._1)
         .toList
         .map { case (stage, count) => s"$prefix $stage: $count" }
-        .mkString(s"$prefix ==== START OF DEBUG REPORT ====\n", "\n", s"\n$prefix ==== END OF DEBUG REPORT ====\n")
+        .mkString(s"$prefix ==== START OF STREAM-BUFFERS REPORT ====\n", "\n", s"\n$prefix ==== END OF STREAM-BUFFERS REPORT ====\n")
       )
     }
   })
+  system.registerOnTermination(scheduledStreamBuffersReport.cancel())
 
   /**
     * Create a new debug buffer flow. This is just like a (backpressured) buffer flow, but it keeps track of how many

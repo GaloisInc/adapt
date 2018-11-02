@@ -106,7 +106,7 @@ object AdaptConfig extends Utils {
   )
 
   case class PpmConfig(
-    saveintervalseconds: Option[Long],
+//    saveintervalseconds: Option[Long],
     pluckingdelay: Int,
     basedir: String,
     eventtypemodelsdir: String,
@@ -123,7 +123,7 @@ object AdaptConfig extends Utils {
     computethresholdintervalminutes: Int = 0,
     alarmlppercentile: Float = 0.1F
   ) {
-    require(saveintervalseconds.forall(_ => shouldsave), "`saveintervalseconds` cannot be honored unless `shouldsave` is true")
+//    require(saveintervalseconds.forall(_ => shouldsave), "`saveintervalseconds` cannot be honored unless `shouldsave` is true")
   }
 
   case class TestConfig(
