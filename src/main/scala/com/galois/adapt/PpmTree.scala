@@ -90,10 +90,10 @@ case class PpmDefinition[DataShape](
   val startingState =
       if (ppmConfig.shouldload)
         inputFilePath.flatMap { s =>
-          TreeRepr.readFromFile(s).map { t => println(s"Reading tree $name in from file: $s"); t }
-            .orElse {println(s"Loading no data for tree: $name"); None}
+          TreeRepr.readFromFile(s).map { t => println(s"Reading tree $name on host: $hostName in from file: $s"); t }
+            .orElse {println(s"Loading no data for tree: $name  on host: $hostName"); None}
         }
-      else { println(s"Loading no data for tree: $name"); None }
+      else { println(s"Loading no data for tree: $name  on host: $hostName"); None }
 
   val tree = context.actorOf(Props(classOf[PpmNodeActor], name, alarmActor, startingState), name = name)
 
@@ -110,12 +110,12 @@ case class PpmDefinition[DataShape](
           val content = new String(Files.readAllBytes(new File(fp).toPath()), StandardCharsets.UTF_8)
           content.parseJson.convertTo[List[(List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].toMap
         }.toOption orElse  {
-          println(s"Did not load alarms for tree: $name. Starting with empty tree state.")
+          println(s"Did not load alarms for tree: $name  on host: $hostName. Starting with empty tree state.")
           None
         }
       }.getOrElse(Map.empty[List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])])
     else {
-      println(s"Loading no alarms for tree: $name")
+      println(s"Loading no alarms for tree: $name  on host: $hostName")
       Map.empty
     }
 
