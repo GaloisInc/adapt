@@ -26,8 +26,8 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.concurrent.Future
 import Application.system
 import ApiJsonProtocol._
-
-case class ProcessDetails(processName:String, pid:Option[Int], hostName:String)
+import com.galois.adapt.AdaptConfig.HostName
+case class ProcessDetails(processName:String, pid:Option[Int], hostName:HostName)
 
 
 //trait AlarmNamespace
@@ -44,7 +44,7 @@ case class MetaData(runID:String, alarmCategory:String){
   }
 }
 
-trait AlarmData{
+sealed trait AlarmData{
   def toJson:JsValue
 }
 
@@ -62,7 +62,7 @@ case class DetailedAlarmData (processName:String, pid:String,details:String) ext
 
 case class ConciseAlarmData(
                              treeInfo: String,
-                             hostName: String,
+                             hostName: HostName,
                              key: List[String],
                              timestamp:Long,
                              localProbThreshold:Float,
@@ -195,7 +195,7 @@ class AlarmReporterActor(runID:String, maxbufferlength:Long, splunkHecClient:Spl
     val mostNovelF: Set[(ProcessDetails, Future[String])] = processRefSet.map{ processDetails =>
       {
         val l: Future[List[String]] = PpmSummarizer.mostNovelActions(20, processDetails.processName, processDetails.hostName, processDetails.pid)
-        (processDetails,l.map(_.fold("")(_ + "\n" + _)))
+        (processDetails,l.map(_.mkString("\n")))
       }
     }
 
@@ -238,7 +238,7 @@ class AlarmReporterActor(runID:String, maxbufferlength:Long, splunkHecClient:Spl
 
 case class ReceivedAlarm(
                           treeName:String,
-                          hostName:String,
+                          hostName:HostName,
                           a: AnAlarm,
                           processDetailsSet: Set[ProcessDetails],
                           localProbThreshold:Float
@@ -262,7 +262,7 @@ object AlarmReporter extends LazyLogging {
   system.registerOnTermination(scheduleDetailedMessages.cancel())
   system.registerOnTermination(scheduleConciseMessagesFlush.cancel())
 
-  def report(treeName:String, hostName:String, a: AnAlarm, processDetailsSet: Set[ProcessDetails], localProbThreshold:Float) = {
+  def report(treeName:String, hostName:HostName, a: AnAlarm, processDetailsSet: Set[ProcessDetails], localProbThreshold:Float) = {
 
     val receivedAlarm = ReceivedAlarm(treeName, hostName, a, processDetailsSet, localProbThreshold)
 
