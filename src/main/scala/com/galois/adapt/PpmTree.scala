@@ -82,12 +82,10 @@ case class PpmDefinition[DataShape](
   hostName: HostName
 ) extends LazyLogging {
 
+  val basePath: String = ppmConfig.basedir + name + "-" + hostName
 
-  val inputFilePath = Try(ppmConfig.basedir + name + ppmConfig.loadfilesuffix + ".csv").toOption
-  val outputFilePath =
-    if (ppmConfig.shouldsave)
-      Try(ppmConfig.basedir + name + ppmConfig.savefilesuffix + ".csv").toOption
-    else None
+  val inputFilePath  = Try(basePath + ppmConfig.loadfilesuffix + ".csv").toOption
+  val outputFilePath = Try(basePath + ppmConfig.savefilesuffix + ".csv").toOption.filter(_ => ppmConfig.shouldsave)
 
   val startingState =
       if (ppmConfig.shouldload)
@@ -99,11 +97,9 @@ case class PpmDefinition[DataShape](
 
   val tree = context.actorOf(Props(classOf[PpmNodeActor], name, alarmActor, startingState), name = name)
 
-  val inputAlarmFilePath  = Try(ppmConfig.basedir + name + ppmConfig.loadfilesuffix + "_alarm.json").toOption
-  val outputAlarmFilePath =
-    if (ppmConfig.shouldsave)
-      Try(ppmConfig.basedir + name + ppmConfig.savefilesuffix + "_alarm.json" + s"_$hostName").toOption
-    else None
+  val inputAlarmFilePath  = Try(basePath + ppmConfig.loadfilesuffix + "_alarm.json").toOption
+  val outputAlarmFilePath = Try(basePath + ppmConfig.savefilesuffix + "_alarm.json").toOption.filter(_ => ppmConfig.shouldsave)
+
   var alarms: Map[List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])] =
     if (ppmConfig.shouldload)
       inputAlarmFilePath.flatMap { fp =>
@@ -777,8 +773,11 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         d._2._2.map(_.path).getOrElse("<no_path>")   // Child process second
       )),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.get.path)),
-        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.get.path))) ++
+        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.get.path),Some(d._2._1.cid.toString)),
+        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.get.path), d._3._1 match {
+          case o: AdmSubject => Some(o.cid.toString)
+          case _ => None
+        })) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
@@ -1588,6 +1587,9 @@ case class AlarmLocalProbabilityAccumulator(hostname: String, initialLocalProbab
         accLPCount += thisLPCount
         accLPCount <= percentileOfTotal
     }.lastOption.map(_._1).getOrElse(1F)
+
+    println(s"THRESHOLD LOG, $hostname: $count novelties collected.")
+    println(s"THRESHOLD LOG, $hostname: $threshold is current local probability threshold.")
 
   }
 }

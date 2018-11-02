@@ -10,7 +10,7 @@ import com.galois.adapt.adm.UuidRemapper.{AnAdm, AnEdge, UuidRemapperInfo}
 import com.galois.adapt.cdm19._
 
 import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.{ListBuffer, Map => MutableMap}
 
 
 // This object contains all of the logic for resolving individual CDM types into their corresponding ADM ones.
@@ -44,15 +44,14 @@ object ERStreamComponents {
     def apply(
       host: IngestHost,
       eventExpiryTime: Time, // how long to wait before expiring an event chain
-      maxEventsMerged: Int,  // maximum number of events to put into an event chain
-
-      activeChains: mutable.Map[EventKey, EventMergeState]
+      maxEventsMerged: Int   // maximum number of events to put into an event chain
     ): ErFlow = Flow[(String,Timed[CurrentCdm])]
 
       .statefulMapConcat { () =>
 
         // INVARIANT: the keys in the fridge should match the keys of the active chains
         val expiryTimes: Fridge[EventKey] = Fridge.empty
+        val activeChains: MutableMap[EventResolution.EventKey, EventResolution.EventMergeState] = MutableMap.empty
 
         // Expire one single event key
         def expireKey(keyToExpire: EventKey, currentTime: Time, expireInto: ListBuffer[Timed[UuidRemapperInfo]]): Unit = {

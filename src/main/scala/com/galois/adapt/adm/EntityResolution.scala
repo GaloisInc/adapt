@@ -10,7 +10,7 @@ import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.adm.ERStreamComponents.{EventResolution, _}
 import com.galois.adapt.adm.UuidRemapper.{JustTime, UuidRemapperInfo}
 import com.galois.adapt.cdm19._
-import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
+import scala.collection.mutable.{Map => MutableMap}
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import com.galois.adapt.AdaptConfig._
@@ -22,18 +22,9 @@ object EntityResolution {
   case object EndOfStream extends CurrentCdm // marker used for in-band signalling
 
   // We keep these as local variables in the object (as opposed to state closed over in `annotateTime`) because we want
-  // easy access to them for logging/debugging purposes.
+  // easy access to them for logging/debugging purposes. This also makes them global across all parallel ER flows.
   var monotonicTime: Long = 0
   var sampledTime: Long = 0
-  var nodeCount: Long = 0
-
-  // This is just for logging state held onto by the `EventResolution` branch of `erWithoutRemaps`
-  val activeChains: MutableMap[EventResolution.EventKey, EventResolution.EventMergeState] = MutableMap.empty
-
-  // This is just for logging state held onto by `deduplicate` .
-  var blockedEdgesCount: Long = 0
-  val blockingNodes: MutableSet[UUID] = MutableSet.empty[UUID]
-
 
   def apply(
     config: AdmConfig,                                              // Config passed in
@@ -42,11 +33,12 @@ object EntityResolution {
     cdm2cdmMaps: Array[AlmostMap[CdmUUID, CdmUUID]],                // Map from CDM to CDM
     cdm2admMaps: Array[AlmostMap[CdmUUID, AdmUUID]],                // Map from CDM to ADM
     blockedEdges: Array[MutableMap[CdmUUID, (List[Edge], Set[CdmUUID])]], // Map of things blocked
-    shardCount: Array[Int],
+    remapperShardCount: Array[Long],
     log: LoggingAdapter,
 
     seenNodesSets: Array[AlmostSet[AdmUUID]],                       // Set of nodes seen so far
-    seenEdgesSets: Array[AlmostSet[EdgeAdm2Adm]]                    // Set of edges seen so far
+    seenEdgesSets: Array[AlmostSet[EdgeAdm2Adm]],                   // Set of edges seen so far
+    deduplicateShardCount: Array[Long]
   ): Flow[(String, CurrentCdm), Either[ADM, EdgeAdm2Adm], NotUsed] = {
 
     val numUuidRemapperShards = config.uuidRemapperShards           // 0 means use the old remapper
@@ -81,17 +73,17 @@ object EntityResolution {
     val remapper: UuidRemapper.UuidRemapperFlow = if (numUuidRemapperShards == 0) {
       UuidRemapper.apply(uuidExpiryTime, cdm2cdmMaps(0), cdm2admMaps(0), blockedEdges(0), ignoreEventUuids, log)
     } else {
-      UuidRemapper.sharded(uuidExpiryTime, cdm2cdmMaps, cdm2admMaps, blockedEdges, shardCount, ignoreEventUuids, log, numUuidRemapperShards)
+      UuidRemapper.sharded(uuidExpiryTime, cdm2cdmMaps, cdm2admMaps, blockedEdges, remapperShardCount, ignoreEventUuids, log, numUuidRemapperShards)
     }
 
     val deduplicate: DeduplicateNodesAndEdges.OrderAndDedupFlow =
-      DeduplicateNodesAndEdges.apply(numUuidRemapperShards, seenNodesSets, seenEdgesSets)
+      DeduplicateNodesAndEdges.apply(numUuidRemapperShards, seenNodesSets, seenEdgesSets, deduplicateShardCount)
 
     Flow[(String, CurrentCdm)]
       .via(annotateTime(maxTimeJump))                                         // Annotate with a monotonic time
       .buffer(2000, OverflowStrategy.backpressure)
       .concat(Source.fromIterator(() => Iterator(maxTimeMarker)))             // Expire everything in UuidRemapper
-      .via(erWithoutRemaps(eventExpiryTime, maxEventsMerged, host, activeChains))  // Entity resolution without remaps
+      .via(erWithoutRemaps(eventExpiryTime, maxEventsMerged, host)) // Entity resolution without remaps
       .concat(Source.fromIterator(() => Iterator(maxTimeRemapper)))           // Expire everything in UuidRemapper
       .buffer(2000, OverflowStrategy.backpressure)
       .via(remapper)                                                          // Remap UUIDs
@@ -117,6 +109,8 @@ object EntityResolution {
   // Annotate a flow of `CDM` with a monotonic time value corresponding roughly to the time when the CDM events were
   // observed on the instrumented machine.
   private def annotateTime(maxTimeJump: Long): TimeFlow = {
+
+    var nodeCount: Long = 0
 
     // Map a CDM onto a possible timestamp
     val timestampOf: CurrentCdm => Option[Long] = {
@@ -174,8 +168,7 @@ object EntityResolution {
   private def erWithoutRemaps(
     eventExpiryTime: Time,
     maxEventsMerged: Int,
-    host: IngestHost,
-    activeChains: MutableMap[EventResolution.EventKey, EventResolution.EventMergeState]
+    host: IngestHost
   ): ErFlow =
     Flow.fromGraph(GraphDSL.create() { implicit b =>
       import GraphDSL.Implicits._
@@ -183,9 +176,9 @@ object EntityResolution {
       val broadcast = b.add(Broadcast[(String,Timed[CurrentCdm])](3))
       val merge = b.add(Merge[Timed[UuidRemapperInfo]](3))
 
-      broadcast ~> EventResolution(host, eventExpiryTime, maxEventsMerged, activeChains) ~> merge
-      broadcast ~> SubjectResolution(host)                                               ~> merge
-      broadcast ~> OtherResolution(host)                                                 ~> merge
+      broadcast ~> EventResolution(host, eventExpiryTime, maxEventsMerged) ~> merge
+      broadcast ~> SubjectResolution(host)                                 ~> merge
+      broadcast ~> OtherResolution(host)                                   ~> merge
 
       FlowShape(broadcast.in, merge.out)
     })

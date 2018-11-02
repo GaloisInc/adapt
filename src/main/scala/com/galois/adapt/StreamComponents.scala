@@ -2,13 +2,16 @@ package com.galois.adapt
 
 import java.nio.file.Paths
 import java.util.UUID
+
 import akka.stream.scaladsl._
+
 import scala.collection.mutable.{Map => MutableMap}
 import akka.actor.ActorRef
 import akka.stream.{FlowShape, OverflowStrategy}
 import akka.util.ByteString
+
 import scala.collection.mutable
-import com.galois.adapt.adm.EntityResolution
+import com.galois.adapt.adm.{DeduplicateNodesAndEdges, EntityResolution}
 import com.galois.adapt.cdm18._
 
 
@@ -38,49 +41,14 @@ object FlowComponents {
         val nowNanos = System.nanoTime()
         val durationSeconds = (nowNanos - lastTimestampNanos) / 1e9
 
-        // Ordering nodes stats
-        val blockEdgesCount = EntityResolution.blockedEdgesCount
-        val blockingNodes = EntityResolution.blockingNodes.size
-
-        val currentTime = EntityResolution.monotonicTime
-        val sampledTime = EntityResolution.sampledTime
-
-        // UuidRemapper related stats
-        val uuidsBlocking: Int = Application.blockedEdgesMaps.values.map(_.map(_.size).sum).sum
-        val blockedUuidResponses: Int = Application.blockedEdgesMaps.values.map(_.map(_.values.map(x => x._1.length).sum).sum).sum
-
-        val activeEventChains = EntityResolution.activeChains.size
-
-        val cdm2cdmSize = Application.cdm2cdmMaps.values.map(_.map(_.size()).sum).sum
-        val cdm2admSize = Application.cdm2admMaps.values.map(_.map(_.size()).sum).sum
-
-        val seenNodesSize = Application.seenNodesMaps.values.map(_.map(_.size()).sum).sum
-        val seenEdgesSize = Application.seenEdgesMaps.values.map(_.map(_.size()).sum).sum
-
-        val shardDistribution: Array[Long] = {
-          val totalCount = Application.shardCount.sum
-          Application.shardCount.map(i => Math.round(i.toDouble * 100 / totalCount.toDouble))
-        }
-
-        println(s"$counterName ingested: $counter   Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${((counter - startingCount) / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.  Edges waiting: $blockEdgesCount.  Nodes blocking edges: $blockingNodes. Shard distribution: ${shardDistribution.mkString("(",",",")")}")
+        println(s"$counterName ingested: $counter   Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${((counter - startingCount) / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.")
 
         statusActor ! PopulationLog(
           counterName,
           counter,
           every,
           populationCounter.toMap,
-          durationSeconds,
-          blockEdgesCount,
-          blockingNodes,
-          uuidsBlocking,
-          blockedUuidResponses,
-          activeEventChains,
-          cdm2cdmSize,
-          cdm2admSize,
-          seenNodesSize,
-          seenEdgesSize,
-          currentTime,
-          sampledTime
+          durationSeconds
         )
 
         populationCounter.clear()

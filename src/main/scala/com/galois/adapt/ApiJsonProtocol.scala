@@ -25,9 +25,9 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   }
 
   implicit val singleAlarm = jsonFormat7(PpmTreeNodeAlarm)
-
-  implicit val statusReport = jsonFormat4(StatusReport)
-  implicit val populationLog = jsonFormat16(PopulationLog)
+  implicit val populationLog = jsonFormat5(PopulationLog)
+  implicit val shardedInfo = jsonFormat4(ShardedInfo.apply)
+  implicit val statusReport = jsonFormat9(StatusReport)
   implicit val cdmUuid: RootJsonFormat[CdmUUID] = jsonFormat2(CdmUUID.apply)
   implicit val admUuid: RootJsonFormat[AdmUUID] = jsonFormat2(AdmUUID.apply)
 
