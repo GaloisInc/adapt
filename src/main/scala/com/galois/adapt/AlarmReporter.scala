@@ -113,25 +113,25 @@ case object Message{
     )
   }
 
-  def activityMessagefromAnAlarm(processName:String, pid:String,details:String, runID: String):Message = {
+  def activityMessagefromAnAlarm(pd:ProcessDetails,details:String, runID:String):Message = {
 
     Message(
-      DetailedAlarmData(processName:String, pid:String,details:String),
+      DetailedAlarmData(pd.processName, pd.pid.getOrElse("None").toString,details),
       MetaData(runID, "processActivity"))
   }
 
-  def summaryMessagefromAnAlarm(processName:String, pid:String,details:String, runID:String):Message = {
+  def summaryMessagefromAnAlarm(pd:ProcessDetails,details:String, runID:String):Message = {
 
     Message(
-      DetailedAlarmData(processName:String, pid:String,details:String),
+      DetailedAlarmData(pd.processName, pd.pid.getOrElse("None").toString,details),
       MetaData(runID, "processSummary"))
   }
 
 
-  def novelMessagefromAnAlarm(processName:String, pid:String,details:String, runID: String):Message = {
+  def novelMessagefromAnAlarm(pd:ProcessDetails,details:String, runID:String):Message = {
 
     Message(
-      DetailedAlarmData(processName:String, pid:String,details:String),
+      DetailedAlarmData(pd.processName, pd.pid.getOrElse("None").toString,details),
       MetaData(runID, "topTwenty"))
   }
 
@@ -180,33 +180,55 @@ class AlarmReporterActor(runID:String, maxbufferlength:Long, splunkHecClient:Spl
 
   def generateSummaryAndSend = {
 
-    val summariesF: Set[(ProcessDetails, Future[String])] = processRefSet.map{ processDetails =>
+    val batchedMessages: List[Future[Message]] = processRefSet.view.map{ processDetails =>
       {
-        (processDetails,PpmSummarizer.summarize(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map(_.readableString))
+        val pd = processDetails
+        val summaries: Future[Message] = PpmSummarizer.summarize(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map { s =>
+          Message.summaryMessagefromAnAlarm(pd, s.readableString, runID)}
+
+        val completeTreeRepr = PpmSummarizer.fullTree(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map{a =>
+          Message.activityMessagefromAnAlarm(pd, a.readableString, runID)}
+
+        val mostNovel = PpmSummarizer.mostNovelActions(20, processDetails.processName, processDetails.hostName, processDetails.pid).map{nm =>
+          Message.novelMessagefromAnAlarm(pd, nm.mkString("\n"), runID)}
+
+        (summaries, completeTreeRepr, mostNovel)
       }
-    }
+    }.toList.flatMap(x => List(x._1, x._2, x._3))
 
-    val completeTreeRepr: Set[(ProcessDetails, Future[String])] = processRefSet.map{ processDetails =>
-      {
-        (processDetails,PpmSummarizer.fullTree(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map(_.readableString))
-      }
-    }
 
-    val mostNovelF: Set[(ProcessDetails, Future[String])] = processRefSet.map{ processDetails =>
-      {
-        val l: Future[List[String]] = PpmSummarizer.mostNovelActions(20, processDetails.processName, processDetails.hostName, processDetails.pid)
-        (processDetails,l.map(_.mkString("\n")))
-      }
-    }
+//    val completeTreeRepr: Set[(ProcessDetails, Future[String])] = processRefSet.map{ processDetails =>
+//      {
+//        (processDetails,PpmSummarizer.fullTree(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map(_.readableString))
+//      }
+//    }
 
-    val summaryMessages: Set[Future[Message]] = summariesF.map{case (p,sf) => sf.map{s => Message.summaryMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, s, runID)}}
-    Future.sequence(summaryMessages).map(m => reportSplunk(m.toList))
+//    val mostNovelF: Set[(ProcessDetails, Future[String])] = processRefSet.map{ processDetails =>
+//      {
+//        val l: Future[List[String]] = PpmSummarizer.mostNovelActions(20, processDetails.processName, processDetails.hostName, processDetails.pid)
+//        (processDetails,l.map(_.mkString("\n")))
+//      }
+//    }
 
-    val activityMessages:Set[Future[Message]] = completeTreeRepr.map{case (p,af) => af.map{a => Message.activityMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, a, runID)}}
-    Future.sequence(activityMessages).map(m => reportSplunk(m.toList))
 
-    val novelMessages: Set[Future[Message]] = mostNovelF.map{case (p,nmf) => nmf.map{nm => Message.novelMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, nm, runID)}}
-    Future.sequence(novelMessages).map(m => reportSplunk(m.toList))
+//    batchedMessages.unzip3.match{case (summaries: List[Future[Message]], completeTreeReprs, mostNovels) =>
+//      Future.sequence(summaries).map(s=>reportSplunk(s))
+//      Future.sequence(completeTreeReprs).map(s=>reportSplunk(s))
+//      Future.sequence(mostNovels).map(s=>reportSplunk(s))
+//    }
+
+    Future.sequence(batchedMessages).map(reportSplunk)
+
+
+
+//    val summaryMessages: Set[Future[Message]] = summariesF.map{case (p,sf) => sf.map{s => Message.summaryMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, s, runID)}}
+//    Future.sequence(summaryMessages).map(m => reportSplunk(m.toList))
+//
+//    val activityMessages:Set[Future[Message]] = completeTreeRepr.map{case (p,af) => af.map{a => Message.activityMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, a, runID)}}
+//    Future.sequence(activityMessages).map(m => reportSplunk(m.toList))
+//
+//    val novelMessages: Set[Future[Message]] = mostNovelF.map{case (p,nmf) => nmf.map{nm => Message.novelMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, nm, runID)}}
+//    Future.sequence(novelMessages).map(m => reportSplunk(m.toList))
 
 
     //todo: deletes the set without checking if the reportSplunk succeeded. Add error handling above
