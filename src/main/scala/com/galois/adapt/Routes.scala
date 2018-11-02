@@ -9,7 +9,7 @@ import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpEntity, MediaTyp
 import akka.http.scaladsl.server.Directives.{complete, formField, formFieldMap, get, getFromResource, getFromResourceDirectory, path, pathPrefix, post}
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshaller
-import com.galois.adapt.AdaptConfig.HostName
+import com.galois.adapt.AdaptConfig.{HostName, ingestConfig}
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.AlmostMap
 import com.galois.adapt.adm.{AdmUUID, CdmUUID}
@@ -119,6 +119,29 @@ object Routes {
             import ApiJsonProtocol.statusReport
             complete(
               (statusActor ? GetStats).mapTo[StatusReport]
+            )
+          } ~
+          pathPrefix("ingest") {
+            path("terminate"){
+              parameters('hostName, 'parallelIndex.as[Int], 'sequentialIndex.as[Int]) { (hostName, parallelIdx, sequentialIdx) =>
+                complete(
+                  Try(
+                    ingestConfig.hosts.find(_.hostName == hostName).get
+                      .parallel(parallelIdx)
+                      .sequential(sequentialIdx)
+                      .range.shouldIngest = false
+                  ).map(_ => s"Terminated ingest for host: $hostName, $parallelIdx, $sequentialIdx")
+                )
+              }
+            } ~
+            complete(
+              ingestConfig.hosts.flatMap(h =>
+                h.parallel.zipWithIndex.flatMap(p =>
+                  p._1.sequential.zipWithIndex.map(l =>
+                    h.hostName -> (p._2, l._2)
+                  )
+                )
+              ).toMap[String, (Int, Int)]
             )
           } ~
           pathPrefix("summarize") {

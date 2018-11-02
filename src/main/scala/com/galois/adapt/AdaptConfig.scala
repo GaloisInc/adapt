@@ -41,7 +41,7 @@ object AdaptConfig extends Utils {
   )
 
   case class IngestConfig(
-      hosts: Set[IngestHost],
+      hosts: List[IngestHost],
       quitafteringest: Boolean,
       logduplicates: Boolean,
       produce: DataModelProduction
@@ -251,7 +251,7 @@ object AdaptConfig extends Utils {
          */
 
       hostName: HostName,
-      parallel: Set[LinearIngest],
+      parallel: List[LinearIngest],
 
       loadlimit: Option[Long] = None
   ) {
@@ -279,13 +279,13 @@ object AdaptConfig extends Utils {
 
   case class Range(
     startInclusive: Long = 0,
-    endExclusive:   Long = Long.MaxValue
-//    var shouldIngest: Boolean = true
+    endExclusive:   Long = Long.MaxValue,
+    var shouldIngest: Boolean = true
   ) {
     def applyToSource[Out, Mat](source: Source[Out, Mat]): Source[Out, Mat] = source
       .take(endExclusive)
       .drop(startInclusive)
-//      .takeWhile(_ => shouldIngest)
+      .takeWhile(_ => shouldIngest)
 
     /// Variant of [applyToSource] that prints out helpful "Skipping past" messages
     def applyToSourceMessage[Out, Mat](source: Source[Out, Mat], every: Long = 100000): Source[Out, Mat] = source
