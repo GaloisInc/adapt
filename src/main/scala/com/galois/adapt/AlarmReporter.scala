@@ -11,10 +11,10 @@ package com.galois.adapt
 *
 */
 
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
-
-import scala.concurrent.duration._
 import akka.event.{Logging, LoggingAdapter}
 import com.galois.adapt.NoveltyDetection.PpmTreeNodeAlarm
 //import com.galois.adapt.NoveltyDetection.{Alarm, NamespacedUuidDetails}
@@ -27,6 +27,8 @@ import scala.concurrent.Future
 import Application.system
 import ApiJsonProtocol._
 import com.galois.adapt.AdaptConfig.HostName
+
+
 case class ProcessDetails(processName:String, pid:Option[Int], hostName:HostName)
 
 
@@ -180,44 +182,50 @@ class AlarmReporterActor(runID:String, maxbufferlength:Long, splunkHecClient:Spl
 
   def generateSummaryAndSend = {
 
-    val batchedMessages: List[Future[Message]] = processRefSet.view.map{ processDetails =>
-      {
-        val pd = processDetails
-        val summaries: Future[Message] = PpmSummarizer.summarize(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map { s =>
-          Message.summaryMessagefromAnAlarm(pd, s.readableString, runID)}
-
-        val completeTreeRepr = PpmSummarizer.fullTree(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map{a =>
-          Message.activityMessagefromAnAlarm(pd, a.readableString, runID)}
-
-        val mostNovel = PpmSummarizer.mostNovelActions(20, processDetails.processName, processDetails.hostName, processDetails.pid).map{nm =>
-          Message.novelMessagefromAnAlarm(pd, nm.mkString("\n"), runID)}
-
-        (summaries, completeTreeRepr, mostNovel)
+    val batchedMessages: List[Future[Message]] = processRefSet.view.map { processDetails => {
+      val pd = processDetails
+      val summaries: Future[Message] = PpmSummarizer.summarize(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map { s =>
+        Message.summaryMessagefromAnAlarm(pd, s.readableString, runID)
       }
+
+      val completeTreeRepr = PpmSummarizer.fullTree(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map { a =>
+        Message.activityMessagefromAnAlarm(pd, a.readableString, runID)
+      }
+
+      val mostNovel = PpmSummarizer.mostNovelActions(20, processDetails.processName, processDetails.hostName, processDetails.pid).map { nm =>
+        Message.novelMessagefromAnAlarm(pd, nm.mkString("\n"), runID)
+      }
+
+      (summaries, completeTreeRepr, mostNovel)
+    }
     }.toList.flatMap(x => List(x._1, x._2, x._3))
 
 
-//    val completeTreeRepr: Set[(ProcessDetails, Future[String])] = processRefSet.map{ processDetails =>
-//      {
-//        (processDetails,PpmSummarizer.fullTree(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map(_.readableString))
-//      }
-//    }
+    //    val completeTreeRepr: Set[(ProcessDetails, Future[String])] = processRefSet.map{ processDetails =>
+    //      {
+    //        (processDetails,PpmSummarizer.fullTree(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map(_.readableString))
+    //      }
+    //    }
 
-//    val mostNovelF: Set[(ProcessDetails, Future[String])] = processRefSet.map{ processDetails =>
-//      {
-//        val l: Future[List[String]] = PpmSummarizer.mostNovelActions(20, processDetails.processName, processDetails.hostName, processDetails.pid)
-//        (processDetails,l.map(_.mkString("\n")))
-//      }
-//    }
+    //    val mostNovelF: Set[(ProcessDetails, Future[String])] = processRefSet.map{ processDetails =>
+    //      {
+    //        val l: Future[List[String]] = PpmSummarizer.mostNovelActions(20, processDetails.processName, processDetails.hostName, processDetails.pid)
+    //        (processDetails,l.map(_.mkString("\n")))
+    //      }
+    //    }
 
 
-//    batchedMessages.unzip3.match{case (summaries: List[Future[Message]], completeTreeReprs, mostNovels) =>
-//      Future.sequence(summaries).map(s=>reportSplunk(s))
-//      Future.sequence(completeTreeReprs).map(s=>reportSplunk(s))
-//      Future.sequence(mostNovels).map(s=>reportSplunk(s))
-//    }
+    //    batchedMessages.unzip3.match{case (summaries: List[Future[Message]], completeTreeReprs, mostNovels) =>
+    //      Future.sequence(summaries).map(s=>reportSplunk(s))
+    //      Future.sequence(completeTreeReprs).map(s=>reportSplunk(s))
+    //      Future.sequence(mostNovels).map(s=>reportSplunk(s))
+    //    }
 
-    Future.sequence(batchedMessages).map(reportSplunk)
+    val x = Future.sequence(batchedMessages).map(reportSplunk)
+    x.onComplete {
+    case Success(res) => ()
+    case Failure(res) => println("AlarmReporter: failed!")
+  }
 
 
 
@@ -259,12 +267,12 @@ class AlarmReporterActor(runID:String, maxbufferlength:Long, splunkHecClient:Spl
 }
 
 case class ReceivedAlarm(
-                          treeName:String,
-                          hostName:HostName,
-                          a: AnAlarm,
-                          processDetailsSet: Set[ProcessDetails],
-                          localProbThreshold:Float
-                        )
+  treeName:String,
+  hostName:HostName,
+  a: AnAlarm,
+  processDetailsSet: Set[ProcessDetails],
+  localProbThreshold:Float
+  )
 
 object AlarmReporter extends LazyLogging {
   implicit val executionContext = system.dispatcher

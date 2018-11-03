@@ -137,13 +137,13 @@ object AdaptConfig extends Utils {
   case class ConsoleConfig(enabled:Boolean)
   case class LogConfig(enabled:Boolean)
   case class SplunkConfig(
-                           enabled:Boolean,
-                           token: String,
-                           host:String,
-                           port:Int,
-                           maxbufferlength:Long,
-                           realtimeReportingPeriodSeconds:Int,
-                           detailedReportingPeriodSeconds:Int)
+    enabled:Boolean,
+    token: String,
+    host:String,
+    port:Int,
+    maxbufferlength:Long,
+    realtimeReportingPeriodSeconds:Int,
+    detailedReportingPeriodSeconds:Int)
   case class AlarmsConfig(
     splunk: SplunkConfig,
     logging: LogConfig,
