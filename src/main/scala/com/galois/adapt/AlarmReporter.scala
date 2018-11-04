@@ -102,7 +102,7 @@ case class Message(
 case object Message{
   implicit val executionContext = system.dispatcher
 
-  def conciseMessagefromAnAlarm(receivedAlarm: ReceivedAlarm, runID:String, alarmID:Long):Message = {
+  def fromRawAlarm(receivedAlarm: ReceivedAlarm, runID:String, alarmID:Long):Message = {
     //key
     val key: List[String] = receivedAlarm.a.key
     //details:(timestamp, System.currentTimeMillis, alarm, setNamespacedUuidDetails, Map.empty[String,Int]): (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])
@@ -115,29 +115,18 @@ case object Message{
     )
   }
 
-  def activityMessagefromAnAlarm(pd:ProcessDetails,details:String, runID:String):Message = {
+  def fromBatchedAlarm(alarmCategory:AlarmCategory, pd:ProcessDetails, details:String, runID:String):Message = {
 
     Message(
       DetailedAlarmData(pd.processName, pd.pid.getOrElse("None").toString,details),
-      MetaData(runID, "processActivity"))
+      MetaData(runID, alarmCategory.toString))
   }
-
-  def summaryMessagefromAnAlarm(pd:ProcessDetails,details:String, runID:String):Message = {
-
-    Message(
-      DetailedAlarmData(pd.processName, pd.pid.getOrElse("None").toString,details),
-      MetaData(runID, "processSummary"))
-  }
-
-
-  def novelMessagefromAnAlarm(pd:ProcessDetails,details:String, runID:String):Message = {
-
-    Message(
-      DetailedAlarmData(pd.processName, pd.pid.getOrElse("None").toString,details),
-      MetaData(runID, "topTwenty"))
-  }
-
 }
+
+sealed trait AlarmCategory
+case object ProcessActivity extends AlarmCategory{override def toString = "processActivity"}
+case object ProcessSummary extends AlarmCategory{override def toString = "processSummary"}
+case object TopTwenty extends AlarmCategory{override def toString = "topTwenty"}
 
 // alarm cateogories: realtime, batched summaries: Process name+pid,batched summaries: Process name
 // summarized for process and summarized for process /\ pid
@@ -171,7 +160,7 @@ class AlarmReporterActor(runID:String, maxbufferlength:Long, splunkHecClient:Spl
     case FlushConciseMessages => flush
     case SendDetailedMessages => generateSummaryAndSend
     case AddConciseAlarm(a) => addConciseAlarm(a)
-    case SendConciseAlarm(a) => reportSplunk(List(Message.conciseMessagefromAnAlarm(a, runID, genAlarmID())))
+    case SendConciseAlarm(a) => reportSplunk(List(Message.fromRawAlarm(a, runID, genAlarmID())))
   }
 
   //todo: verify any truncation of alarms and ... in the treeRepr.toString
@@ -185,60 +174,26 @@ class AlarmReporterActor(runID:String, maxbufferlength:Long, splunkHecClient:Spl
     val batchedMessages: List[Future[Message]] = processRefSet.view.map { processDetails => {
       val pd = processDetails
       val summaries: Future[Message] = PpmSummarizer.summarize(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map { s =>
-        Message.summaryMessagefromAnAlarm(pd, s.readableString, runID)
+        Message.fromBatchedAlarm(ProcessSummary, pd, s.readableString, runID)
       }
 
       val completeTreeRepr = PpmSummarizer.fullTree(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map { a =>
-        Message.activityMessagefromAnAlarm(pd, a.readableString, runID)
+        Message.fromBatchedAlarm(ProcessActivity, pd, a.readableString, runID)
       }
 
       val mostNovel = PpmSummarizer.mostNovelActions(20, processDetails.processName, processDetails.hostName, processDetails.pid).map { nm =>
-        Message.novelMessagefromAnAlarm(pd, nm.mkString("\n"), runID)
+        Message.fromBatchedAlarm(TopTwenty, pd, nm.mkString("\n"), runID)
       }
 
       (summaries, completeTreeRepr, mostNovel)
     }
     }.toList.flatMap(x => List(x._1, x._2, x._3))
 
-
-    //    val completeTreeRepr: Set[(ProcessDetails, Future[String])] = processRefSet.map{ processDetails =>
-    //      {
-    //        (processDetails,PpmSummarizer.fullTree(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map(_.readableString))
-    //      }
-    //    }
-
-    //    val mostNovelF: Set[(ProcessDetails, Future[String])] = processRefSet.map{ processDetails =>
-    //      {
-    //        val l: Future[List[String]] = PpmSummarizer.mostNovelActions(20, processDetails.processName, processDetails.hostName, processDetails.pid)
-    //        (processDetails,l.map(_.mkString("\n")))
-    //      }
-    //    }
-
-
-    //    batchedMessages.unzip3.match{case (summaries: List[Future[Message]], completeTreeReprs, mostNovels) =>
-    //      Future.sequence(summaries).map(s=>reportSplunk(s))
-    //      Future.sequence(completeTreeReprs).map(s=>reportSplunk(s))
-    //      Future.sequence(mostNovels).map(s=>reportSplunk(s))
-    //    }
-
     val x = Future.sequence(batchedMessages).map(reportSplunk)
     x.onComplete {
     case Success(res) => ()
-    case Failure(res) => println("AlarmReporter: failed!")
+    case Failure(res) => println(s"AlarmReporter: failed with $res!")
   }
-
-
-
-//    val summaryMessages: Set[Future[Message]] = summariesF.map{case (p,sf) => sf.map{s => Message.summaryMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, s, runID)}}
-//    Future.sequence(summaryMessages).map(m => reportSplunk(m.toList))
-//
-//    val activityMessages:Set[Future[Message]] = completeTreeRepr.map{case (p,af) => af.map{a => Message.activityMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, a, runID)}}
-//    Future.sequence(activityMessages).map(m => reportSplunk(m.toList))
-//
-//    val novelMessages: Set[Future[Message]] = mostNovelF.map{case (p,nmf) => nmf.map{nm => Message.novelMessagefromAnAlarm(p.processName, p.pid.getOrElse("None").toString, nm, runID)}}
-//    Future.sequence(novelMessages).map(m => reportSplunk(m.toList))
-
-
     //todo: deletes the set without checking if the reportSplunk succeeded. Add error handling above
     processRefSet = Set.empty
   }
@@ -252,7 +207,7 @@ class AlarmReporterActor(runID:String, maxbufferlength:Long, splunkHecClient:Spl
 
   //todo: Process alarm instead of just add
   def addConciseAlarm(a: ReceivedAlarm) = {
-    val conciseAlarm = Message.conciseMessagefromAnAlarm(a, runID, genAlarmID())
+    val conciseAlarm = Message.fromRawAlarm(a, runID, genAlarmID())
     alarmSummaryBuffer = conciseAlarm::alarmSummaryBuffer
     processRefSet |= a.processDetailsSet
 

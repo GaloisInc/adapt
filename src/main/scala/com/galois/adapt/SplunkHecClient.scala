@@ -76,9 +76,9 @@ case class SplunkHecClient(token: String, host:String, port:Int) extends LazyLog
   def sendEvents(events:List[JsValue]) = {
     val payLoad = events.map{e =>
       EventMsg(e, System.currentTimeMillis).toJson.toString
-    }.reduce(_ + _)
+    }.mkString("")
 
-    sendEventHttp(payLoad)
+    if (!payLoad.isEmpty) sendEventHttp(payLoad)
   }
 
   def sendEventHttp(payLoad:String) = {
