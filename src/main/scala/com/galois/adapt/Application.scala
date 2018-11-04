@@ -359,7 +359,7 @@ object Application extends App {
           }).run()
       }
 
-    case "e3" =>
+    case "e3" | "e3-no-db" =>
       println(
         raw"""
 Unknown runflow argument e3. Quitting. (Did you mean e4?)
@@ -399,7 +399,9 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       )
       Runtime.getRuntime.halt(1)
 
-    case "e4" =>
+    case "e4" | "e4-no-db" =>
+      val needsDb: Boolean = runFlow == "e4"
+
       startWebServer()
       statusActor ! InitMsg
 
@@ -429,7 +431,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
             mergeAdm.in(i)
         }
 
-        val broadcastAdm = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
+        val broadcastAdm = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](if (needsDb) { 2 } else { 1 }))
         (mergeAdm.out via debug.debugBuffer(s"~ 0 after ADM merge")) ~>
           (betweenHostDedup via debug.debugBuffer(s"~ 1 after cross-host deduplicate")) ~>
           broadcastAdm.in
@@ -440,23 +442,13 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
           Sink.foreach[CompletedESO](crossHostPpmActorRef ! _)
  //         Sink.actorRefWithAck[CompletedESO](ppmManagerActors(hostNameForAllHosts), InitMsg, Ack, CompleteMsg)
 
-        (broadcastAdm.out(1) via debug.debugBuffer(s"~ 2 before DB sink")).via(printCounter("DB counter", statusActor)) ~>
-          DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
+        if (needsDb) {
+          (broadcastAdm.out(1) via debug.debugBuffer(s"~ 2 before DB sink")).via(printCounter("DB counter", statusActor)) ~>
+            DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
+        }
 
         ClosedShape
       }).run()
-
-//    case "e4-no-db" =>
-//      startWebServer()
-//      statusActor ! InitMsg
-//
-//      cdmSource
-//      // CDMSource.cdm19(ta1, handleError = { case (off, t) =>println(s"Error at $off: ${t.printStackTrace}") })
-//        .via(printCounter("E3 (no DB)", statusActor, startingCount))
-//        .via(filterFlow)
-//        .via(splitToSink[(String, CDM19)](ppmObservationDistributorSink, 1000))
-//        .via(er)
-//        .runWith(PpmFlowComponents.ppmSink)
 
     case "print-cdm" =>
       var i = 0
