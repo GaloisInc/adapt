@@ -191,8 +191,10 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
     "inV" -> JsNumber(e.inVertex().id().asInstanceOf[Long]),
     "outV" -> JsNumber(e.outVertex().id().asInstanceOf[Long])
   )
-}
 
+  implicit val alarmMetadataFormat = jsonFormat2(AlarmMetaData)
+  //implicit val detailedAlarmDataFormat = jsonFormat3(DetailedAlarmData)
+}
 
 
 case class UIEdge(from: String, to: String, label: String)

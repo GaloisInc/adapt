@@ -149,7 +149,7 @@ case class PpmDefinition[DataShape](
       val newAlarm = AnAlarm(key,alarmDetails)
       alarms = alarms + AnAlarm.unapply(newAlarm).get
 
-      def thresholdAllows: Boolean = ! ( (alarm.last.localProb > localProbThreshold) && shouldApplyThreshold )
+      def thresholdAllows: Boolean = ! ( (alarm.lastOption.map((i:PpmTreeNodeAlarm) => i.localProb > localProbThreshold).getOrElse(true)) && shouldApplyThreshold )
 
       val processDetails = getProcessDetails(setNamespacedUuidDetails)
       //report the alarm

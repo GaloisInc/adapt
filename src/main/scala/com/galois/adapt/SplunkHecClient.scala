@@ -78,7 +78,7 @@ case class SplunkHecClient(token: String, host:String, port:Int) extends LazyLog
       EventMsg(e, System.currentTimeMillis).toJson.toString
     }.mkString("")
 
-    if (!payLoad.isEmpty) sendEventHttp(payLoad)
+    if (payLoad.nonEmpty) sendEventHttp(payLoad)
   }
 
   def sendEventHttp(payLoad:String) = {
@@ -100,8 +100,8 @@ case class SplunkHecClient(token: String, host:String, port:Int) extends LazyLog
       case Success(res) => httpReqResponseHandler(res)
       case Failure(res) => logger.error(s"splunk message not sent: ${res}");println("SplunkHecClient:splunk message not sent: ${res}")
     }
-//    val f = responseFuture.map(res => "asd").recover{ case t: Throwable => t.printStackTrace(); t.getMessage}
-//    f
+    val f = responseFuture.map(res => "asd").recover{ case t: Throwable => t.printStackTrace(); t.getMessage}
+    f
   }
 
 
