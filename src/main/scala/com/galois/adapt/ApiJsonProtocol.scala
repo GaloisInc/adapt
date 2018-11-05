@@ -192,7 +192,7 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
     "outV" -> JsNumber(e.outVertex().id().asInstanceOf[Long])
   )
 
-  implicit val alarmMetadataFormat = jsonFormat2(AlarmMetaData)
+  implicit val alarmMetadataFormat = jsonFormat2(AlarmEventMetaData)
   //implicit val detailedAlarmDataFormat = jsonFormat3(DetailedAlarmData)
 }
 

@@ -100,8 +100,8 @@ case class SplunkHecClient(token: String, host:String, port:Int) extends LazyLog
       case Success(res) => httpReqResponseHandler(res)
       case Failure(res) => logger.error(s"splunk message not sent: ${res}");println("SplunkHecClient:splunk message not sent: ${res}")
     }
-    val f = responseFuture.map(res => "asd").recover{ case t: Throwable => t.printStackTrace(); t.getMessage}
-    f
+    //val f = responseFuture.map(res => "asd").recover{ case t: Throwable => t.printStackTrace(); t.getMessage}
+    //f
   }
 
 
@@ -114,6 +114,6 @@ case class SplunkHecClient(token: String, host:String, port:Int) extends LazyLog
     //[INFO] [09/14/2018 23:53:11.348] [default-akka.actor.default-dispatcher-5] [splunkHecClient$(akka://default)] HttpResponse(200 OK,List(Date: Fri, 14 Sep 2018 23:53:11 GMT, X-Content-Type-Options: nosniff, Vary: Authorization, Connection: Keep-Alive, X-Frame-Options: SAMEORIGIN, Server: Splunkd),HttpEntity.Strict(application/json,{"text":"Success","code":0}),HttpProtocol(HTTP/1.1))
 
         case OK => logger.info(response.toString)
-        case _ => logger.error(s"splunk message malformed? Failed with: ${response}");println("SplunkHecClient:Splunk rejected the message!")
+        case _ => logger.error(s"splunk message malformed? Failed with: ${response}")//;println("SplunkHecClient:Splunk rejected the message!")
       }
 }
