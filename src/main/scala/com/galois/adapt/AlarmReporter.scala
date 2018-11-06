@@ -27,18 +27,18 @@ import ApiJsonProtocol._
 import com.galois.adapt.AdaptConfig.HostName
 
 case class ProcessDetails (processName: String, pid: Option[Int], hostName: HostName)
-
 case class AlarmEventMetaData (runID: String, alarmCategory: String)
 
 trait AlarmEventData {
   def toJson: JsValue
 }
 
-case class DetailedAlarmEvent (processName: String, pid: String, details: String) extends AlarmEventData {
+case class DetailedAlarmEvent (processName: String, pid: String, details: String, alarmIDs: List[Long]) extends AlarmEventData {
   def toJson: JsValue = {
     JsObject(
       "processName" -> JsString(processName),
       "pid" -> JsString(pid),
+      "referencedRawAlarms" -> JsArray(alarmIDs.map(JsNumber(_)).toVector),
       "details" -> JsString(details)
     )
   }
@@ -97,10 +97,10 @@ case object AlarmEvent {
     )
   }
 
-  def fromBatchedAlarm (alarmCategory: AlarmCategory, pd: ProcessDetails, details: String, runID: String): AlarmEvent = {
+  def fromBatchedAlarm (alarmCategory: AlarmCategory, pd: ProcessDetails, details: String, alarmIDs:List[Long], runID: String): AlarmEvent = {
 
     AlarmEvent(
-      DetailedAlarmEvent(pd.processName, pd.pid.getOrElse("None").toString, details),
+      DetailedAlarmEvent(pd.processName, pd.pid.getOrElse("None").toString, details, alarmIDs),
       AlarmEventMetaData(runID, alarmCategory.toString))
   }
 }
@@ -141,7 +141,8 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
   implicit val executionContext = system.dispatcher
 
   var alarmSummaryBuffer: List[AlarmEvent] = List.empty[AlarmEvent]
-  var processRefSet: Set[ProcessDetails] = Set.empty
+  //var processRefSet: Set[ProcessDetails] = Set.empty
+  var processRefSet: Map[ProcessDetails, List[Long]] = Map.empty
   var alarmCounter: Long = 0
   val numMostNovel = 20
 
@@ -154,6 +155,7 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
     case SendDetailedMessages => generateSummaryAndSend
     case AddConciseAlarm(alarmDetails) => addConciseAlarm(alarmDetails)
     case SendConciseAlarm(alarmDetails) => reportSplunk(List(AlarmEvent.fromRawAlarm(alarmDetails, runID, genAlarmID())))
+    case unknownMessage => log.error(s"Received unknown message: $unknownMessage")
   }
 
   //todo: handle <no_subject_path_node>?
@@ -161,18 +163,18 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
 
   def generateSummaryAndSend = {
 
-    val batchedMessages: List[Future[AlarmEvent]] = processRefSet.view.map { processDetails => {
-      val pd = processDetails
-      val summaries: Future[AlarmEvent] = PpmSummarizer.summarize(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map { s =>
-        AlarmEvent.fromBatchedAlarm(ProcessSummary, pd, s.readableString, runID)
+    val batchedMessages: List[Future[AlarmEvent]] = processRefSet.view.map { case (pd, alarmIDs) => {
+
+      val summaries: Future[AlarmEvent] = PpmSummarizer.summarize(pd.processName, Some(pd.hostName), pd.pid).map { s =>
+        AlarmEvent.fromBatchedAlarm(ProcessSummary, pd, s.readableString, alarmIDs, runID)
       }
 
-      val completeTreeRepr = PpmSummarizer.fullTree(processDetails.processName, Some(processDetails.hostName), processDetails.pid).map { a =>
-        AlarmEvent.fromBatchedAlarm(ProcessActivity, pd, a.readableString, runID)
+      val completeTreeRepr = PpmSummarizer.fullTree(pd.processName, Some(pd.hostName), pd.pid).map { a =>
+        AlarmEvent.fromBatchedAlarm(ProcessActivity, pd, a.readableString, alarmIDs, runID)
       }
 
-      val mostNovel = PpmSummarizer.mostNovelActions(numMostNovel, processDetails.processName, processDetails.hostName, processDetails.pid).map { nm =>
-        AlarmEvent.fromBatchedAlarm(TopTwenty, pd, nm.mkString("\n"), runID)
+      val mostNovel = PpmSummarizer.mostNovelActions(numMostNovel, pd.processName, pd.hostName, pd.pid).map { nm =>
+        AlarmEvent.fromBatchedAlarm(TopTwenty, pd, nm.mkString("\n"), alarmIDs, runID)
       }
 
       (summaries, completeTreeRepr, mostNovel)
@@ -185,7 +187,7 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
       case Failure(res) => println(s"AlarmReporter: failed with $res!")
     }
     //todo: deletes the set without checking if the reportSplunk succeeded. Add error handling above
-    processRefSet = Set.empty
+    processRefSet = Map.empty
   }
 
   def flush () = {
@@ -196,9 +198,22 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
   }
 
   def addConciseAlarm (alarmDetails: AlarmDetails) = {
-    val conciseAlarm = AlarmEvent.fromRawAlarm(alarmDetails, runID, genAlarmID())
+
+    val alarmID = genAlarmID()
+    val conciseAlarm = AlarmEvent.fromRawAlarm(alarmDetails, runID, alarmID)
+
+    //update vars
     alarmSummaryBuffer = conciseAlarm :: alarmSummaryBuffer
-    processRefSet |= alarmDetails.processDetailsSet
+
+    alarmDetails.processDetailsSet.foreach{pd =>
+      processRefSet += (pd -> (alarmID :: processRefSet.getOrElse(pd, List.empty[Long])))
+    }
+
+    // is this a cleaner solution?
+    //    val tmp: Map[ProcessDetails, List[Long]] = alarmDetails.processDetailsSet.view.map{pd =>
+    //      pd -> (processRefSet.getOrElse(pd, List(alarmID)) ++ processRefSet(pd))
+    //    }.toMap
+    // Now use scalaz to merge the maps!
 
     if (alarmSummaryBuffer.length > maxbufferlength) {
       flush()
