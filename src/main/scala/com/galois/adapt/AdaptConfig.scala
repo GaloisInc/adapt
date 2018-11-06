@@ -10,6 +10,7 @@ import com.galois.adapt.cdm18.CDM18
 import com.galois.adapt.cdm19.{CDM19, RawCDM19Type}
 import org.apache.avro.specific.SpecificDatumReader
 import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.lucene.search.ControlledRealTimeReopenThread
 import pureconfig.error.{ConfigReaderFailures, ConvertFailure, NoValidCoproductChoiceFound, UnknownKey}
 import shapeless.Lazy
 
@@ -135,7 +136,14 @@ object AdaptConfig extends Utils {
   case class GuiConfig(enabled:Boolean)
   case class ConsoleConfig(enabled:Boolean)
   case class LogConfig(enabled:Boolean)
-  case class SplunkConfig(enabled:Boolean, token: String, host:String, port:Int, ssl:Boolean, bufferlength:Long)
+  case class SplunkConfig(
+    enabled:Boolean,
+    token: String,
+    host:String,
+    port:Int,
+    maxbufferlength:Long,
+    realtimeReportingPeriodSeconds:Int,
+    detailedReportingPeriodSeconds:Int)
   case class AlarmsConfig(
     splunk: SplunkConfig,
     logging: LogConfig,
