@@ -3,13 +3,15 @@ package com.galois.adapt
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import com.typesafe.scalalogging.LazyLogging
-import spray.json.{JsObject,JsString,JsValue}
+import spray.json.{JsObject, JsString, JsValue}
+
+import scala.concurrent.ExecutionContextExecutor
 //[Ref: https://doc.akka.io/docs/akka-http/10.0.2/scala/http/common/http-model.html]
 import HttpMethods._
 import akka.http.scaladsl.model.headers.{BasicHttpCredentials, GenericHttpCredentials}
 import akka.util.ByteString
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 import MediaTypes._
@@ -70,10 +72,10 @@ case class EventMsg(eventData: JsValue, time:Long, host:String="localhost", sour
 */
 
 case class SplunkHecClient(token: String, host:String, port:Int) extends LazyLogging{
-  implicit val executionContext = Application.system.dispatcher
-  val homeUri =  Uri.from(scheme = "http", host=host, port=port, path = "/services/collector/event/1.0")
+  implicit val executionContext: ExecutionContextExecutor = Application.system.dispatcher
+  val homeUri: Uri =  Uri.from(scheme = "http", host=host, port=port, path = "/services/collector/event/1.0")
 
-  def sendEvents(events:List[JsValue]) = {
+  def sendEvents(events:List[JsValue]): Unit = {
     val payLoad = events.map{e =>
       EventMsg(e, System.currentTimeMillis).toJson.toString
     }.mkString("")
@@ -81,7 +83,7 @@ case class SplunkHecClient(token: String, host:String, port:Int) extends LazyLog
     if (payLoad.nonEmpty) sendEventHttp(payLoad)
   }
 
-  def sendEventHttp(payLoad:String) = {
+  def sendEventHttp(payLoad:String): Unit = {
     //log.info("SplunkHttpMessage: " + event.toJson.toString)
     // customize every detail of HTTP request
     //val authorization = headers.Authorization(BasicHttpCredentials("Splunk", token))
@@ -98,7 +100,7 @@ case class SplunkHecClient(token: String, host:String, port:Int) extends LazyLog
 
     responseFuture.onComplete {
       case Success(res) => httpReqResponseHandler(res)
-      case Failure(res) => logger.error(s"splunk message not sent: ${res}");println("SplunkHecClient:splunk message not sent: ${res}")
+      case Failure(res) => logger.error(s"splunk message not sent: $res");println("SplunkHecClient:splunk message not sent: ${res}")
     }
     //val f = responseFuture.map(res => "asd").recover{ case t: Throwable => t.printStackTrace(); t.getMessage}
     //f
@@ -106,7 +108,7 @@ case class SplunkHecClient(token: String, host:String, port:Int) extends LazyLog
 
 
 
-  def httpReqResponseHandler(response: HttpResponse) = response.status match {
+  def httpReqResponseHandler(response: HttpResponse): Unit = response.status match {
     // Splunk's reponse for malformed data:
     //[INFO] [09/14/2018 23:52:07.572] [default-akka.actor.default-dispatcher-4] [splunkHecClient$(akka://default)] HttpResponse(400 Bad Request,List(Date: Fri, 14 Sep 2018 23:52:07 GMT, X-Content-Type-Options: nosniff, Vary: Authorization, Connection: Keep-Alive, X-Frame-Options: SAMEORIGIN, Server: Splunkd),HttpEntity.Strict(application/json,{"text":"No data","code":5}),HttpProtocol(HTTP/1.1))
 
@@ -114,6 +116,6 @@ case class SplunkHecClient(token: String, host:String, port:Int) extends LazyLog
     //[INFO] [09/14/2018 23:53:11.348] [default-akka.actor.default-dispatcher-5] [splunkHecClient$(akka://default)] HttpResponse(200 OK,List(Date: Fri, 14 Sep 2018 23:53:11 GMT, X-Content-Type-Options: nosniff, Vary: Authorization, Connection: Keep-Alive, X-Frame-Options: SAMEORIGIN, Server: Splunkd),HttpEntity.Strict(application/json,{"text":"Success","code":0}),HttpProtocol(HTTP/1.1))
 
         case OK => logger.info(response.toString)
-        case _ => logger.error(s"splunk message malformed? Failed with: ${response}")//;println("SplunkHecClient:Splunk rejected the message!")
+        case _ => logger.error(s"splunk message malformed? Failed with: $response")//;println("SplunkHecClient:Splunk rejected the message!")
       }
 }

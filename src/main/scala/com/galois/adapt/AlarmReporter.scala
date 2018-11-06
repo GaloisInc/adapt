@@ -16,6 +16,8 @@ import scala.util.{Failure, Success}
 import akka.actor.{Actor, ActorLogging, ActorRef, Cancellable, Props}
 import com.galois.adapt.NoveltyDetection.PpmTreeNodeAlarm
 import spray.json._
+
+import scala.concurrent.ExecutionContextExecutor
 //import spray.json.DefaultJsonProtocol._
 
 import com.typesafe.scalalogging.LazyLogging
@@ -81,7 +83,7 @@ case class AlarmEvent (
 
 
 case object AlarmEvent {
-  implicit val executionContext = system.dispatcher
+  implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
   def fromRawAlarm (alarmDetails: AlarmDetails, runID: String, alarmID: Long): AlarmEvent = {
     //key
@@ -90,7 +92,6 @@ case object AlarmEvent {
     val ppmTreeNodeAlarms: List[NoveltyDetection.PpmTreeNodeAlarm] = alarmDetails.alarm.details._3
 
     AlarmEvent(
-      //todo: Fix alarmID
       ConciseAlarmEvent(alarmDetails.treeName, alarmDetails.hostName, key, alarmDetails.alarm.details._1, alarmDetails.localProbThreshold, ppmTreeNodeAlarms, alarmID),
       AlarmEventMetaData(runID, "raw")
     )
@@ -137,7 +138,7 @@ case object SendDetailedMessages
 
 
 class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient: SplunkHecClient, alarmConfig: AdaptConfig.AlarmsConfig) extends Actor with ActorLogging {
-  implicit val executionContext = system.dispatcher
+  implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
   var alarmSummaryBuffer: List[AlarmEvent] = List.empty[AlarmEvent]
   //var processRefSet: Set[ProcessDetails] = Set.empty
@@ -161,7 +162,7 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
 
   def generateSummaryAndSend(): Unit = {
 
-    val batchedMessages: List[Future[AlarmEvent]] = processRefSet.view.map { case (pd, alarmIDs) => {
+    val batchedMessages: List[Future[AlarmEvent]] = processRefSet.view.map { case (pd, alarmIDs) =>
 
       val summaries: Future[AlarmEvent] = PpmSummarizer.summarize(pd.processName, Some(pd.hostName), pd.pid).map { s =>
         AlarmEvent.fromBatchedAlarm(ProcessSummary, pd, s.readableString, alarmIDs, runID)
@@ -176,13 +177,10 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
       }
 
       (summaries, completeTreeRepr, mostNovel)
-    }
     }.toList.flatMap(x => List(x._1, x._2, x._3))
 
-    val x = Future.sequence(batchedMessages).map(reportSplunk)
-    x.onComplete {
-      case Success(res) => ()
-      case Failure(res) => println(s"AlarmReporter: failed with $res!")
+    Future.sequence(batchedMessages).map(reportSplunk).onFailure{
+      case res => log.error(s"AlarmReporter: failed with $res."); println(s"AlarmReporter: failed with $res.")
     }
     //todo: deletes the set without checking if the reportSplunk succeeded. Add error handling above
     processRefSet = Map.empty
@@ -230,7 +228,7 @@ case class AlarmDetails (
 )
 
 object AlarmReporter extends LazyLogging {
-  implicit val executionContext = system.dispatcher
+  implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
   val runID: String = Application.randomIdentifier
   val alarmConfig: AdaptConfig.AlarmsConfig = AdaptConfig.alarmConfig
