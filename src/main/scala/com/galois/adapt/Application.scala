@@ -453,6 +453,33 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         ClosedShape
       }).run()
 
+    case "e4-no-ppm" =>
+
+      startWebServer()
+      statusActor ! InitMsg
+
+      // Write out debug states
+      val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
+
+      RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
+        import GraphDSL.Implicits._
+
+        val hostSources = cdmSources.values.toSeq
+        val mergeAdm = b.add(Merge[Either[ADM, EdgeAdm2Adm]](hostSources.size))
+
+        for (((host, source), i) <- hostSources.zipWithIndex) {
+          (source.via(printCounter(host.hostName, statusActor, 0)) via debug.debugBuffer(s"[${host.hostName}] 0 before ER")) ~>
+            (erMap(host.hostName) via debug.debugBuffer(s"[${host.hostName}] 1 after ER")) ~>
+            mergeAdm.in(i)
+        }
+
+        (mergeAdm.out via debug.debugBuffer(s"~ 0 after ADM merge")) ~>
+          (betweenHostDedup via debug.debugBuffer(s"~ 1 after cross-host deduplicate")) ~>
+          DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
+
+        ClosedShape
+      }).run()
+
     case "print-cdm" =>
       var i = 0
       RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
