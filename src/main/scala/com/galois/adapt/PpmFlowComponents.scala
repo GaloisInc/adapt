@@ -41,7 +41,8 @@ object PpmFlowComponents {
       val releaseQueue: mutable.Map[Long, DelayedESO]                              = loadMapFromDisk("releaseQueue", ppmConfig.components.releasequeue)
 
       // Shutdown hook to save the maps above back to disk when we shutdown
-//      if (ppmConfig.shouldsave) {
+      if (ppmConfig.shouldsaveppmpartialobservationaccumulators) {
+        throw new RuntimeException("TODO: Saving of PPM partial obsercation accumulators is not implemented on shutdown.")
 //        val runnable = new Runnable() {
 //          override def run(): Unit = {
 //            println(s"Saving state in PpmComponents...")
@@ -56,7 +57,7 @@ object PpmFlowComponents {
 //        ppmConfig.saveintervalseconds.foreach( interval =>
 //          system.scheduler.schedule(interval seconds, interval seconds, runnable)
 //        )
-//      }
+      }
 
       val eventsWithPredObj2: Set[EventType] = Set(EVENT_RENAME, EVENT_MODIFY_PROCESS, EVENT_ACCEPT, EVENT_EXECUTE,
         EVENT_CREATE_OBJECT, EVENT_RENAME, EVENT_OTHER, EVENT_MMAP, EVENT_LINK, EVENT_UPDATE, EVENT_CREATE_THREAD)
@@ -174,7 +175,7 @@ object PpmFlowComponents {
 
   // Load a mutable map from disk
   def loadMapFromDisk[T, U](name: String, fp: String)(implicit l: JsonReader[(T,U)]): mutable.Map[T,U] =
-    if (ppmConfig.shouldload) {
+    if (ppmConfig.shouldloadppmpartialobservationaccumulators) {
       val toReturn = mutable.Map.empty[T, U]
       Try {
         Files.lines(Paths.get(fp)).forEach(new Consumer[String] {
@@ -194,7 +195,7 @@ object PpmFlowComponents {
 
   // Write a mutable map to disk
   def saveMapToDisk[T, U](name: String, map: mutable.Map[T,U], fp: String)(implicit l: JsonWriter[(T,U)]): Unit =
-    if (ppmConfig.shouldsave) {
+    if (ppmConfig.shouldsaveppmpartialobservationaccumulators) {
       import sys.process._
       Try {
         val outputFile = new File(fp)
