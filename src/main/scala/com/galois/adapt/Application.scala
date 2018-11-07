@@ -655,11 +655,11 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 
   Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
     override def run(): Unit = {
-      val patienceLevel = 120 minutes
+      val patienceLevel = 48 hours
       implicit val timeout = Timeout(patienceLevel)
 
       println(s"Saving PPM trees to disk...")
-      val saveF = if (ppmConfig.shouldsave)
+      val saveF = if (ppmConfig.shouldsaveppmtree)
         ppmManagerActors.values.toList.foldLeft(Future.successful(Ack))((a,b) => a.flatMap(_ => (b ? SaveTrees(true)).mapTo[Ack.type]))
       else Future.successful( Ack )
 

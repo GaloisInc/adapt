@@ -113,8 +113,15 @@ object AdaptConfig extends Utils {
     eventtypemodelsdir: String,
     loadfilesuffix: String,
     savefilesuffix: String,
-    shouldload: Boolean,
-    shouldsave: Boolean,
+
+    shouldloadppmtree: Boolean,
+    shouldloadalarms: Boolean,
+    shouldloadppmpartialobservationaccumulators: Boolean,  // stream component state and also partialMap => state for producing a PPM tree observation
+
+    shouldsaveppmtree: Boolean,
+    shouldsavealarms: Boolean,
+    shouldsaveppmpartialobservationaccumulators: Boolean,
+
     rotatescriptpath: String,
     components: PpmConfigComponents,
     iforestfreqminutes: Int,
