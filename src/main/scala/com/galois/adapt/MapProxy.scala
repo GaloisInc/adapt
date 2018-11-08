@@ -36,7 +36,7 @@ class MapProxy(
   private val fileDb: DB = fileDbPath match {
     case Some(p) =>
       val parentDir = new File(p).getParent
-      if ( ! new File(parentDir).exists()) {
+      if ( ! Option(new File(parentDir)).fold(true)(_.exists()) ) {
         println(s"Creating parent directory for map.db file at: $parentDir")
         new File(parentDir).mkdir()
       }
