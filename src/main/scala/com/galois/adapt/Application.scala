@@ -402,6 +402,19 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       )
       Runtime.getRuntime.halt(1)
 
+    case "pre-e4-test" =>
+      startWebServer()
+      statusActor ! InitMsg
+
+      RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
+        import GraphDSL.Implicits._
+        val hostSources = cdmSources.values.toSeq
+        for (((host, source), i) <- hostSources.zipWithIndex) {
+          source.via(printCounter(host.hostName, statusActor, 0)) ~> Sink.ignore
+        }
+        ClosedShape
+      }).run()
+
     case "e4" | "e4-no-db" =>
       val needsDb: Boolean = runFlow == "e4"
 
@@ -659,15 +672,19 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       implicit val timeout = Timeout(patienceLevel)
 
       println(s"Saving PPM trees to disk...")
-      val saveF = if (ppmConfig.shouldsaveppmtree)
-        ppmManagerActors.values.toList.foldLeft(Future.successful(Ack))((a,b) => a.flatMap(_ => (b ? SaveTrees(true)).mapTo[Ack.type]))
-      else Future.successful( Ack )
+      val saveF =
+        if (ppmConfig.shouldsaveppmtrees)
+          ppmManagerActors.values.toList.foldLeft(Future.successful(Ack))((a,b) => a.flatMap(_ => (b ? SaveTrees(true)).mapTo[Ack.type]))
+        else Future.successful( Ack )
 
-      val shutdownF = saveF.flatMap{_ => system.terminate() }
+      val shutdownF = saveF.flatMap{_ =>
+        println("Expiring MapDB contents to disk...")
+        mapProxy.mapdbCdm2AdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
+        mapProxy.mapdbCdm2CdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
 
-      println("Expiring MapDB contents to disk...")
-      mapProxy.mapdbCdm2AdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
-      mapProxy.mapdbCdm2CdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
+        println("Shutting down the actor system")
+        system.terminate()
+      }
 
       Await.result(shutdownF, patienceLevel)
     }

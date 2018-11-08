@@ -217,9 +217,9 @@ case class PpmDefinition[DataShape](
       isCurrentlySaving.set(true)
 
       implicit val timeout = Timeout(593 seconds)
-      val treeWriteF = if (ppmConfig.shouldsaveppmtree) {
+      val treeWriteF = if (ppmConfig.shouldsaveppmtrees) {
         (tree ? PpmNodeActorBeginGetTreeRepr(name)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map { reprResult =>
-          if (ppmConfig.shouldsaveppmtree) reprResult.repr.writeToFile(outputFilePath)
+          if (ppmConfig.shouldsaveppmtrees) reprResult.repr.writeToFile(outputFilePath)
         }
       } else Future.successful( () )
 
