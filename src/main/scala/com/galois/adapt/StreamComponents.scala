@@ -22,7 +22,8 @@ object FlowComponents {
     var counter = startingCount
     var originalStartTime = 0L
     var lastTimestampNanos = 0L
-    val populationCounter = MutableMap.empty[String, Long]
+    val recentPopulationCounter = MutableMap.empty[String, Long]
+    val totalPopulationCounter = MutableMap.empty[String, Long]
 
     { item: T =>  // Type annotation T is a compilation hack! No runtime effect because it's generic.
       if (lastTimestampNanos == 0L) {
@@ -35,7 +36,8 @@ object FlowComponents {
         case (_, i: AnyRef) => i.getClass.getSimpleName
         case i => i.getClass.getSimpleName
       }
-      populationCounter += (className -> (populationCounter.getOrElse(className, 0L) + 1))
+      recentPopulationCounter += (className -> (recentPopulationCounter.getOrElse(className, 0L) + 1))
+      totalPopulationCounter  += (className -> (totalPopulationCounter.getOrElse(className, 0L)  + 1))
 
       if (counter % every == 0) {
         val nowNanos = System.nanoTime()
@@ -47,11 +49,12 @@ object FlowComponents {
           counterName,
           counter,
           every,
-          populationCounter.toMap,
+          recentPopulationCounter.toMap,
+          totalPopulationCounter.toMap,
           durationSeconds
         )
 
-        populationCounter.clear()
+        recentPopulationCounter.clear()
 
         lastTimestampNanos = nowNanos
       }
