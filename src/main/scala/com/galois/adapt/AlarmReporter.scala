@@ -231,9 +231,10 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
   }
 
   def reportSplunk (messages: List[AlarmEvent]): Unit = {
-    val messagesJson = messages.map(_.toJson)
+    val messagesJson: List[JsValue] = messages.map(_.toJson)
+    val messageString = messagesJson.mkString("\n")
     splunkHecClient.sendEvents(messagesJson)
-    pw.foreach(_.println(messagesJson.toString))
+    pw.foreach(_.println(messageString))
     //summaries.foreach(pwProcessSummary.println)
     //completeTreeRepr.foreach(pwProcessActivity.println)
     //mostNovel.foreach(pwTopTwenty.println)
