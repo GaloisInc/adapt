@@ -29,7 +29,7 @@ lazy val adapt = (project in file(".")).settings(
     "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV,
     "com.typesafe.akka" %% "akka-stream" % akkaV,
     "com.typesafe.akka" %% "akka-stream-kafka" % "0.22",
-    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6",
+    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.1.1",
     "org.mapdb" % "mapdb" % "3.0.7",
     "com.github.alexandrnikitin" %% "bloom-filter" % "0.10.1",
     "org.neo4j" % "neo4j-community" % neoV,

@@ -93,7 +93,7 @@ object AdaptConfig extends Utils {
     cdm2cdmlrucachesize: Long = 10000000L,
     cdm2admlrucachesize: Long = 30000000L,
     ignoreeventremaps: Boolean,
-    mapdb: String,
+    mapdb: Option[String],
     mapdbbypasschecksum: Boolean,
     mapdbtransactions: Boolean
   )
@@ -111,10 +111,18 @@ object AdaptConfig extends Utils {
     pluckingdelay: Int,
     basedir: String,
     eventtypemodelsdir: String,
-    loadfilesuffix: String,
-    savefilesuffix: String,
-    shouldload: Boolean,
-    shouldsave: Boolean,
+    loadfilesuffix: String = "",
+    savefilesuffix: String = "",
+
+    shouldloadppmtree: Boolean,
+    shouldloadalarms: Boolean,
+    shouldloadlocalprobabilitiesfromalarms: Boolean,
+    shouldloadppmpartialobservationaccumulators: Boolean,  // stream component state and also partialMap => state for producing a PPM tree observation
+
+    shouldsaveppmtree: Boolean,
+    shouldsavealarms: Boolean,
+    shouldsaveppmpartialobservationaccumulators: Boolean,
+
     rotatescriptpath: String,
     components: PpmConfigComponents,
     iforestfreqminutes: Int,

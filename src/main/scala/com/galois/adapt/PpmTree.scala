@@ -84,43 +84,42 @@ case class PpmDefinition[DataShape](
 
   val basePath: String = ppmConfig.basedir + name + "-" + hostName
 
-  val inputFilePath  = Try(basePath + ppmConfig.loadfilesuffix + ".csv").toOption
-  val outputFilePath = Try(basePath + ppmConfig.savefilesuffix + ".csv").toOption.filter(_ => ppmConfig.shouldsave)
+  val inputFilePath  = basePath + ppmConfig.loadfilesuffix + ".csv"
+  val outputFilePath = basePath + ppmConfig.savefilesuffix + ".csv"
+  val inputAlarmFilePath  = basePath + ppmConfig.loadfilesuffix + "_alarm.json"
+  val outputAlarmFilePath = basePath + ppmConfig.savefilesuffix + "_alarm.json"
 
   val startingState =
-      if (ppmConfig.shouldload)
-        inputFilePath.flatMap { s =>
-          TreeRepr.readFromFile(s).map { t => println(s"Reading tree $name on host: $hostName in from file: $s"); t }
-            .orElse {println(s"Loading no data for tree: $name  on host: $hostName"); None}
-        }
-      else { println(s"Loading no data for tree: $name  on host: $hostName"); None }
+      if (ppmConfig.shouldloadppmtree)
+        TreeRepr.readFromFile(inputFilePath).map { t => println(s"Reading tree $name on host: $hostName in from file: $inputFilePath"); t }
+          .orElse {println(s"FAILED to load data for tree: $name  on host: $hostName"); None}
+      else None
 
   val tree = context.actorOf(Props(classOf[PpmNodeActor], name, alarmActor, startingState), name = name)
 
-  val inputAlarmFilePath  = Try(basePath + ppmConfig.loadfilesuffix + "_alarm.json").toOption
-  val outputAlarmFilePath = Try(basePath + ppmConfig.savefilesuffix + "_alarm.json").toOption.filter(_ => ppmConfig.shouldsave)
-
   var alarms: Map[List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])] =
-    if (ppmConfig.shouldload)
-      inputAlarmFilePath.flatMap { fp =>
-        Try {
-          import spray.json._
-          import ApiJsonProtocol._
-
-          val content = new String(Files.readAllBytes(new File(fp).toPath()), StandardCharsets.UTF_8)
-          content.parseJson.convertTo[List[(List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].toMap
-        }.toOption orElse  {
-          println(s"Did not load alarms for tree: $name  on host: $hostName. Starting with empty tree state.")
-          None
-        }
-      }.getOrElse(Map.empty[List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])])
-    else {
-      println(s"Loading no alarms for tree: $name  on host: $hostName")
-      Map.empty
-    }
+    if (ppmConfig.shouldloadalarms)
+      Try {
+        val content = new String(Files.readAllBytes(new File(inputAlarmFilePath).toPath), StandardCharsets.UTF_8)
+        content.parseJson.convertTo[List[(List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].toMap
+      } getOrElse {
+        println(s"FAILED to load alarms for tree: $name  on host: $hostName. Starting with empty tree state.")
+        Map.empty[List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])]
+      }
+    else Map.empty
 
   var localProbAccumulator: SortedMap[Float,Int] = // If there are more than 2,147,483,647 alarms with a given LP; then need Long.
-    if (shouldApplyThreshold) SortedMap.empty(Ordering[Float]) ++ alarms.map(_._2._3.last.localProb).groupBy(identity).mapValues(_.size)
+    if (ppmConfig.shouldloadlocalprobabilitiesfromalarms && shouldApplyThreshold) {
+      val noveltyLPs =
+        Try {
+          val content = new String(Files.readAllBytes(new File(inputAlarmFilePath).toPath), StandardCharsets.UTF_8)
+          content.parseJson.convertTo[List[(List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].map(_._2._3.last.localProb).groupBy(identity).mapValues(_.size)
+        } getOrElse {
+          println(s"FAILED to load local probability alarms for tree: $name  on host: $hostName. Starting with empty local probability accumulator.")
+          Map.empty[Float, Int]
+        }
+      SortedMap.empty(Ordering[Float]) ++ noveltyLPs
+    }
     else SortedMap.empty(Ordering[Float])
 
   var localProbCount: Int = localProbAccumulator.values.sum
@@ -228,29 +227,36 @@ case class PpmDefinition[DataShape](
       isCurrentlySaving.set(true)
 
       implicit val timeout = Timeout(593 seconds)
-      (tree ? PpmNodeActorBeginGetTreeRepr(name)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{ reprResult =>
-        val repr = reprResult.repr
-        outputFilePath.foreach(p => repr.writeToFile(p + s"_$hostName"))
-        outputAlarmFilePath.foreach((fp: String) => {
-          import spray.json._
-          import ApiJsonProtocol._
+      val treeWriteF = if (ppmConfig.shouldsaveppmtree) {
+        (tree ? PpmNodeActorBeginGetTreeRepr(name)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map { reprResult =>
+          if (ppmConfig.shouldsaveppmtree) reprResult.repr.writeToFile(outputFilePath)
+        }
+      } else Future.successful( () )
 
-          val content = alarms.toList.toJson.prettyPrint
-          val outputFile = new File(fp)
-          if ( ! outputFile.exists) outputFile.createNewFile()
-          Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
-        })
-
-        if (this.isInstanceOf[PartialPpm[_]]) this.asInstanceOf[PartialPpm[_]].saveStateSync(hostName)
-
-        lastSaveCompleteMillis.set(System.currentTimeMillis)
-        isCurrentlySaving.set(false)
-      }.failed.map { case e =>
-        println(s"Error writing to file for $name tree: ${e.getMessage}")
-        isCurrentlySaving.set(false)
+      if (ppmConfig.shouldsavealarms) {
+        val content = alarms.toList.toJson.prettyPrint
+        val outputFile = new File(outputAlarmFilePath)
+        if ( ! outputFile.exists) outputFile.createNewFile()
+        Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
       }
+
+      if (this.isInstanceOf[PartialPpm[_]] && ppmConfig.shouldsaveppmpartialobservationaccumulators)
+        this.asInstanceOf[PartialPpm[_]].saveStateSync(hostName)
+
+      treeWriteF.transform(
+        _ => {
+          lastSaveCompleteMillis.set(System.currentTimeMillis)
+          isCurrentlySaving.set(false)
+        },
+        e => {
+          println(s"Error writing to file for $name tree: ${e.getMessage}")
+          isCurrentlySaving.set(false)
+          e
+        }
+      )
     } else Future.successful(())
   }
+
   def prettyString: Future[String] = {
     implicit val timeout = Timeout(593 seconds)
     (tree ? PpmNodeActorBeginGetTreeRepr(name)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map(_.repr.toString)
@@ -259,16 +265,18 @@ case class PpmDefinition[DataShape](
 
 trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
   type PartialShape = DataShape
+
   val discriminators: List[Discriminator[PartialShape]]
+
   require(discriminators.length == 2, "PartialPpm trees must have a discriminator length of exactly two; the first extracting from the observation written into the partialMap, and the second extracting from the observation that completes the match. NOTE: they can be reordered (mixed) by overriding the `arrangeExtracted` function.")
-  implicit def partialMapJson: RootJsonFormat[(JoinType, (List[ExtractedValue],Set[NamespacedUuidDetails]))] = implicitly[RootJsonFormat[(JoinType, (List[ExtractedValue], Set[NamespacedUuidDetails]))]]
-  var partialMap: mutable.Map[JoinType, (List[ExtractedValue],Set[NamespacedUuidDetails])] = (inputFilePath, ppmConfig.shouldload) match {
-    case (Some(fp), true) =>
+
+  implicit val partialMapJson: RootJsonFormat[(JoinType, (List[ExtractedValue],Set[NamespacedUuidDetails]))] =
+    implicitly[RootJsonFormat[(JoinType, (List[ExtractedValue], Set[NamespacedUuidDetails]))]]
+
+  val partialMap: mutable.Map[JoinType, (List[ExtractedValue],Set[NamespacedUuidDetails])] = (inputFilePath, ppmConfig.shouldloadppmpartialobservationaccumulators) match {
+    case (fp, true) =>
       val loadPath = fp + ".partialMap"
       Try {
-        import spray.json._
-        import ApiJsonProtocol._
-
         val toReturn = mutable.Map.empty[JoinType,(List[ExtractedValue],Set[NamespacedUuidDetails])]
         Files.lines(Paths.get(loadPath)).forEach(new Consumer[String]{
           override def accept(line: String): Unit = {
@@ -286,6 +294,24 @@ trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
           mutable.Map.empty
       }
     case _ => mutable.Map.empty
+  }
+
+  def saveStateSync(hostName: HostName): Unit = {
+    outputFilePath.foreach { savePath =>
+      Try {
+        val outputFile = new File(savePath + ".partialMap")
+        if (!outputFile.exists) outputFile.createNewFile()
+
+        val writer = new BufferedWriter(new FileWriter(outputFile))
+        for (pair <- this.partialMap) {
+          writer.write(pair.toJson.compactPrint + "\n")
+        }
+        writer.close()
+
+      } getOrElse {
+        println(s"Failed to save partial map to disk $name at $savePath.partialMap: ${partialMap.size}")
+      }
+    }
   }
 
   def getJoinCondition(observation: PartialShape): Option[JoinType]
@@ -310,28 +336,6 @@ trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
               tree ! PpmNodeActorBeginObservation(name, arrangeExtracted(firstExtracted ++ newlyExtracted), uuidDetailSet ++ uuidCollector(observation), observation._1.latestTimestampNanos, myself.alarmFilter)
             }
           }
-      }
-    }
-  }
-
-
-  def saveStateSync(hostName: HostName): Unit = {
-    outputFilePath.foreach { savePath =>
-      Try {
-        import spray.json._
-        import ApiJsonProtocol._
-
-        val outputFile = new File(savePath + ".partialMap" + s"_$hostName")
-        if (!outputFile.exists) outputFile.createNewFile()
-
-        val writer = new BufferedWriter(new FileWriter(outputFile))
-        for (pair <- this.partialMap) {
-          writer.write(pair.toJson.compactPrint + "\n")
-        }
-        writer.close()
-
-      } getOrElse {
-        println(s"Failed to save partial map to disk $name at $savePath.partialMap: ${partialMap.size}")
       }
     }
   }
@@ -591,7 +595,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
 
   import NoveltyDetection._
 
-  val cdmSanityTrees = List(
+  lazy val cdmSanityTrees = List(
     PpmDefinition[CurrentCdm]("CDM-Event",
       d => d.isInstanceOf[cdm18.Event],
       List(
@@ -665,7 +669,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
   ).par
 
 
-  val iforestTrees = List(
+  lazy val iforestTrees = List(
     PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestProcessEventType",
       d => d._3.nonEmpty,
       List(
@@ -702,7 +706,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
   ).par
 
 
-  val esoTrees = List(
+  lazy val esoTrees = List(
     PpmDefinition[DataShape]( "ProcessFileTouches",
       d => readAndWriteTypes.contains(d._1.eventType),
       List(
@@ -888,7 +892,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
   ).par
 
 
-  val seoesTrees = List(
+  lazy val seoesTrees = List(
     new PpmDefinition[DataShape]("FileExecuteDelete",
       d => d._3._1.isInstanceOf[AdmFileObject],
       List(
@@ -916,12 +920,6 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         (d: DataShape) => d._1.eventType == EVENT_EXECUTE,
         (d: DataShape) => d._1.eventType == EVENT_UNLINK
       )
-
-      override def partialMapJson = {
-        import spray.json._
-        import ApiJsonProtocol._
-        implicitly[RootJsonFormat[(String,(List[ExtractedValue],Set[NamespacedUuidDetails]))]]
-      }
     },
 
     new PpmDefinition[DataShape]("FilesWrittenThenExecuted",
@@ -951,12 +949,6 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         (d: DataShape) => writeTypes.contains(d._1.eventType),
         (d: DataShape) => d._1.eventType == EVENT_EXECUTE
       )
-
-      override def partialMapJson = {
-        import spray.json._
-        import ApiJsonProtocol._
-        implicitly[RootJsonFormat[(String,(List[ExtractedValue],Set[NamespacedUuidDetails]))]]
-      }
     },
 
     new PpmDefinition[DataShape]("CommunicationPathThroughObject",
@@ -1003,13 +995,11 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
           (d._3._1.isInstanceOf[AdmSrcSinkObject] && d._3._1.asInstanceOf[AdmSrcSinkObject].srcSinkType == MEMORY_SRCSINK)) &&  // Any kind of event to a memory object.
           (partialMap.contains(getJoinCondition(d).get) && d._2._2.exists(_.path != partialMap(getJoinCondition(d).get)._1.head))  // subject names are distinct
       )
-
-      override def partialMapJson = implicitly[RootJsonFormat[(AdmUUID,(List[ExtractedValue],Set[NamespacedUuidDetails]))]]
     }
   ).par
 
 
-  val oeseoTrees = List(
+  lazy val oeseoTrees = List(
     new PpmDefinition[DataShape]("ProcessWritesFileSoonAfterNetflowRead",
       d => readAndWriteTypes.contains(d._1.eventType),
       List(
@@ -1042,10 +1032,6 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         (eso: DataShape) => eso._3._1.isInstanceOf[AdmNetFlowObject] && readTypes.contains(eso._1.eventType),
         (eso: DataShape) => eso._3._1.isInstanceOf[AdmFileObject] && writeTypes.contains(eso._1.eventType)
       )
-
-      override def partialMapJson =
-        implicitly[RootJsonFormat[(AdmUUID,(List[ExtractedValue],Set[NamespacedUuidDetails]))]]
-
     }
   ).par
 
@@ -1062,7 +1048,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
     def invert = CrossHostNetObs(sendRec.invert, remoteAddress, remotePort, localAddress, localPort)
   }
 
-  val crossHostTrees = List(
+  lazy val crossHostTrees = List(
 
     new PpmDefinition[DataShape]("CrossHostProcessCommunication",
       d => netFlowTypes.contains(d._1.eventType) && (d._3._1 match {
@@ -1168,18 +1154,23 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
 
 
 
-  val iforestEnabled = ppmConfig.iforestenabled
-
   lazy val admPpmTrees =
     if (hostName == hostNameForAllHosts) crossHostTrees
     else esoTrees ++ seoesTrees ++ oeseoTrees
 
-  lazy val iforestTreesToUse = if (iforestEnabled && hostName != hostNameForAllHosts) iforestTrees else Nil
+  lazy val iforestTreesToUse = if (ppmConfig.iforestenabled && hostName != hostNameForAllHosts) iforestTrees else Nil
 
   val ppmList =
     if (hostName == hostNameForAllHosts) admPpmTrees
     else cdmSanityTrees ++ admPpmTrees ++ iforestTreesToUse
 
+
+
+  def saveTrees(): Future[Unit] = {
+    val saveFutures = ppmList.map(_.saveStateAsync())
+    if (ppmConfig.iforestenabled) saveIforestModel()
+    Future.sequence(saveFutures.toList).map(_ => () )
+  }
 
   def saveIforestModel(): Unit = {
     val iForestTree = iforestTrees.find(_.name == "iForestProcessEventType")
@@ -1263,7 +1254,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
           Future.successful(())
       }
 
-      if (iforestEnabled) {
+      if (ppmConfig.iforestenabled) {
         Try(
           (e, s, subPathNodes.asInstanceOf[Set[AdmPathNode]])
         ) match {
@@ -1271,6 +1262,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
           case Failure(err) => log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
         }
       }
+
       Try(
         Await.result(f, 15 seconds)
       ).failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
@@ -1316,7 +1308,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
     case InitMsg =>
       if ( ! didReceiveInit) {
         didReceiveInit = true
-        if (iforestEnabled)   // TODO: If using iForest again in the future, come back and refactor this to use the right host name!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        if (ppmConfig.iforestenabled)   // TODO: If using iForest again in the future, come back and refactor this to use the right host name!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
           Future {
             Application.ppmManagerActors.keys.foreach(hostName => EventTypeModels.evaluateModels(context.system, hostName))
           }.recoverWith{ case e => e.printStackTrace(); throw e }
@@ -1325,17 +1317,16 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
 
     case SaveTrees(shouldConfirm) =>
       val s = sender()
-      val saveFutures = ppmList.map(_.saveStateAsync())
-      if (iforestEnabled) saveIforestModel()
-      if (shouldConfirm) Future.sequence(saveFutures.toList).onComplete(_ => s ! Ack )
+      val saveTreesF = saveTrees()
+      if (shouldConfirm) saveTreesF.onComplete(_ => s ! Ack )
 
     case CompleteMsg =>
       if ( ! didReceiveComplete) {
         println(s"PPM Manager with hostName: $hostName is completing the stream.")
         didReceiveComplete = true
-        val ppmSaveFutures = ppmList.map{ ppm => ppm.saveStateAsync() }
-        if (iforestEnabled) saveIforestModel()
-        Await.ready(Future.sequence(ppmSaveFutures.seq), 603 seconds)
+        val saveTreesF = saveTrees()
+        if (ppmConfig.iforestenabled) saveIforestModel()
+        Await.ready(saveTreesF, 48 hours)
       }
 
     case x =>
