@@ -116,6 +116,7 @@ object AdaptConfig extends Utils {
 
     shouldloadppmtree: Boolean,
     shouldloadalarms: Boolean,
+    shouldloadlocalprobabilitiesfromalarms: Boolean,
     shouldloadppmpartialobservationaccumulators: Boolean,  // stream component state and also partialMap => state for producing a PPM tree observation
 
     shouldsaveppmtrees: Boolean,

@@ -14,7 +14,8 @@ class StatusActor extends Actor {
 
   var currentlyIngesting = false
   var duplicateAlarmCount = 0L
-  val populationLogs: mutable.Map[String, PopulationLog] = mutable.Map.empty
+  val recentPopulationLogs: mutable.Map[String, PopulationLog] = mutable.Map.empty
+  val totalPopulationLogs: mutable.Map[String, PopulationLog] = mutable.Map.empty
 
   // This is aggrgeated over all dedup stages in the akka-streams graph we are running
   def blockEdgesCount: Long = DeduplicateNodesAndEdges.blockedEdgesCount
@@ -41,14 +42,10 @@ class StatusActor extends Actor {
   def currentTime: Long = EntityResolution.monotonicTime
   def sampledTime: Long = EntityResolution.sampledTime
 
-  val generalRecords = mutable.Map.empty[String,Any]
-
-  val totalPopulationLog = mutable.Map.empty[String, Long]
-  var recentPopulationLog = Map.empty[String, Long]
 
   def calculateStats(): StatusReport = StatusReport(
     currentlyIngesting,
-    populationLogs.values.toList,
+    recentPopulationLogs.values.toList,
     uuidRemapperSize,
     deduplicateSize,
     uuidsBlocking,
@@ -72,7 +69,7 @@ class StatusActor extends Actor {
     }
 
     case IncrementAlarmDuplicateCount => duplicateAlarmCount += 1
-    case p: PopulationLog => populationLogs.put(p.name, p)
+    case p: PopulationLog => recentPopulationLogs.put(p.name, p)
     case InitMsg => currentlyIngesting = true
     case CompleteMsg => currentlyIngesting = false
   }
@@ -106,6 +103,7 @@ case class PopulationLog(
   position: Long,
   every: Int,
   counter: Map[String,Long],
+  totalCounter: Map[String,Long],
   secondsThisEvery: Double
 )
 

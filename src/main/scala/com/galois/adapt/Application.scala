@@ -23,6 +23,7 @@ import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.language.postfixOps
+import sys.process._
 import scala.util.{Failure, Success, Try}
 import AdaptConfig._
 import com.galois.adapt.PpmFlowComponents.CompletedESO
@@ -51,13 +52,15 @@ object Application extends App {
     val date: java.util.Date = java.util.Calendar.getInstance.getTime                 // Right now
     val cores: Int = Runtime.getRuntime.availableProcessors                           // # cores available to the JVM
     val freeGb: Double = Runtime.getRuntime.totalMemory().toDouble / 1e9              // GB available to the JVM
+    val commit: Try[String] = Try("git rev-parse HEAD".!!)
 
     Array(
       "Identifier:" -> randomIdentifier,
       "Host name:"  -> hostname.toOption.fold("could not determine host name")(_.toString),
       "Date:"       -> date.toString,
       "Cores:"      -> cores.toString,
-      "Mem (GB):"   -> freeGb.toString
+      "Mem (GB):"   -> freeGb.toString,
+      "Git commit:" -> commit.getOrElse("could not determine git commit")
     )
   }
 
@@ -462,6 +465,33 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
           (broadcastAdm.out(1) via debug.debugBuffer(s"~ 2 before DB sink")).via(printCounter("DB counter", statusActor)) ~>
             DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
         }
+
+        ClosedShape
+      }).run()
+
+    case "e4-no-ppm" =>
+
+      startWebServer()
+      statusActor ! InitMsg
+
+      // Write out debug states
+      val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
+
+      RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
+        import GraphDSL.Implicits._
+
+        val hostSources = cdmSources.values.toSeq
+        val mergeAdm = b.add(Merge[Either[ADM, EdgeAdm2Adm]](hostSources.size))
+
+        for (((host, source), i) <- hostSources.zipWithIndex) {
+          (source.via(printCounter(host.hostName, statusActor, 0)) via debug.debugBuffer(s"[${host.hostName}] 0 before ER")) ~>
+            (erMap(host.hostName) via debug.debugBuffer(s"[${host.hostName}] 1 after ER")) ~>
+            mergeAdm.in(i)
+        }
+
+        (mergeAdm.out via debug.debugBuffer(s"~ 0 after ADM merge")) ~>
+          (betweenHostDedup via debug.debugBuffer(s"~ 1 after cross-host deduplicate")) ~>
+          DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
 
         ClosedShape
       }).run()
