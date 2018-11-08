@@ -144,10 +144,15 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
 
-  val pwRawAlarm: PrintWriter = new PrintWriter(new FileOutputStream(new File(logFilenamePrefix + "Raw"),true))
-  val pwProcessActivity: PrintWriter = new PrintWriter(new FileOutputStream(new File(logFilenamePrefix + "ProcessActivity"),true))
-  val pwProcessSummary: PrintWriter = new PrintWriter(new FileOutputStream(new File(logFilenamePrefix + "ProcessSummary"),true))
-  val pwTopTwenty: PrintWriter = new PrintWriter(new FileOutputStream(new File(logFilenamePrefix + "TopTwenty"),true))
+  val pwAllAlarms: PrintWriter = new PrintWriter(new FileOutputStream(new File(logFilenamePrefix + "AllAlarms"),true))
+  //val pwRawAlarm: PrintWriter = new PrintWriter(new FileOutputStream(new File(logFilenamePrefix + "Raw"),true))
+  //val pwDetailedAlarm: PrintWriter = new PrintWriter(new FileOutputStream(new File(logFilenamePrefix + "DetailedAlarm"),true))
+  //val pwProcessActivity: PrintWriter = new PrintWriter(new FileOutputStream(new File(logFilenamePrefix + "ProcessActivity"),true))
+  //val pwProcessSummary: PrintWriter = new PrintWriter(new FileOutputStream(new File(logFilenamePrefix + "ProcessSummary"),true))
+  //val pwTopTwenty: PrintWriter = new PrintWriter(new FileOutputStream(new File(logFilenamePrefix + "TopTwenty"),true))
+
+  val pw = List(pwAllAlarms)
+  pw.foreach(_.println(s"runID: $runID"))
 
   var alarmSummaryBuffer: List[AlarmEvent] = List.empty[AlarmEvent]
   //var processRefSet: Set[ProcessDetails] = Set.empty
@@ -177,17 +182,13 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
         AlarmEvent.fromBatchedAlarm(ProcessSummary, pd, s.readableString, alarmIDs, runID)
       }
 
-      val completeTreeRepr = PpmSummarizer.fullTree(pd.processName, Some(pd.hostName), pd.pid).map { a =>
+      val completeTreeRepr: Future[AlarmEvent] = PpmSummarizer.fullTree(pd.processName, Some(pd.hostName), pd.pid).map { a =>
         AlarmEvent.fromBatchedAlarm(ProcessActivity, pd, a.readableString, alarmIDs, runID)
       }
 
-      val mostNovel = PpmSummarizer.mostNovelActions(numMostNovel, pd.processName, pd.hostName, pd.pid).map { nm =>
+      val mostNovel: Future[AlarmEvent] = PpmSummarizer.mostNovelActions(numMostNovel, pd.processName, pd.hostName, pd.pid).map { nm =>
         AlarmEvent.fromBatchedAlarm(TopTwenty, pd, nm.mkString("\n"), alarmIDs, runID)
       }
-
-      summaries.foreach(pwProcessSummary.println)
-      completeTreeRepr.foreach(pwProcessActivity.println)
-      mostNovel.foreach(pwTopTwenty.println)
 
       (summaries, completeTreeRepr, mostNovel)
     }.toList.flatMap(x => List(x._1, x._2, x._3))
@@ -202,7 +203,6 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
   def flush (): Unit = {
     if (alarmSummaryBuffer.nonEmpty) {
       reportSplunk(alarmSummaryBuffer)
-      alarmSummaryBuffer.foreach(pwRawAlarm.println)
       alarmSummaryBuffer = List.empty
     }
   }
@@ -210,7 +210,7 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
   def addConciseAlarm (alarmDetails: AlarmDetails): Unit = {
 
     val alarmID = genAlarmID()
-    val conciseAlarm = AlarmEvent.fromRawAlarm(alarmDetails, runID, alarmID)
+    val conciseAlarm: AlarmEvent = AlarmEvent.fromRawAlarm(alarmDetails, runID, alarmID)
 
     //update vars
     alarmSummaryBuffer = conciseAlarm :: alarmSummaryBuffer
@@ -233,17 +233,18 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
   def reportSplunk (messages: List[AlarmEvent]): Unit = {
     val messagesJson = messages.map(_.toJson)
     splunkHecClient.sendEvents(messagesJson)
+    pw.foreach(_.println(messagesJson.toString))
+    //summaries.foreach(pwProcessSummary.println)
+    //completeTreeRepr.foreach(pwProcessActivity.println)
+    //mostNovel.foreach(pwTopTwenty.println)
+    //alarmSummaryBuffer.foreach(pwRawAlarm.println)
   }
 
   override def postStop(): Unit = {
     flush()
     generateSummaryAndSend()
     //close the file
-    pwRawAlarm.close()
-    pwProcessActivity.close()
-    pwProcessSummary.close()
-    pwTopTwenty.close()
-
+    pw.foreach(_.close)
   }
 }
 
