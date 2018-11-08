@@ -23,6 +23,7 @@ import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.language.postfixOps
+import sys.process._
 import scala.util.{Failure, Success, Try}
 import AdaptConfig._
 import com.galois.adapt.PpmFlowComponents.CompletedESO
@@ -51,13 +52,15 @@ object Application extends App {
     val date: java.util.Date = java.util.Calendar.getInstance.getTime                 // Right now
     val cores: Int = Runtime.getRuntime.availableProcessors                           // # cores available to the JVM
     val freeGb: Double = Runtime.getRuntime.totalMemory().toDouble / 1e9              // GB available to the JVM
+    val commit: Try[String] = Try("git rev-parse HEAD".!!)
 
     Array(
       "Identifier:" -> randomIdentifier,
       "Host name:"  -> hostname.toOption.fold("could not determine host name")(_.toString),
       "Date:"       -> date.toString,
       "Cores:"      -> cores.toString,
-      "Mem (GB):"   -> freeGb.toString
+      "Mem (GB):"   -> freeGb.toString,
+      "Git commit:" -> commit.getOrElse("could not determine git commit")
     )
   }
 
