@@ -131,7 +131,7 @@ case object TopTwenty extends AlarmCategory {
 case class AddConciseAlarm (a: AlarmDetails)
 
 // Skip the concise alarm alarm buffer and send the message
-case class SendConciseAlarm (a: AlarmDetails)
+//case class SendConciseAlarm (a: AlarmDetails)
 
 // Flushes the Concise Alarm buffer
 case object FlushConciseMessages
@@ -139,6 +139,8 @@ case object FlushConciseMessages
 // Generate summaries and send
 case object SendDetailedMessages
 
+//log the alarm
+case class LogAlarm(alarmEvents: List[AlarmEvent])
 
 class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient: SplunkHecClient, alarmConfig: AdaptConfig.AlarmsConfig, logFilenamePrefix: String) extends Actor with ActorLogging {
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
@@ -168,8 +170,16 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
     case FlushConciseMessages => flush()
     case SendDetailedMessages => generateSummaryAndSend()
     case AddConciseAlarm(alarmDetails) => addConciseAlarm(alarmDetails)
-    case SendConciseAlarm(alarmDetails) => reportSplunk(List(AlarmEvent.fromRawAlarm(alarmDetails, runID, genAlarmID())))
+    //case SendConciseAlarm(alarmDetails) => reportSplunk(List(AlarmEvent.fromRawAlarm(alarmDetails, runID, genAlarmID())))
+    case LogAlarm(alarmEvents: List[AlarmEvent]) => logAlarm(alarmEvents)
     case unknownMessage => log.error(s"Received unknown message: $unknownMessage")
+  }
+
+  def logAlarm(alarmEvents: List[AlarmEvent]) = {
+    //if (alarmConfig.logging.enabled) logger.info(alarmDetails.toString)
+    val messageString = alarmEvents.map(_.toJson).mkString("\n")
+    pw.foreach(_.println(messageString))
+    reportSplunk(alarmEvents)
   }
 
   //todo: handle <no_subject_path_node>?
@@ -193,7 +203,7 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
       (summaries, completeTreeRepr, mostNovel)
     }.toList.flatMap(x => List(x._1, x._2, x._3))
 
-    Future.sequence(batchedMessages).map(reportSplunk).onFailure{
+    Future.sequence(batchedMessages).map(m => self ! LogAlarm(m)).onFailure{
       case res => log.error(s"AlarmReporter: failed with $res."); println(s"AlarmReporter: failed with $res.")
     }
     //todo: deletes the set without checking if the reportSplunk succeeded. Add error handling above
@@ -202,7 +212,7 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
 
   def flush (): Unit = {
     if (alarmSummaryBuffer.nonEmpty) {
-      reportSplunk(alarmSummaryBuffer)
+      self ! LogAlarm(alarmSummaryBuffer)
       alarmSummaryBuffer = List.empty
     }
   }
@@ -232,9 +242,7 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
 
   def reportSplunk (messages: List[AlarmEvent]): Unit = {
     val messagesJson: List[JsValue] = messages.map(_.toJson)
-    val messageString = messagesJson.mkString("\n")
     splunkHecClient.sendEvents(messagesJson)
-    pw.foreach(_.println(messageString))
     //summaries.foreach(pwProcessSummary.println)
     //completeTreeRepr.foreach(pwProcessActivity.println)
     //mostNovel.foreach(pwTopTwenty.println)
@@ -283,7 +291,6 @@ object AlarmReporter extends LazyLogging {
     val alarmDetails = AlarmDetails(treeName, hostName, alarm, processDetailsSet, localProbThreshold)
 
     if (alarmConfig.console.enabled) println(alarmDetails.toString)
-    //if (alarmConfig.logging.enabled) logger.info(alarmDetails.toString)
     if (splunkConfig.enabled) alarmReporterActor ! AddConciseAlarm(alarmDetails)
   }
 }
