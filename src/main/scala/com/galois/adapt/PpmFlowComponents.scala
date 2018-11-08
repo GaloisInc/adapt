@@ -42,7 +42,7 @@ object PpmFlowComponents {
 
       // Shutdown hook to save the maps above back to disk when we shutdown
       if (ppmConfig.shouldsaveppmpartialobservationaccumulators) {
-        throw new RuntimeException("TODO: Saving of PPM partial obsercation accumulators is not implemented on shutdown.")
+        throw new RuntimeException("TODO: Saving of PPM partial observation accumulators is not implemented on shutdown.")
 //        val runnable = new Runnable() {
 //          override def run(): Unit = {
 //            println(s"Saving state in PpmComponents...")

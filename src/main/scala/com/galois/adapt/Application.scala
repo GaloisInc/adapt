@@ -87,7 +87,7 @@ object Application extends App {
   val hostNames: List[HostName] = ingestConfig.hosts.toList.map(_.hostName)
   val hostNameForAllHosts = "BetweenHosts"
   val mapProxy: MapProxy = new MapProxy(
-    fileDbPath = runFlow match { case "accept" => None; case _ => Some(admConfig.mapdb)},
+    fileDbPath = runFlow match { case "accept" => None; case _ => admConfig.mapdb },
     fileDbBypassChecksum = admConfig.mapdbbypasschecksum,
     fileDbTransactions = admConfig.mapdbtransactions,
 

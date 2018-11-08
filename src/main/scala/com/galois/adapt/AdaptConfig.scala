@@ -93,7 +93,7 @@ object AdaptConfig extends Utils {
     cdm2cdmlrucachesize: Long = 10000000L,
     cdm2admlrucachesize: Long = 30000000L,
     ignoreeventremaps: Boolean,
-    mapdb: String,
+    mapdb: Option[String],
     mapdbbypasschecksum: Boolean,
     mapdbtransactions: Boolean
   )
@@ -111,8 +111,8 @@ object AdaptConfig extends Utils {
     pluckingdelay: Int,
     basedir: String,
     eventtypemodelsdir: String,
-    loadfilesuffix: String,
-    savefilesuffix: String,
+    loadfilesuffix: String = "",
+    savefilesuffix: String = "",
 
     shouldloadppmtree: Boolean,
     shouldloadalarms: Boolean,

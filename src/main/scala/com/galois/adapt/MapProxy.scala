@@ -35,6 +35,12 @@ class MapProxy(
   // File DB
   private val fileDb: DB = fileDbPath match {
     case Some(p) =>
+      val parentDir = new File(p).getParent
+      if ( ! new File(parentDir).exists()) {
+        println(s"Creating parent directory for map.db file at: $parentDir")
+        new File(parentDir).mkdir()
+      }
+
       var maker = DBMaker.fileDB(p).fileMmapEnable()
 
       if (fileDbBypassChecksum) maker = maker.checksumHeaderBypass()
