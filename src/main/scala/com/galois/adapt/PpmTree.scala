@@ -109,7 +109,17 @@ case class PpmDefinition[DataShape](
     else Map.empty
 
   var localProbAccumulator: SortedMap[Float,Int] = // If there are more than 2,147,483,647 alarms with a given LP; then need Long.
-    if (shouldApplyThreshold) SortedMap.empty(Ordering[Float]) ++ alarms.map(_._2._3.last.localProb).groupBy(identity).mapValues(_.size)
+    if (ppmConfig.shouldloadlocalprobabilitiesfromalarms && shouldApplyThreshold) {
+      val noveltyLPs =
+        Try {
+          val content = new String(Files.readAllBytes(new File(inputAlarmFilePath).toPath), StandardCharsets.UTF_8)
+          content.parseJson.convertTo[List[(List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].map(_._2._3.last.localProb).groupBy(identity).mapValues(_.size)
+        } getOrElse {
+          println(s"FAILED to load local probability alarms for tree: $name  on host: $hostName. Starting with empty local probability accumulator.")
+          Map.empty[Float, Int]
+        }
+      SortedMap.empty(Ordering[Float]) ++ noveltyLPs
+    }
     else SortedMap.empty(Ordering[Float])
 
   var localProbCount: Int = localProbAccumulator.values.sum
