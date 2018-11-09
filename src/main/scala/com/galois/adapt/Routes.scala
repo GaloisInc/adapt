@@ -211,9 +211,13 @@ object Routes {
             }
           } ~
           pathPrefix("getCdmFilter") {
-            complete(
-              Future.successful(Application.filterAst.toJson)
-            )
+            parameters('hostName.as[String]) { hostName =>
+              complete(
+                Try(
+                  ingestConfig.hosts.find(_.hostName == hostName).get.filterAst.toJson
+                )
+              )
+            }
           }
         } ~
         pathPrefix("query") {
@@ -265,27 +269,23 @@ object Routes {
       post {
         pathPrefix("api") {
           pathPrefix("setCdmFilter") {
-            formField('filter.as[Filter]) { filter: Filter =>
+            formField('hostName.as[String], 'filter.as[Filter]) { (hostName: HostName, filter: Filter) =>
               complete {
-                Future {
-                  Application.filterAst = Some(filter)
-                  Try {
-                    Some(FilterCdm.compile(filter))
-                  } match {
-                    case Failure(e) => StatusCodes.BadRequest -> s"Invalid CDM filter: ${e.toString}"
-                    case Success(f) =>
-                      Application.filter = f
-                      StatusCodes.Created -> s"New CDM filter set"
-                  }
+                Try(ingestConfig.hosts.find(_.hostName == hostName).get).flatMap(_.setFilter(Some(filter))) match {
+                  case Failure(e) => StatusCodes.BadRequest -> s"Invalid CDM filter: ${e.toString}"
+                  case Success(f) => StatusCodes.Created -> s"New CDM filter set"
                 }
               }
             }
           } ~
           pathPrefix("clearCdmFilter") {
-            complete {
-              Application.filterAst = None
-              Application.filter = None
-              StatusCodes.Created -> "CDM filter cleared"
+            formField('hostName.as[String]) { hostName: HostName =>
+              complete {
+                Try(ingestConfig.hosts.find(_.hostName == hostName).get).flatMap(_.setFilter(None)) match {
+                  case Failure(e) => StatusCodes.BadRequest -> s"Failed to clear filter: ${e.toString}"
+                  case Success(f) => StatusCodes.Created -> s"CDM filter cleared"
+                }
+              }
             }
           } ~
           pathPrefix("ppm") {

@@ -219,38 +219,6 @@ object Application extends App {
     SinkShape(broadcast.in)
   })
 
-  // Coarse grain filtering of the input CDM
-  var filter: Option[Filterable => Boolean] = None
-  var filterAst: Option[Filter] = None
-  val filterFlow: Flow[(String,CDM19),(String,CDM19),_] = Flow[(String,CDM19)]
-    .map[(String, Either[Filterable,CDM19])] {
-      case (s, c: Event) => (s, Left(Filterable.apply(c)))
-      case (s, c: FileObject) => (s, Left(Filterable.apply(c)))
-//      case (s, c: Host) => (s, Left(Filterable.apply(c)))
-      case (s, c: MemoryObject) => (s, Left(Filterable.apply(c)))
-      case (s, c: NetFlowObject) => (s, Left(Filterable.apply(c)))
-      case (s, c: PacketSocketObject) => (s, Left(Filterable.apply(c)))
-      case (s, c: Principal) => (s, Left(Filterable.apply(c)))
-      case (s, c: ProvenanceTagNode) => (s, Left(Filterable.apply(c)))
-      case (s, c: RegistryKeyObject) => (s, Left(Filterable.apply(c)))
-      case (s, c: SrcSinkObject) => (s, Left(Filterable.apply(c)))
-      case (s, c: Subject) => (s, Left(Filterable.apply(c)))
-      case (s, c: TagRunLengthTuple) => (s, Left(Filterable.apply(c)))
-      case (s, c: UnitDependency) => (s, Left(Filterable.apply(c)))
-      case (s, c: IpcObject) => (s, Left(Filterable.apply(c)))
-      case (s, other) => (s, Right(other))
-    }
-    .filter {
-      case (s, Left(f)) => filter.fold(true)(func => func(f))
-      case (s, right) => true
-    }
-    .map[(String, CDM19)] {
-      case (s, Left(f)) => (s, f.underlying)
-      case (s, Right(cdm)) => (s, cdm)
-    }
-
-
-
   def startWebServer(): Http.ServerBinding = {
     println(s"Starting the web server at: http://${runtimeConfig.webinterface}:${runtimeConfig.port}")
     val route = Routes.mainRoute(dbActor, statusActor, ppmManagerActors)

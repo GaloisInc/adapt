@@ -4,7 +4,8 @@ import java.io.{ByteArrayInputStream, File}
 import java.util.UUID
 
 import akka.NotUsed
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{Flow, Source}
+import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.cdm17.CDM17
 import com.galois.adapt.cdm18.CDM18
 import com.galois.adapt.cdm19.{CDM19, RawCDM19Type}
@@ -56,7 +57,6 @@ object AdaptConfig extends Utils {
     }
 
     def toCdmSource(handler: ErrorHandler = ErrorHandler.print): Source[(Namespace,CDM19), NotUsed] = hosts
-      .toList
       .foldLeft(Source.empty[(Namespace,CDM19)])((acc, h: IngestHost) => acc.merge(h.toCdmSource(handler)))
   }
 
@@ -271,6 +271,14 @@ object AdaptConfig extends Utils {
 
       loadlimit: Option[Long] = None
   ) {
+    var filterAst: Option[Filter] = None
+    private var filter: Option[Filterable => Boolean] = filterAst.map(FilterCdm.compile)
+
+    def setFilter(newFilter: Option[Filter]): Try[Unit] = Try {
+      filter = filterAst.map(FilterCdm.compile)
+      filterAst = newFilter
+    }
+
     def isWindows: Boolean = DataProvider.isWindows(
       ta1.getOrElse(throw new Exception("No instrumentation source found - make sure `toCdmSource` has mean called first"))
     )
@@ -281,9 +289,9 @@ object AdaptConfig extends Utils {
       .toLowerCase
 
     def toCdmSource(handler: ErrorHandler = ErrorHandler.print): Source[(Namespace,CDM19), NotUsed] = parallel
-      .toList
       .foldLeft(Source.empty[(Namespace,CDM19)])((acc, li: LinearIngest) => acc.merge(li.toCdmSource(handler, updateHost _)))
       .take(loadlimit.getOrElse(Long.MaxValue))
+      .filter { case (_, cdm: CDM19) => filter.fold(true)(applyFilter(cdm, _)) }
 
     def updateHost(is: DataProvider): Unit = ta1 match {
       case None => ta1 = Some(is)
@@ -481,6 +489,24 @@ object AdaptConfig extends Utils {
   }
 
   val dummyHost: UUID = new java.util.UUID(0L,1L)
+
+  def applyFilter(c: CDM19, f: Filterable => Boolean): Boolean = c match {
+    case c: cdm19.Event => f(Filterable.apply(c))
+    case c: cdm19.FileObject => f(Filterable.apply(c))
+    //      case (s, c: Host) => (s, Left(Filterable.apply(c)))
+    case c: cdm19.MemoryObject => f(Filterable.apply(c))
+    case c: cdm19.NetFlowObject => f(Filterable.apply(c))
+    case c: cdm19.PacketSocketObject => f(Filterable.apply(c))
+    case c: cdm19.Principal => f(Filterable.apply(c))
+    case c: cdm19.ProvenanceTagNode => f(Filterable.apply(c))
+    case c: cdm19.RegistryKeyObject => f(Filterable.apply(c))
+    case c: cdm19.SrcSinkObject => f(Filterable.apply(c))
+    case c: cdm19.Subject => f(Filterable.apply(c))
+    case c: cdm19.TagRunLengthTuple => f(Filterable.apply(c))
+    case c: cdm19.UnitDependency => f(Filterable.apply(c))
+    case c: cdm19.IpcObject => f(Filterable.apply(c))
+    case other => true
+  }
 
   // Read a CDM19 file in
   def readCdm19(path: FilePath): Try[(DataProvider, Source[Lazy[Try[CDM19]], NotUsed])] =
