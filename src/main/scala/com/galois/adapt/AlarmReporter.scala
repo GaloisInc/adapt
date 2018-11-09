@@ -167,8 +167,8 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
   }
 
   def receive: PartialFunction[Any, Unit] = {
-    case FlushConciseMessages => flush()
-    case SendDetailedMessages => generateSummaryAndSend()
+    case FlushConciseMessages => flushConciseAlarms(false)
+    case SendDetailedMessages => generateSummaryAndSend(lastMessage = false)
     case AddConciseAlarm(alarmDetails) => addConciseAlarm(alarmDetails)
     //case SendConciseAlarm(alarmDetails) => reportSplunk(List(AlarmEvent.fromRawAlarm(alarmDetails, runID, genAlarmID())))
     case LogAlarm(alarmEvents: List[AlarmEvent]) => logAlarm(alarmEvents)
@@ -182,9 +182,11 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
     reportSplunk(alarmEvents)
   }
 
+  def handleMessage(m:List[AlarmEvent], lastMessage:Boolean = false) = if (lastMessage) logAlarm(m) else self ! LogAlarm(m)
+
   //todo: handle <no_subject_path_node>?
 
-  def generateSummaryAndSend(): Unit = {
+  def generateSummaryAndSend(lastMessage:Boolean) = {
 
     val batchedMessages: List[Future[AlarmEvent]] = processRefSet.view.map { case (pd, alarmIDs) =>
 
@@ -203,18 +205,19 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
       (summaries, completeTreeRepr, mostNovel)
     }.toList.flatMap(x => List(x._1, x._2, x._3))
 
-    Future.sequence(batchedMessages).map(m => self ! LogAlarm(m)).onFailure{
+    Future.sequence(batchedMessages).map(m => handleMessage(m, lastMessage)).onFailure{
       case res => log.error(s"AlarmReporter: failed with $res."); println(s"AlarmReporter: failed with $res.")
     }
+
     //todo: deletes the set without checking if the reportSplunk succeeded. Add error handling above
     processRefSet = Map.empty
   }
 
-  def flush (): Unit = {
-    if (alarmSummaryBuffer.nonEmpty) {
-      self ! LogAlarm(alarmSummaryBuffer)
-      alarmSummaryBuffer = List.empty
+  def flushConciseAlarms(lastMessage: Boolean): Unit = {
+    if(alarmSummaryBuffer.nonEmpty){
+      handleMessage(alarmSummaryBuffer, lastMessage)
     }
+    alarmSummaryBuffer = List.empty
   }
 
   def addConciseAlarm (alarmDetails: AlarmDetails): Unit = {
@@ -236,7 +239,7 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
     // Now use scalaz to merge the maps!
 
     if (alarmSummaryBuffer.length > maxbufferlength) {
-      flush()
+      flushConciseAlarms(false)
     }
   }
 
@@ -250,8 +253,8 @@ class AlarmReporterActor (runID: String, maxbufferlength: Long, splunkHecClient:
   }
 
   override def postStop(): Unit = {
-    flush()
-    generateSummaryAndSend()
+    flushConciseAlarms(true)
+    generateSummaryAndSend(true)
     //close the file
     pw.foreach(_.close)
   }
