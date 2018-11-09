@@ -425,7 +425,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       statusActor ! InitMsg
 
       // Write out debug states
-      val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
+      val debug = new StreamDebugger("stream-buffers|", 10 minutes, 10 seconds)
 
       RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
         import GraphDSL.Implicits._
@@ -752,7 +752,7 @@ class StreamDebugger(prefix: String, printEvery: FiniteDuration, reportEvery: Fi
         .sortBy(_._1)
         .toList
         .map { case (stage, count) => s"$prefix $stage: $count" }
-        .mkString(s"$prefix ==== START OF STREAM-BUFFERS REPORT ====\n", "\n", s"\n$prefix ==== END OF STREAM-BUFFERS REPORT ====\n")
+        .mkString(s"$prefix ==== START OF STREAM-BUFFERS REPORT ====\n", "\n", s"\n$prefix ==== END OF STREAM-BUFFERS REPORT ====")
       )
     }
   })
