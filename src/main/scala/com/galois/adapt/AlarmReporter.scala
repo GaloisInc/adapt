@@ -16,9 +16,9 @@ import scala.util.{Failure, Success}
 import akka.actor.{Actor, ActorLogging, ActorRef, Cancellable, Props}
 import com.galois.adapt.NoveltyDetection.PpmTreeNodeAlarm
 import spray.json._
-import java.io.{File, PrintWriter, FileOutputStream}
+import java.io.{File, FileOutputStream, PrintWriter}
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{Await, ExecutionContextExecutor}
 //import spray.json.DefaultJsonProtocol._
 
 import com.typesafe.scalalogging.LazyLogging
@@ -169,16 +169,24 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
 
   def receive: PartialFunction[Any, Unit] = {
     case FlushConciseMessages => flushConciseAlarms(false)
-    case SendDetailedMessages => generateSummaryAndSend(lastMessage = false)
+
+    case SendDetailedMessages => generateSummary().map(m => handleMessage(m, false)).onFailure {
+        case res => log.error(s"AlarmReporter: failed with $res."); println(s"AlarmReporter: failed with $res.")
+      }
+
     case AddConciseAlarm(alarmDetails) => addConciseAlarm(alarmDetails)
+
     //case SendConciseAlarm(alarmDetails) => reportSplunk(List(AlarmEvent.fromRawAlarm(alarmDetails, runID, genAlarmID())))
+
     case LogAlarm(alarmEvents: List[AlarmEvent]) => logAlarm(alarmEvents)
+
     case unknownMessage => log.error(s"Received unknown message: $unknownMessage")
   }
 
   def logAlarm(alarmEvents: List[AlarmEvent]): Unit = {
     //if (alarmConfig.logging.enabled) logger.info(alarmDetails.toString)
     val messageString = alarmEvents.map(_.toJson).mkString("\n")
+    //todo: add try block
     pw.foreach(_.println(messageString))
     reportSplunk(alarmEvents)
   }
@@ -187,7 +195,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
 
   //todo: handle <no_subject_path_node>?
 
-  def generateSummaryAndSend(lastMessage: Boolean): Unit = {
+  def generateSummary(): Future[List[AlarmEvent]] = {
 
     val batchedMessages: List[Future[AlarmEvent]] = processRefSet.view.map { case (pd, alarmIDs) =>
 
@@ -206,12 +214,11 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
       (summaries, completeTreeRepr, mostNovel)
     }.toList.flatMap(x => List(x._1, x._2, x._3))
 
-    Future.sequence(batchedMessages).map(m => handleMessage(m, lastMessage)).onFailure {
-      case res => log.error(s"AlarmReporter: failed with $res."); println(s"AlarmReporter: failed with $res.")
-    }
+    val x = Future.sequence(batchedMessages)
 
     //todo: deletes the set without checking if the reportSplunk succeeded. Add error handling above
     processRefSet = Map.empty
+    x
   }
 
   def flushConciseAlarms(lastMessage: Boolean): Unit = {
@@ -255,7 +262,8 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
 
   override def postStop(): Unit = {
     flushConciseAlarms(true)
-    generateSummaryAndSend(true)
+    val m: List[AlarmEvent] = Await.result(generateSummary(), 20 seconds)
+    handleMessage(m, true)
     //close the file
     pw.foreach(_.close)
     super.postStop()
