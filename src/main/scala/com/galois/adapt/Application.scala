@@ -708,9 +708,11 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         else Future.successful( Ack )
 
       val shutdownF = saveF.flatMap{_ =>
-        println("Expiring MapDB contents to disk...")
-        mapProxy.mapdbCdm2AdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
+        println("Expiring MapDB Cdm2Cdm contents to disk...")
         mapProxy.mapdbCdm2CdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
+
+        println("Expiring MapDB Cdm2Adm contents to disk...")
+        mapProxy.mapdbCdm2AdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
 
         println("Shutting down the actor system")
         system.terminate()
