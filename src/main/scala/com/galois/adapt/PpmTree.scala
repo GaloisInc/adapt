@@ -90,7 +90,7 @@ case class PpmDefinition[DataShape](
   val outputAlarmFilePath = basePath + ppmConfig.savefilesuffix + "_alarm.json"
 
   val startingState =
-      if (ppmConfig.shouldloadppmtree)
+      if (ppmConfig.shouldloadppmtrees)
         TreeRepr.readFromFile(inputFilePath).map { t => println(s"Reading tree $name on host: $hostName in from file: $inputFilePath"); t }
           .orElse {println(s"FAILED to load data for tree: $name  on host: $hostName"); None}
       else None
