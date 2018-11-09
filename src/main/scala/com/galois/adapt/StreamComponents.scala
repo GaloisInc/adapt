@@ -2,21 +2,16 @@ package com.galois.adapt
 
 import java.nio.file.Paths
 import java.util.UUID
-
 import akka.stream.scaladsl._
-
 import scala.collection.mutable.{Map => MutableMap}
 import akka.actor.ActorRef
 import akka.stream.{FlowShape, OverflowStrategy}
 import akka.util.ByteString
-
 import scala.collection.mutable
-import com.galois.adapt.adm.{DeduplicateNodesAndEdges, EntityResolution}
-import com.galois.adapt.cdm18._
+import com.galois.adapt.cdm19._
 
 
 object FlowComponents {
-  import AdaptConfig._
 
   def printCounter[T](counterName: String, statusActor: ActorRef, startingCount: Long = 0, every: Int = 10000) = Flow[T].statefulMapConcat { () =>
     var counter = startingCount
@@ -117,7 +112,7 @@ object FlowComponents {
 }
 
 
-trait ProcessingCommand extends CDM18
+trait ProcessingCommand extends CurrentCdm
 case class AdaptProcessingInstruction(id: Long) extends ProcessingCommand
 case object EmitCmd extends ProcessingCommand
 case object CleanUp extends ProcessingCommand
