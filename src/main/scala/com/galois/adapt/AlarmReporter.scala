@@ -258,6 +258,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
     generateSummaryAndSend(true)
     //close the file
     pw.foreach(_.close)
+    super.postStop()
   }
 }
 
