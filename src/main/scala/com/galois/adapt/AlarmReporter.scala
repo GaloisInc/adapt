@@ -147,7 +147,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
 
-  val pwAllAlarms: PrintWriter = new PrintWriter(new FileOutputStream(new File(logFilenamePrefix + "AllAlarms"), true))
+  val pwAllAlarms: PrintWriter = new PrintWriter(new FileOutputStream(new File(logFilenamePrefix + "All"), true))
   //val pwRawAlarm: PrintWriter = new PrintWriter(new FileOutputStream(new File(logFilenamePrefix + "Raw"),true))
   //val pwDetailedAlarm: PrintWriter = new PrintWriter(new FileOutputStream(new File(logFilenamePrefix + "DetailedAlarm"),true))
   //val pwProcessActivity: PrintWriter = new PrintWriter(new FileOutputStream(new File(logFilenamePrefix + "ProcessActivity"),true))
