@@ -36,11 +36,12 @@ trait AlarmEventData {
   def toJson: JsValue
 }
 
-case class DetailedAlarmEvent(processName: String, pid: String, details: String, alarmIDs: Set[Long]) extends AlarmEventData {
+case class DetailedAlarmEvent(processName: String, pid: String, hostName: HostName, details: String, alarmIDs: Set[Long]) extends AlarmEventData {
   def toJson: JsValue = {
     JsObject(
       "processName" -> JsString(processName),
       "pid" -> JsString(pid),
+      "hostName" -> JsString(hostName),
       "referencedRawAlarms" -> JsArray(alarmIDs.map(JsNumber(_)).toVector),
       "details" -> JsString(details)
     )
@@ -104,7 +105,7 @@ case object AlarmEvent {
   def fromBatchedAlarm(alarmCategory: AlarmCategory, pd: ProcessDetails, details: String, alarmIDs: Set[Long], runID: String): AlarmEvent = {
 
     AlarmEvent(
-      DetailedAlarmEvent(pd.processName, pd.pid.getOrElse("None").toString, details, alarmIDs),
+      DetailedAlarmEvent(pd.processName, pd.pid.getOrElse("None").toString, pd.hostName, details, alarmIDs),
       AlarmEventMetaData(runID, alarmCategory.toString))
   }
 }
