@@ -29,6 +29,7 @@ object FlowComponents {
       val className = item match {
         case (_, e: Event) => e.eventType.toString
         case (_, i: AnyRef) => i.getClass.getSimpleName
+        case e: Event => e.eventType.toString
         case i => i.getClass.getSimpleName
       }
       recentPopulationCounter += (className -> (recentPopulationCounter.getOrElse(className, 0L) + 1))
