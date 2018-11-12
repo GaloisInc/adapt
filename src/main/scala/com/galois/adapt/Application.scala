@@ -464,6 +464,26 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         ClosedShape
       }).run()
 
+    case "e4-ignore" =>
+
+      startWebServer()
+      statusActor ! InitMsg
+
+      RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
+        import GraphDSL.Implicits._
+
+        val hostSources = cdmSources.values.toSeq
+        val mergeCdm = b.add(Merge[CDM19](hostSources.size))
+
+        for (((host, source), i) <- hostSources.zipWithIndex) {
+          source.map(_._2) ~> mergeCdm.in(i)
+        }
+
+        (mergeCdm.out via printCounter("e4-ignore", statusActor, 0)) ~> Sink.ignore
+
+        ClosedShape
+      }).run()
+
     case "print-cdm" =>
       var i = 0
       RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
