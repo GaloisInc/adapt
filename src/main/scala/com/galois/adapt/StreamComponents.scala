@@ -30,6 +30,8 @@ object FlowComponents {
         case (_, e: Event) => e.eventType.toString
         case (_, i: AnyRef) => i.getClass.getSimpleName
         case e: Event => e.eventType.toString
+        case Left(l) => s"Left[${l.getClass.getSimpleName}]"
+        case Right(r) => s"Right[${r.getClass.getSimpleName}]"
         case i => i.getClass.getSimpleName
       }
       recentPopulationCounter += (className -> (recentPopulationCounter.getOrElse(className, 0L) + 1))
