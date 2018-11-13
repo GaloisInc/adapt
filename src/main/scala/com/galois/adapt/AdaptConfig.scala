@@ -275,7 +275,7 @@ object AdaptConfig extends Utils {
     private var filter: Option[Filterable => Boolean] = filterAst.map(FilterCdm.compile)
 
     def setFilter(newFilter: Option[Filter]): Try[Unit] = Try {
-      filter = filterAst.map(FilterCdm.compile)
+      filter = newFilter.map(FilterCdm.compile)
       filterAst = newFilter
     }
 
