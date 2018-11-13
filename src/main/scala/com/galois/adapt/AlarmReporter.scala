@@ -49,14 +49,14 @@ case class DetailedAlarmEvent(processName: String, pid: String, hostName: HostNa
 }
 
 case class ConciseAlarmEvent(
-  treeInfo              : String,
-  hostName              : HostName,
-  key                   : List[String],
-  dataTimestamp         : Long,
-  alarmCreationTimestamp: Long,
-  localProbThreshold    : Float,
-  ppmTreeNodeAlarms     : List[PpmTreeNodeAlarm],
-  alarmID               : Long) extends AlarmEventData {
+  treeInfo          : String,
+  hostName          : HostName,
+  key               : List[String],
+  dataTimestamp     : Long,
+  emitTimestamp     : Long,
+  localProbThreshold: Float,
+  ppmTreeNodeAlarms : List[PpmTreeNodeAlarm],
+  alarmID           : Long) extends AlarmEventData {
   def toJson: JsValue = {
     val delim = "∫"
 
@@ -65,7 +65,7 @@ case class ConciseAlarmEvent(
       "tree" -> JsString(this.treeInfo),
       "shortSummary" -> JsString(this.key.reduce(_ + s" $delim " + _)),
       "dataTimestamp" -> JsNumber(this.dataTimestamp),
-      "emitTimestamp" -> JsNumber(this.alarmCreationTimestamp),
+      "emitTimestamp" -> JsNumber(this.emitTimestamp),
       "localProbThreshold" -> JsNumber(this.localProbThreshold),
       "ppmTreeNodeAlarms" -> JsArray(this.ppmTreeNodeAlarms.map(_.toJson).toVector),
       "alarmID" -> JsNumber(this.alarmID)
@@ -97,7 +97,7 @@ case object AlarmEvent {
     val ppmTreeNodeAlarms: List[NoveltyDetection.PpmTreeNodeAlarm] = alarmDetails.alarm.details._3
 
     AlarmEvent(
-      ConciseAlarmEvent(alarmDetails.treeName, alarmDetails.hostName, key, alarmDetails.alarm.details._1, System.nanoTime(), alarmDetails.localProbThreshold, ppmTreeNodeAlarms, alarmID),
+      ConciseAlarmEvent(alarmDetails.treeName, alarmDetails.hostName, key, alarmDetails.alarm.details._1, alarmDetails.alarm.details._2, alarmDetails.localProbThreshold, ppmTreeNodeAlarms, alarmID),
       AlarmEventMetaData(runID, "raw")
     )
   }
