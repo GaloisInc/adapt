@@ -1173,9 +1173,8 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
 
 
   def saveTrees(): Future[Unit] = {
-    val saveFutures = ppmList.map(_.saveStateAsync())
     if (ppmConfig.iforestenabled) saveIforestModel()
-    Future.sequence(saveFutures.toList).map(_ => () )
+    ppmList.toList.foldLeft(Future.successful(()))((acc, ppmTree) => acc.flatMap(_ => ppmTree.saveStateAsync()))
   }
 
   def saveIforestModel(): Unit = {
