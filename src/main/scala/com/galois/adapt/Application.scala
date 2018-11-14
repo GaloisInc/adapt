@@ -219,38 +219,6 @@ object Application extends App {
     SinkShape(broadcast.in)
   })
 
-  // Coarse grain filtering of the input CDM
-  var filter: Option[Filterable => Boolean] = None
-  var filterAst: Option[Filter] = None
-  val filterFlow: Flow[(String,CDM19),(String,CDM19),_] = Flow[(String,CDM19)]
-    .map[(String, Either[Filterable,CDM19])] {
-      case (s, c: Event) => (s, Left(Filterable.apply(c)))
-      case (s, c: FileObject) => (s, Left(Filterable.apply(c)))
-//      case (s, c: Host) => (s, Left(Filterable.apply(c)))
-      case (s, c: MemoryObject) => (s, Left(Filterable.apply(c)))
-      case (s, c: NetFlowObject) => (s, Left(Filterable.apply(c)))
-      case (s, c: PacketSocketObject) => (s, Left(Filterable.apply(c)))
-      case (s, c: Principal) => (s, Left(Filterable.apply(c)))
-      case (s, c: ProvenanceTagNode) => (s, Left(Filterable.apply(c)))
-      case (s, c: RegistryKeyObject) => (s, Left(Filterable.apply(c)))
-      case (s, c: SrcSinkObject) => (s, Left(Filterable.apply(c)))
-      case (s, c: Subject) => (s, Left(Filterable.apply(c)))
-      case (s, c: TagRunLengthTuple) => (s, Left(Filterable.apply(c)))
-      case (s, c: UnitDependency) => (s, Left(Filterable.apply(c)))
-      case (s, c: IpcObject) => (s, Left(Filterable.apply(c)))
-      case (s, other) => (s, Right(other))
-    }
-    .filter {
-      case (s, Left(f)) => filter.fold(true)(func => func(f))
-      case (s, right) => true
-    }
-    .map[(String, CDM19)] {
-      case (s, Left(f)) => (s, f.underlying)
-      case (s, Right(cdm)) => (s, cdm)
-    }
-
-
-
   def startWebServer(): Http.ServerBinding = {
     println(s"Starting the web server at: http://${runtimeConfig.webinterface}:${runtimeConfig.port}")
     val route = Routes.mainRoute(dbActor, statusActor, ppmManagerActors)
@@ -405,6 +373,19 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       )
       Runtime.getRuntime.halt(1)
 
+    case "pre-e4-test" =>
+      startWebServer()
+      statusActor ! InitMsg
+
+      RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
+        import GraphDSL.Implicits._
+        val hostSources = cdmSources.values.toSeq
+        for (((host, source), i) <- hostSources.zipWithIndex) {
+          source.via(printCounter(host.hostName, statusActor, 0)) ~> Sink.ignore
+        }
+        ClosedShape
+      }).run()
+
     case "e4" | "e4-no-db" =>
       val needsDb: Boolean = runFlow == "e4"
 
@@ -412,7 +393,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       statusActor ! InitMsg
 
       // Write out debug states
-      val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
+      val debug = new StreamDebugger("stream-buffers|", 10 minutes, 10 seconds)
 
       RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
         import GraphDSL.Implicits._
@@ -479,6 +460,26 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         (mergeAdm.out via debug.debugBuffer(s"~ 0 after ADM merge")) ~>
           (betweenHostDedup via debug.debugBuffer(s"~ 1 after cross-host deduplicate")) ~>
           DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
+
+        ClosedShape
+      }).run()
+
+    case "e4-ignore" =>
+
+      startWebServer()
+      statusActor ! InitMsg
+
+      RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
+        import GraphDSL.Implicits._
+
+        val hostSources = cdmSources.values.toSeq
+        val mergeCdm = b.add(Merge[CDM19](hostSources.size))
+
+        for (((host, source), i) <- hostSources.zipWithIndex) {
+          source.map(_._2) ~> mergeCdm.in(i)
+        }
+
+        (mergeCdm.out via printCounter("e4-ignore", statusActor, 0)) ~> Sink.ignore
 
         ClosedShape
       }).run()
@@ -689,15 +690,21 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       implicit val timeout = Timeout(patienceLevel)
 
       println(s"Saving PPM trees to disk...")
-      val saveF = if (ppmConfig.shouldsaveppmtree)
-        ppmManagerActors.values.toList.foldLeft(Future.successful(Ack))((a,b) => a.flatMap(_ => (b ? SaveTrees(true)).mapTo[Ack.type]))
-      else Future.successful( Ack )
+      val saveF =
+        if (ppmConfig.shouldsaveppmtrees)
+          ppmManagerActors.values.toList.foldLeft(Future.successful(Ack))((a,b) => a.flatMap(_ => (b ? SaveTrees(true)).mapTo[Ack.type]))
+        else Future.successful( Ack )
 
-      val shutdownF = saveF.flatMap{_ => system.terminate() }
+      val shutdownF = saveF.flatMap{_ =>
+        println("Expiring MapDB Cdm2Cdm contents to disk...")
+        mapProxy.mapdbCdm2CdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
 
-      println("Expiring MapDB contents to disk...")
-      mapProxy.mapdbCdm2AdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
-      mapProxy.mapdbCdm2CdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
+        println("Expiring MapDB Cdm2Adm contents to disk...")
+        mapProxy.mapdbCdm2AdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
+
+        println("Shutting down the actor system")
+        system.terminate()
+      }
 
       Await.result(shutdownF, patienceLevel)
     }
@@ -733,7 +740,7 @@ class StreamDebugger(prefix: String, printEvery: FiniteDuration, reportEvery: Fi
         .sortBy(_._1)
         .toList
         .map { case (stage, count) => s"$prefix $stage: $count" }
-        .mkString(s"$prefix ==== START OF STREAM-BUFFERS REPORT ====\n", "\n", s"\n$prefix ==== END OF STREAM-BUFFERS REPORT ====\n")
+        .mkString(s"$prefix ==== START OF STREAM-BUFFERS REPORT ====\n", "\n", s"\n$prefix ==== END OF STREAM-BUFFERS REPORT ====")
       )
     }
   })

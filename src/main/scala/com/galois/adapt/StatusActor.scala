@@ -15,7 +15,7 @@ class StatusActor extends Actor {
   var currentlyIngesting = false
   var duplicateAlarmCount = 0L
   val recentPopulationLogs: mutable.Map[String, PopulationLog] = mutable.Map.empty
-  val totalPopulationLogs: mutable.Map[String, PopulationLog] = mutable.Map.empty
+//  val totalPopulationLogs: mutable.Map[String, PopulationLog] = mutable.Map.empty
 
   // This is aggrgeated over all dedup stages in the akka-streams graph we are running
   def blockEdgesCount: Long = DeduplicateNodesAndEdges.blockedEdgesCount

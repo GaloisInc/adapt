@@ -55,7 +55,7 @@ object NoveltyDetection {
 }
 
 case object AlarmExclusions {
-  val cadets = Set("ld-elf.so.1", "local", "bounce", "master", "pkg", "top", "mlock", "cleanup", "qmgr", "smtpd", "trivial-rewrite", "head")
+  val cadets = Set("ld-elf.so.1", "local", "bounce", "pkg", "top", "mlock", "cleanup", "qmgr", "smtpd", "trivial-rewrite")
   val clearscope = Set("system_server", "proc", "com.android.inputmethod.latin", "com.android.camera2", "com.android.launcher3", "com.android.smspush", "com.android.quicksearchbox", "com.android.gallery3d", "android.process.media", "com.android.music")
   val fivedirections = Set("\\windows\\system32\\svchost.exe", "\\program files\\tightvnc\\tvnserver.exe", "mscorsvw.exe")
   val marple= Set()
@@ -90,7 +90,7 @@ case class PpmDefinition[DataShape](
   val outputAlarmFilePath = basePath + ppmConfig.savefilesuffix + "_alarm.json"
 
   val startingState =
-      if (ppmConfig.shouldloadppmtree)
+      if (ppmConfig.shouldloadppmtrees)
         TreeRepr.readFromFile(inputFilePath).map { t => println(s"Reading tree $name on host: $hostName in from file: $inputFilePath"); t }
           .orElse {println(s"FAILED to load data for tree: $name  on host: $hostName"); None}
       else None
@@ -102,9 +102,12 @@ case class PpmDefinition[DataShape](
       Try {
         val content = new String(Files.readAllBytes(new File(inputAlarmFilePath).toPath), StandardCharsets.UTF_8)
         content.parseJson.convertTo[List[(List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].toMap
-      } getOrElse {
-        println(s"FAILED to load alarms for tree: $name  on host: $hostName. Starting with empty tree state.")
-        Map.empty[List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])]
+      } match {
+        case Success(alarm) => alarm
+        case Failure(e) =>
+          println(s"FAILED to load alarms for tree: $name  on host: $hostName. Starting with empty tree state.")
+          e.printStackTrace()
+          Map.empty[List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])]
       }
     else Map.empty
 
@@ -114,9 +117,12 @@ case class PpmDefinition[DataShape](
         Try {
           val content = new String(Files.readAllBytes(new File(inputAlarmFilePath).toPath), StandardCharsets.UTF_8)
           content.parseJson.convertTo[List[(List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].map(_._2._3.last.localProb).groupBy(identity).mapValues(_.size)
-        } getOrElse {
-          println(s"FAILED to load local probability alarms for tree: $name  on host: $hostName. Starting with empty local probability accumulator.")
-          Map.empty[Float, Int]
+        } match {
+          case Success(lps) => lps
+          case Failure(e) =>
+            println(s"FAILED to load local probability alarms for tree: $name  on host: $hostName. Starting with empty local probability accumulator.")
+            e.printStackTrace()
+            Map.empty[Float, Int]
         }
       SortedMap.empty(Ordering[Float]) ++ noveltyLPs
     }
@@ -227,9 +233,9 @@ case class PpmDefinition[DataShape](
       isCurrentlySaving.set(true)
 
       implicit val timeout = Timeout(593 seconds)
-      val treeWriteF = if (ppmConfig.shouldsaveppmtree) {
+      val treeWriteF = if (ppmConfig.shouldsaveppmtrees) {
         (tree ? PpmNodeActorBeginGetTreeRepr(name)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map { reprResult =>
-          if (ppmConfig.shouldsaveppmtree) reprResult.repr.writeToFile(outputFilePath)
+          if (ppmConfig.shouldsaveppmtrees) reprResult.repr.writeToFile(outputFilePath)
         }
       } else Future.successful( () )
 

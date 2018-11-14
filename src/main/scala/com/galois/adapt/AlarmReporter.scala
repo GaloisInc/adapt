@@ -197,7 +197,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
       }
 
       val completeTreeRepr: Future[AlarmEvent] = PpmSummarizer.fullTree(pd.processName, Some(pd.hostName), pd.pid).map { a =>
-        AlarmEvent.fromBatchedAlarm(ProcessActivity, pd, a.readableString, alarmIDs, runID)
+        AlarmEvent.fromBatchedAlarm(ProcessActivity, pd, a.withoutQNodes.readableString, alarmIDs, runID)
       }
 
       val mostNovel: Future[AlarmEvent] = PpmSummarizer.mostNovelActions(numMostNovel, pd.processName, pd.hostName, pd.pid).map { nm =>
