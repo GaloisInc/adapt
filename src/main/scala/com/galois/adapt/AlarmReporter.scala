@@ -49,14 +49,14 @@ case class DetailedAlarmEvent(processName: String, pid: String, hostName: HostNa
 }
 
 case class ConciseAlarmEvent(
-  treeInfo              : String,
-  hostName              : HostName,
-  key                   : List[String],
-  dataTimestamp         : Long,
-  alarmCreationTimestamp: Long,
-  localProbThreshold    : Float,
-  ppmTreeNodeAlarms     : List[PpmTreeNodeAlarm],
-  alarmID               : Long) extends AlarmEventData {
+  treeInfo          : String,
+  hostName          : HostName,
+  key               : List[String],
+  dataTimestamp     : Long,
+  emitTimestamp     : Long,
+  localProbThreshold: Float,
+  ppmTreeNodeAlarms : List[PpmTreeNodeAlarm],
+  alarmID           : Long) extends AlarmEventData {
   def toJson: JsValue = {
     val delim = "∫"
 
@@ -65,7 +65,7 @@ case class ConciseAlarmEvent(
       "tree" -> JsString(this.treeInfo),
       "shortSummary" -> JsString(this.key.reduce(_ + s" $delim " + _)),
       "dataTimestamp" -> JsNumber(this.dataTimestamp),
-      "emitTimestamp" -> JsNumber(this.alarmCreationTimestamp),
+      "emitTimestamp" -> JsNumber(this.emitTimestamp),
       "localProbThreshold" -> JsNumber(this.localProbThreshold),
       "ppmTreeNodeAlarms" -> JsArray(this.ppmTreeNodeAlarms.map(_.toJson).toVector),
       "alarmID" -> JsNumber(this.alarmID)
@@ -97,7 +97,7 @@ case object AlarmEvent {
     val ppmTreeNodeAlarms: List[NoveltyDetection.PpmTreeNodeAlarm] = alarmDetails.alarm.details._3
 
     AlarmEvent(
-      ConciseAlarmEvent(alarmDetails.treeName, alarmDetails.hostName, key, alarmDetails.alarm.details._1, System.nanoTime(), alarmDetails.localProbThreshold, ppmTreeNodeAlarms, alarmID),
+      ConciseAlarmEvent(alarmDetails.treeName, alarmDetails.hostName, key, alarmDetails.alarm.details._1, alarmDetails.alarm.details._2, alarmDetails.localProbThreshold, ppmTreeNodeAlarms, alarmID),
       AlarmEventMetaData(runID, "raw")
     )
   }
@@ -190,24 +190,28 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
 
   def generateSummaryAndSend(lastMessage: Boolean): Unit = {
 
-    val batchedMessages: List[Future[AlarmEvent]] = processRefSet.view.map { case (pd, alarmIDs) =>
+    val batchedMessages: List[Future[Option[AlarmEvent]]] = processRefSet.view.map { case (pd, alarmIDs) =>
 
-      val summaries: Future[AlarmEvent] = PpmSummarizer.summarize(pd.processName, Some(pd.hostName), pd.pid).map { s =>
-        AlarmEvent.fromBatchedAlarm(ProcessSummary, pd, s.readableString, alarmIDs, runID)
+      val summaries: Future[Option[AlarmEvent]] = PpmSummarizer.summarize(pd.processName, Some(pd.hostName), pd.pid).map { s =>
+        if (s == TreeRepr.empty) None
+        else Some(AlarmEvent.fromBatchedAlarm(ProcessSummary, pd, s.readableString, alarmIDs, runID))
+        }
+
+
+      val completeTreeRepr: Future[Option[AlarmEvent]] = PpmSummarizer.fullTree(pd.processName, Some(pd.hostName), pd.pid).map { a =>
+        if (a == TreeRepr.empty) None
+        else Some(AlarmEvent.fromBatchedAlarm(ProcessActivity, pd, a.withoutQNodes.readableString, alarmIDs, runID))
       }
 
-      val completeTreeRepr: Future[AlarmEvent] = PpmSummarizer.fullTree(pd.processName, Some(pd.hostName), pd.pid).map { a =>
-        AlarmEvent.fromBatchedAlarm(ProcessActivity, pd, a.withoutQNodes.readableString, alarmIDs, runID)
-      }
-
-      val mostNovel: Future[AlarmEvent] = PpmSummarizer.mostNovelActions(numMostNovel, pd.processName, pd.hostName, pd.pid).map { nm =>
-        AlarmEvent.fromBatchedAlarm(TopTwenty, pd, nm.mkString("\n"), alarmIDs, runID)
+      val mostNovel: Future[Option[AlarmEvent]] = PpmSummarizer.mostNovelActions(numMostNovel, pd.processName, pd.hostName, pd.pid).map { mn =>
+        if (mn == TreeRepr.empty) None
+        else Some(AlarmEvent.fromBatchedAlarm(TopTwenty, pd, mn.mkString("\n"), alarmIDs, runID))
       }
 
       (summaries, completeTreeRepr, mostNovel)
     }.toList.flatMap(x => List(x._1, x._2, x._3))
 
-    Future.sequence(batchedMessages).map(m => handleMessage(m, lastMessage)).onFailure {
+    Future.sequence(batchedMessages).map(m => handleMessage(m.flatten, lastMessage)).onFailure {
       case res => log.error(s"AlarmReporter: failed with $res."); println(s"AlarmReporter: failed with $res.")
     }
 
