@@ -76,19 +76,8 @@ case class SplunkHecClient(token: String, host:String, port:Int) extends LazyLog
   val homeUri: Uri =  Uri.from(scheme = "http", host=host, port=port, path = "/services/collector/event/1.0")
 
   def sendEvents(events:List[JsValue]): Unit = {
-    val ti: Long = System.currentTimeMillis
-    val tf: Long = ti + events.length
-
-    val reportingPeriodMills = AdaptConfig.alarmConfig.splunk.detailedReportingPeriodSeconds * 1000
-    // fast forward time and hope the last timestamp never exceeds the detailed-reporting-period-seconds.
-    // Perhaps adding delay makes more sense? or Issuing a warning?
-    if (events.length >= reportingPeriodMills) {
-      println(s"""SplunkHecClient: "#of events >= reportingPeriod". Timestamps for detailed splunk reports issued b/w [$ti, $tf]: will be incorrect.""")
-    }
-
-    val timerange = ti until tf
-    val payLoad = (timerange, events).zipped.map { case (t, e) =>
-      EventMsg(e, t).toJson.toString
+    val payLoad = events.map{e =>
+      EventMsg(e, System.currentTimeMillis).toJson.toString
     }.mkString("")
 
     if (payLoad.nonEmpty) sendEventHttp(payLoad)
