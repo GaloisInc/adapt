@@ -821,7 +821,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
-      shouldApplyThreshold = false
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, hostName),
 
     PpmDefinition[DataShape]( "ParentChildProcesses",
