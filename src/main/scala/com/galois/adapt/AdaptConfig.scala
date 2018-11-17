@@ -143,7 +143,7 @@ object AdaptConfig extends Utils {
 
   case class GuiConfig(enabled:Boolean)
   case class ConsoleConfig(enabled:Boolean)
-  case class LogConfig(fileprefix:String)
+  case class LogConfig(enabled:Boolean, fileprefix:String)
   case class SplunkConfig(
     enabled:Boolean,
     token: String,

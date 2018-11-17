@@ -180,8 +180,10 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
   def logAlarm(alarmEvents: List[AlarmEvent]): Unit = {
     //if (alarmConfig.logging.enabled) logger.info(alarmDetails.toString)
     val messageString = alarmEvents.map(_.toJson).mkString("\n")
-    pw.foreach(_.println(messageString))
-    reportSplunk(alarmEvents)
+    
+    if (alarmConfig.splunk.enabled) reportSplunk(alarmEvents)
+    if (alarmConfig.logging.enabled) pw.foreach(_.println(messageString))
+    if (alarmConfig.console.enabled) println(messageString)
   }
 
   def handleMessage(m: List[AlarmEvent], lastMessage: Boolean = false): Unit = if (lastMessage) logAlarm(m) else self ! LogAlarm(m)
@@ -195,7 +197,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
       val summaries: Future[Option[AlarmEvent]] = PpmSummarizer.summarize(pd.processName, Some(pd.hostName), pd.pid).map { s =>
         if (s == TreeRepr.empty) None
         else Some(AlarmEvent.fromBatchedAlarm(ProcessSummary, pd, s.readableString, alarmIDs, runID))
-        }
+      }
 
 
       val completeTreeRepr: Future[Option[AlarmEvent]] = PpmSummarizer.fullTree(pd.processName, Some(pd.hostName), pd.pid).map { a =>
@@ -268,10 +270,10 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
 }
 
 case class AlarmDetails(
-  treeName          : String,
-  hostName          : HostName,
-  alarm             : AnAlarm,
-  processDetailsSet : Set[ProcessDetails],
+  treeName: String,
+  hostName: HostName,
+  alarm: AnAlarm,
+  processDetailsSet: Set[ProcessDetails],
   localProbThreshold: Float
 )
 
@@ -280,8 +282,11 @@ object AlarmReporter extends LazyLogging {
 
   val runID: String = Application.randomIdentifier
   val alarmConfig: AdaptConfig.AlarmsConfig = AdaptConfig.alarmConfig
-  val splunkConfig: AdaptConfig.SplunkConfig = AdaptConfig.alarmConfig.splunk
+  val splunkConfig: AdaptConfig.SplunkConfig = alarmConfig.splunk
   val splunkHecClient: SplunkHecClient = SplunkHecClient(splunkConfig.token, splunkConfig.host, splunkConfig.port)
+
+  val guiConfig: AdaptConfig.GuiConfig = alarmConfig.gui
+  val consoleConfig: AdaptConfig.ConsoleConfig = alarmConfig.console
 
   //Assumes ppmConfig.basedir is already created
   val logFilenamePrefix: String = AdaptConfig.ppmConfig.basedir + alarmConfig.logging.fileprefix
@@ -297,10 +302,7 @@ object AlarmReporter extends LazyLogging {
   system.registerOnTermination(scheduleConciseMessagesFlush.cancel())
 
   def report(treeName: String, hostName: HostName, alarm: AnAlarm, processDetailsSet: Set[ProcessDetails], localProbThreshold: Float): Unit = {
-
-    val alarmDetails = AlarmDetails(treeName, hostName, alarm, processDetailsSet, localProbThreshold)
-
-    if (alarmConfig.console.enabled) println(alarmDetails.toString)
-    if (splunkConfig.enabled) alarmReporterActor ! AddConciseAlarm(alarmDetails)
+    if (splunkConfig.enabled || consoleConfig.enabled || guiConfig.enabled)
+      alarmReporterActor ! AddConciseAlarm(AlarmDetails(treeName, hostName, alarm, processDetailsSet, localProbThreshold))
   }
 }
