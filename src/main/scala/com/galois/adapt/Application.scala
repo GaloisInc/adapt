@@ -32,6 +32,19 @@ import com.galois.adapt.PpmFlowComponents.CompletedESO
 object Application extends App {
   org.slf4j.LoggerFactory.getILoggerFactory  // This is here just to make SLF4j shut up and not log lots of error messages when instantiating the Kafka producer.
 
+  // Open up for SSH ammonite shelling via `ssh repl@localhost -p22222`
+  import ammonite.sshd._
+  import org.apache.sshd.server.auth.password.AcceptAllPasswordAuthenticator
+  val replServer = new SshdRepl(
+    SshServerConfig(
+      address = "localhost", // or "0.0.0.0" for public-facing shells
+      port = AdaptConfig.runtimeConfig.port + 10000, // Any available port
+      passwordAuthenticator = Some(AcceptAllPasswordAuthenticator.INSTANCE)
+    ),
+    predef = "repl.frontEnd() = ammonite.repl.FrontEnd.JLineUnix"
+  )
+  replServer.start()
+
   // Some random string that uniquely identifies this run
   val randomIdentifier: String = {
     val length = 10
