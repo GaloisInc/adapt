@@ -11,7 +11,6 @@ import com.galois.adapt.cdm18.CDM18
 import com.galois.adapt.cdm19.{CDM19, RawCDM19Type}
 import org.apache.avro.specific.SpecificDatumReader
 import org.apache.kafka.clients.consumer.ConsumerRecord
-import org.apache.lucene.search.ControlledRealTimeReopenThread
 import pureconfig.error.{ConfigReaderFailures, ConvertFailure, NoValidCoproductChoiceFound, UnknownKey}
 import shapeless.Lazy
 

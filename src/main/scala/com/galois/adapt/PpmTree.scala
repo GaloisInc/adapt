@@ -1545,11 +1545,23 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
       case Success((novel, next)) => next.extractBelowGlobalProb(globalProbThreshold, novel :: acc)
     }
 
-  def mostNovelKeys(count: Int = 1, delimiter: String = " ∫ "): List[String] = extractMostNovel(count).map(_._1.mkString(delimiter))
+  def mostNovelKeys(count: Int = 1, delimiter: String = " ∫ "): List[ExtractedValue] = extractMostNovel(count).map(_._1.mkString(delimiter))
+
+  def incrementdepth(additionalIncrement: Int = 1): TreeRepr = this.copy(
+    depth = depth + additionalIncrement,
+    children = children.map(_.incrementdepth(additionalIncrement))
+  )
 }
 
 case object TreeRepr {
   val empty: TreeRepr = TreeRepr(0, "", 0F, 0F, 0, Set.empty)
+
+  def fromChildren(topLevelKey: ExtractedValue, children: Set[TreeRepr]): TreeRepr =
+    TreeRepr(0, topLevelKey, 1F, 1F, children.map(_.count).sum, children.map(_.incrementdepth()))
+  def fromNamespacedChildren(topLevelKey: ExtractedValue, namespacedChildren: Map[ExtractedValue, TreeRepr]): TreeRepr = {
+    val renamedChildren = namespacedChildren.map{ case (namespace, tree) => tree.copy(key = s"$namespace:${tree.key}") }.toSet[TreeRepr]
+    fromChildren(topLevelKey, renamedChildren)
+  }
 
   type Depth = Int
   type LocalProb = Float
@@ -1559,7 +1571,8 @@ case object TreeRepr {
 
   def fromFlat(repr: List[CSVRow]): TreeRepr = {
     def fromFlatRecursive(rows: List[CSVRow], atDepth: Int, accAtThisDepth: List[TreeRepr]): (Set[TreeRepr], List[CSVRow]) = {
-      val thisDepthSiblings = rows.takeWhile(_._1 == atDepth).map(l => TreeRepr(l._1, l._2, l._3, l._4, l._5, Set.empty))
+      val thisDepthSiblings = rows.takeWhile(_._1 == atDepth) // WARNING: This `takeWhile` is important for correctness. See `throw new RuntimeException` code below.
+        .map(l => TreeRepr(l._1, l._2, l._3, l._4, l._5, Set.empty))
       val remainingRows = rows.drop(thisDepthSiblings.size)
       val nextDepth = remainingRows.headOption.map(_._1)
       nextDepth match {
