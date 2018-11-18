@@ -204,7 +204,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
       }.recoverWith{ case e => log.error(s"Getting Full Tree for: $pd failed with error: ${e.getMessage}"); Future.failed(e)}
 
       val mostNovel: Future[Option[AlarmEvent]] = PpmSummarizer.mostNovelActions(numMostNovel, pd.processName, pd.hostName, pd.pid).map { mn =>
-        if (mn == TreeRepr.empty) None
+        if (mn.isEmpty) None
         else Some(AlarmEvent.fromBatchedAlarm(TopTwenty, pd, mn.mkString("\n"), alarmIDs, runID))
       }.recoverWith{ case e => log.error(s"Getting Top 20 for: $pd failed with error: ${e.getMessage}"); Future.failed(e)}
 
