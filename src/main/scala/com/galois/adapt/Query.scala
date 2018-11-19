@@ -12,10 +12,10 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__
 import java.util.{Collections, Comparator, Iterator}
 
 import com.carrotsearch.hppc.predicates.BytePredicate
-import com.galois.adapt.Application.config
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Stream
+import scala.collection.mutable
 import scala.util.parsing.combinator._
 import scala.util.{Failure, Success, Try}
 import scala.language.existentials
@@ -145,22 +145,19 @@ import scala.util.matching.Regex
 
 
 object Query {
-
+  import AdaptConfig._
   import QueryLanguage._
 
   // Run a 'Traversal' on a 'Graph'
   def run[T](query: Query[T], graph: Graph): Try[Stream[T]] = query.run(graph)
-  def run[T](query: String, graph: Graph): Try[Stream[T]] =
-    Query(query).flatMap(_.run(graph)).flatMap(t => Try(t.asInstanceOf[Stream[T]]))
+  def run[T](query: String, graph: Graph, namespaces: mutable.Set[String]): Try[Stream[T]] =
+    Query(query, namespaces).flatMap(_.run(graph)).flatMap(t => Try(t.asInstanceOf[Stream[T]]))
 
   // Is this Neo4j or not
-  val isNeo4j: Boolean = config.getString("adapt.runflow") != "accept"
-
-  // Gross hack to get all of the expected UUID namespaces
-  def getNamespaces: List[String] = Application.getNamespaces
+  val isNeo4j: Boolean = runFlow != "accept"
 
   // Attempt to parse a traversal from a string
-  def apply(input: String): Try[Query[_]] = {
+  def apply(input: String, namespaces: mutable.Set[String]): Try[Query[_]] = {
 
     object Parsers extends JavaTokenParsers with RegexParsers {
       // Synonym for untyped traversal and query
@@ -265,7 +262,7 @@ object Query {
         ( ".has(" ~ str ~ ")"              ^^ { case _~k~_      => Has(_: Tr, k): Tr }
         | ".has(" ~ ("'uuid'"|"\"uuid\"") ~ "," ~ lit ~ ")" ^^ {
             case _~_~_~Raw(u: String)~_ if u.length == 36 => {
-              val nsPred: QueryValue[P[String]] = RawWithinPred(RawArr(Raw(u) :: getNamespaces.map(ns => Raw(ns + "_" + u))))
+              val nsPred: QueryValue[P[String]] = RawWithinPred(RawArr(Raw(u) :: namespaces.toList.map(ns => Raw(ns + "_" + u))))
               (t: Tr) => HasPredicate(if (isNeo4j) { HasLabel(t, Raw("Node")) } else { t }, Raw("uuid"), nsPred)
             }
             case _~_~_~v~_ => (t: Tr) => HasValue(if (isNeo4j) { HasLabel(t, Raw("Node")) } else { t }, Raw("uuid"), v)

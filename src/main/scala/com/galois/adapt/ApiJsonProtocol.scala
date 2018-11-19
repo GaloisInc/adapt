@@ -4,7 +4,7 @@ import java.util.UUID
 
 import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import com.galois.adapt.NoveltyDetection.ExtendedUuidDetails
+import com.galois.adapt.NoveltyDetection.{NamespacedUuidDetails, PpmTreeNodeAlarm}
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm19.{CustomEnum, EventType, FileObjectType, HostIdentifier, HostType, Interface, PrincipalType, SrcSinkType, SubjectType}
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
@@ -24,13 +24,15 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
     }
   }
 
-  implicit val statusReport = jsonFormat4(StatusReport)
-  implicit val populationLog = jsonFormat16(PopulationLog)
+  implicit val singleAlarm = jsonFormat7(PpmTreeNodeAlarm)
+  implicit val populationLog = jsonFormat6(PopulationLog)
+  implicit val shardedInfo = jsonFormat4(ShardedInfo.apply)
+  implicit val statusReport = jsonFormat9(StatusReport)
   implicit val cdmUuid: RootJsonFormat[CdmUUID] = jsonFormat2(CdmUUID.apply)
   implicit val admUuid: RootJsonFormat[AdmUUID] = jsonFormat2(AdmUUID.apply)
 
-  implicit val extendedUuid: RootJsonFormat[ExtendedUuid] = new RootJsonFormat[ExtendedUuid] {
-    override def write(eUuid: ExtendedUuid): JsValue = {
+  implicit val extendedUuid: RootJsonFormat[NamespacedUuid] = new RootJsonFormat[NamespacedUuid] {
+    override def write(eUuid: NamespacedUuid): JsValue = {
       val JsObject(payload) = eUuid match {
         case cdm: CdmUUID => cdmUuid.write(cdm)
         case adm: AdmUUID => admUuid.write(adm)
@@ -38,28 +40,34 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
       JsObject(payload + ("type" -> JsString(eUuid.productPrefix)))
     }
 
-    override def read(json: JsValue): ExtendedUuid =
+    override def read(json: JsValue): NamespacedUuid =
       json.asJsObject.getFields("type") match {
         case Seq(JsString("CdmUUID")) => cdmUuid.read(json)
         case Seq(JsString("AdmUUID")) => admUuid.read(json)
       }
   }
 
-  implicit val extendedUuidDetails: RootJsonFormat[ExtendedUuidDetails] = new RootJsonFormat[ExtendedUuidDetails] {
-    override def write(eUuid: ExtendedUuidDetails): JsValue = {
+  implicit val extendedUuidDetails: RootJsonFormat[NamespacedUuidDetails] = new RootJsonFormat[NamespacedUuidDetails] {
+    override def write(eUuid: NamespacedUuidDetails): JsValue = {
       val JsObject(payload) = extendedUuid.write(eUuid.extendedUuid)
-      JsObject(payload + ("name" -> JsString(eUuid.name.getOrElse(""))))
+      JsObject(payload + ("name" -> JsString(eUuid.name.getOrElse(""))) + ("pid" -> JsString(eUuid.pid.map(_.toString).getOrElse(""))))
     }
 
-    override def read(json: JsValue): ExtendedUuidDetails = {
+    override def read(json: JsValue): NamespacedUuidDetails = {
       val eUuid = extendedUuid.read(json)
       val name = json.asJsObject.getFields("name") match {
         case Seq(JsString("")) => None
         case Seq(JsString(jsName)) => Some(jsName)
       }
-      ExtendedUuidDetails(eUuid, name)
+      val pidOpt = json.asJsObject.getFields("pid") match {
+        case Seq(JsString("")) => None
+        case Seq(JsNumber(jsPID)) => Some(jsPID.toInt)
+        case _ => None
+      }
+      NamespacedUuidDetails(eUuid, name, pidOpt)
     }
   }
+
 
   // All enums are JSON-friendly through their string representation
   def jsonEnumFormat[T](enum: CustomEnum[T]): RootJsonFormat[T] = new RootJsonFormat[T]{
@@ -80,16 +88,16 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val cdmHostIdentifier = jsonFormat2(HostIdentifier.apply)
 
   // ADM nodes
-  implicit val admEvent = jsonFormat(AdmEvent.apply, "originalCdmUuids", "eventType", "earliestTimestampNanos", "latestTimestampNanos", "deviceType", "inputType", "provider")
-  implicit val admSubject = jsonFormat(AdmSubject.apply, "originalCdmUuids", "subjectTypes", "cid", "startTimestampNanos", "provider")
+  implicit val admEvent = jsonFormat(AdmEvent.apply, "originalCdmUuids", "eventType", "earliestTimestampNanos", "latestTimestampNanos", "deviceType", "inputType", "hostName", "provider")
+  implicit val admSubject = jsonFormat(AdmSubject.apply, "originalCdmUuids", "subjectTypes", "cid", "startTimestampNanos", "hostName", "provider")
   implicit val admPathNode = jsonFormat(AdmPathNode.apply, "path", "provider")
-  implicit val admFileObject = jsonFormat(AdmFileObject.apply, "originalCdmUuids", "fileObjectType", "size", "provider")
+  implicit val admFileObject = jsonFormat(AdmFileObject.apply, "originalCdmUuids", "fileObjectType", "size", "hostName", "provider")
   implicit val admNetFlowObject = jsonFormat(AdmNetFlowObject.apply, "originalCdmUuids", "localAddress", "localPort", "remoteAddress", "remotePort", "provider")
   implicit val admAddress = jsonFormat(AdmAddress.apply _, "address")
   implicit val admPort = jsonFormat(AdmPort.apply _, "port")
-  implicit val admSrcSinkObject = jsonFormat(AdmSrcSinkObject.apply, "originalCdmUuids", "srcSinkType", "provider")
-  implicit val admPrincipal = jsonFormat(AdmPrincipal.apply, "originalCdmUuids", "userId", "groupIds", "principalType", "username", "provider")
-  implicit val admProvenanceTagNode = jsonFormat(AdmProvenanceTagNode.apply, "originalCdmUuids", "programPoint", "provider")
+  implicit val admSrcSinkObject = jsonFormat(AdmSrcSinkObject.apply, "originalCdmUuids", "srcSinkType", "hostName", "provider")
+  implicit val admPrincipal = jsonFormat(AdmPrincipal.apply, "originalCdmUuids", "userId", "groupIds", "principalType", "username", "hostName", "provider")
+  implicit val admProvenanceTagNode = jsonFormat(AdmProvenanceTagNode.apply, "originalCdmUuids", "programPoint", "hostName", "provider")
   implicit val admHost = jsonFormat(AdmHost.apply, "originalCdmUuids", "hostName", "hostIdentifiers", "osDetails", "hostType", "interfaces", "provider")
   implicit val admSynthesized = jsonFormat(AdmSynthesized.apply _, "originalCdmUuids")
 
@@ -183,8 +191,10 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
     "inV" -> JsNumber(e.inVertex().id().asInstanceOf[Long]),
     "outV" -> JsNumber(e.outVertex().id().asInstanceOf[Long])
   )
-}
 
+  implicit val alarmMetadataFormat = jsonFormat2(AlarmEventMetaData)
+  //implicit val detailedAlarmDataFormat = jsonFormat3(DetailedAlarmData)
+}
 
 
 case class UIEdge(from: String, to: String, label: String)

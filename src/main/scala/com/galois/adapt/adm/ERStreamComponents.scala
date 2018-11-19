@@ -3,20 +3,21 @@ package com.galois.adapt.adm
 import java.util.UUID
 
 import akka.stream.scaladsl.Flow
+import com.galois.adapt.AdaptConfig.IngestHost
+import com.galois.adapt.CurrentCdm
 import com.galois.adapt.adm.EntityResolution._
 import com.galois.adapt.adm.UuidRemapper.{AnAdm, AnEdge, UuidRemapperInfo}
 import com.galois.adapt.cdm19._
 
 import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.{ListBuffer, Map => MutableMap}
+
 
 // This object contains all of the logic for resolving individual CDM types into their corresponding ADM ones.
 object ERStreamComponents {
 
-  import ERRules._
-
   // All flows in this object have this type
-  type TimedCdmToFutureAdm = Flow[(String,Timed[CDM]), Timed[UuidRemapperInfo], _]
+  type TimedCdmToFutureAdm = Flow[(String,Timed[CurrentCdm]), Timed[UuidRemapperInfo], _]
 
 
   def extractPathsAndEdges(pathEdge: Option[(Edge, AdmPathNode)]): List[UuidRemapperInfo] =
@@ -41,16 +42,16 @@ object ERStreamComponents {
     )
 
     def apply(
+      host: IngestHost,
       eventExpiryTime: Time, // how long to wait before expiring an event chain
-      maxEventsMerged: Int,  // maximum number of events to put into an event chain
-
-      activeChains: mutable.Map[EventKey, EventMergeState]
-    ): ErFlow = Flow[(String,Timed[CDM])]
+      maxEventsMerged: Int   // maximum number of events to put into an event chain
+    ): ErFlow = Flow[(String,Timed[CurrentCdm])]
 
       .statefulMapConcat { () =>
 
         // INVARIANT: the keys in the fridge should match the keys of the active chains
         val expiryTimes: Fridge[EventKey] = Fridge.empty
+        val activeChains: MutableMap[EventResolution.EventKey, EventResolution.EventMergeState] = MutableMap.empty
 
         // Expire one single event key
         def expireKey(keyToExpire: EventKey, currentTime: Time, expireInto: ListBuffer[Timed[UuidRemapperInfo]]): Unit = {
@@ -99,7 +100,7 @@ object ERStreamComponents {
               // We already have an active chain for this EventKey
               case Some(EventMergeState(wipAdmEvent, dependent, merged)) =>
 
-                collapseEvents(provider, e, wipAdmEvent, merged, maxEventsMerged) match {
+                ERRules.collapseEvents(provider, e, wipAdmEvent, merged, maxEventsMerged) match {
 
                   // Merged event in => update the new WIP
                   case Left(newWipEvent) =>
@@ -116,7 +117,9 @@ object ERStreamComponents {
 
                     expireKey(eKey, currentTime, toReturn)
 
-                    val (newWipAdmEvent, subject, predicateObject, predicateObject2, path1, path2, path3, path4) = resolveEventAndPaths(provider, e)
+                    val (newWipAdmEvent, subject, predicateObject, predicateObject2, path1, path2, path3, path4) =
+                      ERRules.resolveEventAndPaths(provider, e, host.isWindows, host.hostName)
+
                     activeChains(eKey) = EventMergeState(
                       newWipAdmEvent,
                       List.concat(
@@ -137,7 +140,8 @@ object ERStreamComponents {
               case None =>
 
                 // Create a new WIP from e
-                val (newWipAdmEvent, subject, predicateObject, predicateObject2, path1, path2, path3, path4) = resolveEventAndPaths(provider, e)
+                val (newWipAdmEvent, subject, predicateObject, predicateObject2, path1, path2, path3, path4) =
+                  ERRules.resolveEventAndPaths(provider, e, host.isWindows, host.hostName)
 
                 activeChains(eKey) = EventMergeState(
                   newWipAdmEvent,
@@ -172,13 +176,13 @@ object ERStreamComponents {
 
 
   object SubjectResolution {
-    def apply: TimedCdmToFutureAdm =
-      Flow[(String,Timed[CDM])]
+    def apply(host: IngestHost): TimedCdmToFutureAdm =
+      Flow[(String,Timed[CurrentCdm])]
         .mapConcat[Timed[UuidRemapperInfo]] {
 
           // We are solely interested in subjects
           case (provider, Timed(t, s: Subject)) =>
-            ERRules.resolveSubject(provider, s) match {
+            ERRules.resolveSubject(provider, s, host.isWindows, host.hostName) match {
 
               // Don't merge the Subject (it isn't a UNIT)
               case Left((irSubject, localPrincipal, parentSubjectOpt, path)) =>
@@ -205,12 +209,13 @@ object ERStreamComponents {
 
 
   object OtherResolution {
-    def apply: TimedCdmToFutureAdm = {
+    def apply(host: IngestHost): TimedCdmToFutureAdm = {
 
-      Flow[(String,Timed[CDM])].mapConcat[Timed[UuidRemapperInfo]] {
+      Flow[(String,Timed[CurrentCdm])].mapConcat[Timed[UuidRemapperInfo]] {
         case (provider, Timed(t, ptn: ProvenanceTagNode)) =>
 
-          val (irPtn, flowObjEdge, subjEdge, prevTagEdge, tagIdsEdges) = ERRules.resolveProvenanceTagNode(provider, ptn)
+          val (irPtn, flowObjEdge, subjEdge, prevTagEdge, tagIdsEdges) =
+            ERRules.resolveProvenanceTagNode(provider, ptn, host.hostName)
 
           List.concat(
             Some(AnAdm(irPtn)),
@@ -223,21 +228,21 @@ object ERStreamComponents {
 
         case (provider, Timed(t, p: Principal)) =>
 
-          val irP = resolvePrincipal(provider, p)
+          val irP = ERRules.resolvePrincipal(provider, p, host.hostName)
 
           List(AnAdm(irP)).map(elem => Timed(t, elem))
 
 
         case (provider, Timed(t, s: SrcSinkObject)) =>
 
-          val sP = resolveSrcSink(provider, s)
+          val sP = ERRules.resolveSrcSink(provider, s, host.hostName)
 
           List(AnAdm(sP)).map(elem => Timed(t, elem))
 
 
         case (provider, Timed(t, n: NetFlowObject)) =>
 
-          val (nP, remoteAddress, localAddress, remotePort, localPort) = resolveNetflow(provider, n)
+          val (nP, remoteAddress, localAddress, remotePort, localPort) = ERRules.resolveNetflow(provider, n)
 
           List.concat(
             List(AnAdm(nP)),
@@ -250,7 +255,8 @@ object ERStreamComponents {
 
         case (provider, Timed(t, fo: FileObject)) =>
 
-          val (irFileObject, localPrincipalOpt, path) = resolveFileObject(provider, fo)
+          val (irFileObject, localPrincipalOpt, path) =
+            ERRules.resolveFileObject(provider, fo, host.isWindows, host.hostName)
 
           List.concat(
             Some(AnAdm(irFileObject)),
@@ -261,7 +267,8 @@ object ERStreamComponents {
 
         case (provider, Timed(t, rk: RegistryKeyObject)) =>
 
-          val (irFileObject, path) = resolveRegistryKeyObject(provider, rk)
+          val (irFileObject, path) =
+            ERRules.resolveRegistryKeyObject(provider, rk, host.isWindows, host.hostName)
 
           List.concat(
             Some(AnAdm(irFileObject)),
@@ -270,19 +277,19 @@ object ERStreamComponents {
 
         case (provider, Timed(t, u: IpcObject)) =>
 
-          val irFileObject = resolveUnnamedPipeObject(provider, u)
+          val irFileObject = ERRules.resolveUnnamedPipeObject(provider, u, host.hostName)
 
           List(AnAdm(irFileObject)).map(elem => Timed(t, elem))
 
         case (provider, Timed(t, m: MemoryObject)) =>
 
-          val irSrcSink = resolveMemoryObject(provider, m)
+          val irSrcSink = ERRules.resolveMemoryObject(provider, m, host.hostName)
 
           List(AnAdm(irSrcSink)).map(elem => Timed(t, elem))
 
         case (provider, Timed(t, h: Host)) =>
 
-          val irHost = resolveHost(provider, h)
+          val irHost = ERRules.resolveHost(provider, h)
 
           List(AnAdm(irHost)).map(elem => Timed(t, elem))
 

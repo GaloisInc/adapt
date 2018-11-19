@@ -1,27 +1,17 @@
 package com.galois.adapt
 
 import java.awt.Desktop
-import java.io.ByteArrayOutputStream
 import java.net.URI
-
 import akka.actor._
-import com.galois.adapt.cdm17._
-import org.apache.tinkerpop.gremlin.structure.io.IoCore
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
-import java.nio.file.{Files, Paths}
 import java.util.UUID
-
-import akka.NotUsed
-import akka.stream.scaladsl.{Flow, Sink}
-import akka.util.Timeout
-import com.galois.adapt.cdm18.CDM18
 import com.galois.adapt.scepter._
-
 import scala.concurrent.{ExecutionContext, Future}
 import collection.JavaConverters._
-import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Success, Try}
+import AdaptConfig._
+
 
 class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
 
@@ -154,17 +144,19 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
       var somethingFailed = false
       val updateStatus = (status: Boolean) => { somethingFailed = somethingFailed || status }
 
+      val instrumentationSource = AdaptConfig.ingestConfig.asSingleHost.simpleTa1Name
+
       org.scalatest.run(new General_TA1_Tests(
         Application.failedStatements,
         missingToUuid.toMap,
         graph,
-        Application.instrumentationSource,
+        instrumentationSource,
         toDisplay,
         updateStatus 
       ))
 
       // Provider specific tests
-      val providerSpecificTests = Application.instrumentationSource match {
+      val providerSpecificTests = instrumentationSource match {
         case "clearscope" => Some(new CLEARSCOPE_Specific_Tests(graph, updateStatus))
         case "trace" => Some(new TRACE_Specific_Tests(graph, updateStatus))
         case "cadets" => Some(new CADETS_Specific_Tests(graph, updateStatus))
@@ -179,7 +171,7 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
 
       println(s"\nIf any of these test results surprise you, please email Ryan Wright and the Adapt team at: ryan@galois.com\n")
 
-      if (Application.config.getBoolean("adapt.test.web-ui")) {
+      if (testWebUi.`web-ui`) {
         if (toDisplay.nonEmpty) {
           println("Opening up a web browser to display nodes which failed the tests above...  (nodes are color coded)")
           Desktop.getDesktop.browse(new URI("http://localhost:8080/#" + toDisplay.mkString("&")))

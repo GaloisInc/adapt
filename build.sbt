@@ -18,7 +18,8 @@ lazy val adapt = (project in file(".")).settings(
   autoScalaLibrary := false,
   libraryDependencies ++= Seq(
     "org.scala-lang" % "scala-library" % scalaV,
-    "com.typesafe" % "config" % "1.3.1",
+//    "com.typesafe" % "config" % "1.3.1",
+    "com.github.pureconfig" %% "pureconfig" % "0.9.2",
     "org.scalatest" %% "scalatest" % "3.0.0", // % "test",
     "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
     "org.apache.avro" % "avro" % "1.8.2",
@@ -28,26 +29,24 @@ lazy val adapt = (project in file(".")).settings(
     "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV,
     "com.typesafe.akka" %% "akka-stream" % akkaV,
     "com.typesafe.akka" %% "akka-stream-kafka" % "0.22",
-    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6",
+    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.1.1",
     "org.mapdb" % "mapdb" % "3.0.7",
     "com.github.alexandrnikitin" %% "bloom-filter" % "0.10.1",
     "org.neo4j" % "neo4j-community" % neoV,
     "org.neo4j" % "neo4j-cypher" % neoV,
     "org.neo4j" % "neo4j-tinkerpop-api" % "0.1",
     "org.neo4j" % "neo4j-tinkerpop-api-impl" % "0.7-3.2.3" exclude("org.neo4j", "neo4j-enterprise"),
-//    "org.neo4j" % "neo4j-lucene-index" % neoV,
-//    "org.neo4j" % "neo4j-lucene-upgrade" % neoV,
     "org.apache.tinkerpop" % "neo4j-gremlin" % neoV,
     "org.apache.tinkerpop" % "tinkergraph-gremlin" % neoV,
-//    "org.neo4j.driver" % "neo4j-java-driver" % "1.2.1"
-//    "org.neo4j" % "neo4j-bolt" % neoV
 
-//    , "org.apache.lucene" % "lucene-codecs" % "7.1.0"
+
 
 //  , "com.bbn" % "tc-avro" % "1.0-SNAPSHOT"
     "commons-io" % "commons-io" % "2.6",
     "com.univocity" % "univocity-parsers" % "2.6.1",
-    "com.github.felfert" % "cidrutils" % "1.1"  // For testing IP address ranges in the policy enforcement demo.
+    "com.github.felfert" % "cidrutils" % "1.1",  // For testing IP address ranges in the policy enforcement demo.
+
+    "com.lihaoyi" % "ammonite-sshd" % "1.1.2" cross CrossVersion.full
   ),
 
 //  fork in run := true,

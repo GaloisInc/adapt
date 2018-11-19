@@ -160,9 +160,9 @@ var node_appearance = [
         icon_unicode: "\uf390",
         size: 40,
         make_node_label: function(node) {
-            var hostName = node['properties'].hasOwnProperty('hostName') ? node['properties']['hostName']+"\n" : "no_host_name"+"\n"
-            var hostType = node['properties'].hasOwnProperty('hostType') ? node['properties']['hostType'] : "(unknown_type)"
-            return hostName + "(" + hostType + ")"
+            var hostName = node['properties'].hasOwnProperty('hostName') ? node['properties']['hostName'] : "???"
+            var hostType = node['properties'].hasOwnProperty('hostType') ? node['properties']['hostType'] : "(???)"
+            return hostName + "\n" + hostType
         }
     }, {
         name : "ADM Path Node",
