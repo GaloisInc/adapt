@@ -172,11 +172,9 @@ object PpmSummarizer {
     implicit val timeout = Timeout(30 seconds)
     (hostName, hostName contains Application.hostNameForAllHosts) match {
       case (Some(hn), false) =>
-        println(s"Summarize with specific host case: ${(Some(hn), false)}")
         (Application.ppmManagerActors(hn) ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList))
           .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{r => summarize(r.repr) }
       case x => // None or Some(BetweenHosts)
-        println(s"Summarize with BetweenHosts case: $x")
         allHostPossibilities.foldLeft(Future.successful(List.empty[(HostName, TreeRepr)])) { case (accF, aHost) =>
           accF.flatMap(acc =>
             (Application.ppmManagerActors(aHost) ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList))
