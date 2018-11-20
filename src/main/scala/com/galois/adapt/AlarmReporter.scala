@@ -56,7 +56,9 @@ case class ConciseAlarmEvent(
   emitTimestamp     : Long,
   localProbThreshold: Float,
   ppmTreeNodeAlarms : List[PpmTreeNodeAlarm],
-  alarmID           : Long) extends AlarmEventData {
+  alarmID           : Long,
+  processDetails    : Set[ProcessDetails])
+  extends AlarmEventData {
   def toJson: JsValue = {
     val delim = "∫"
 
@@ -68,7 +70,8 @@ case class ConciseAlarmEvent(
       "emitTimestamp" -> JsNumber(this.emitTimestamp),
       "localProbThreshold" -> JsNumber(this.localProbThreshold),
       "ppmTreeNodeAlarms" -> JsArray(this.ppmTreeNodeAlarms.map(_.toJson).toVector),
-      "alarmID" -> JsNumber(this.alarmID)
+      "alarmID" -> JsNumber(this.alarmID),
+      "processDetails" -> processDetails.toJson
     )
   }
 }
@@ -97,7 +100,7 @@ case object AlarmEvent {
     val ppmTreeNodeAlarms: List[NoveltyDetection.PpmTreeNodeAlarm] = alarmDetails.alarm.details._3
 
     AlarmEvent(
-      ConciseAlarmEvent(alarmDetails.treeName, alarmDetails.hostName, key, alarmDetails.alarm.details._1, alarmDetails.alarm.details._2, alarmDetails.localProbThreshold, ppmTreeNodeAlarms, alarmID),
+      ConciseAlarmEvent(alarmDetails.treeName, alarmDetails.hostName, key, alarmDetails.alarm.details._1, alarmDetails.alarm.details._2, alarmDetails.localProbThreshold, ppmTreeNodeAlarms, alarmID, alarmDetails.processDetailsSet),
       AlarmEventMetaData(runID, "raw")
     )
   }
