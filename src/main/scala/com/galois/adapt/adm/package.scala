@@ -147,10 +147,13 @@ package object adm {
     earliestTimestampNanos: Long,
     latestTimestampNanos: Long,
 
-    // 5D specific
-    // See <https://git.tc.bbn.com/tc-all/cdm-docs/blob/master/ta1-fivedirections/operations/user_interaction.md>
-    deviceType: Option[String],
-    inputType: Option[String],
+    /* Comes from sort of UI event
+     *
+     *   - 5D:     does properties map at 'deviceType' contain 'keyboard'/'mouse'
+     *   - Marple: does the `name` array contain `MouseDownPositionInfo`/`KeyBoardInfo`?
+     *   - Theia:  does the `name` array contain `UI_EVENT`
+     */
+    comesFromUI: Boolean,
 
     hostName: HostName,
     provider: String
@@ -165,15 +168,17 @@ package object adm {
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
       "eventType" -> eventType.toString,
       "earliestTimestampNanos" -> earliestTimestampNanos,
-      "latestTimestampNanos" -> latestTimestampNanos
-    )  ++ (if (provider.isEmpty) Nil else List("provider" -> provider)) ++ {if (deviceType == None) Nil else List("deviceType" -> deviceType.get)} ++ (if (inputType == None) Nil else List("inputType" -> inputType.get))
+      "latestTimestampNanos" -> latestTimestampNanos,
+      "comesFromUI" -> comesFromUI
+    )  ++ (if (provider.isEmpty) Nil else List("provider" -> provider))
 
     def toMap = Map(
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
       "eventType" -> eventType.toString,
       "earliestTimestampNanos" -> earliestTimestampNanos,
       "latestTimestampNanos" -> latestTimestampNanos,
-      "provider" -> provider
+      "provider" -> provider,
+      "comesFromUI" -> comesFromUI
     )
   }
 
