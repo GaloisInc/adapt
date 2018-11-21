@@ -173,6 +173,7 @@ object Query {
       var strs: Set[String] = Set()
       var uids: Set[String] = Set()
       var arrs: Set[String] = Set()
+      var bools: Set[String] = Set()
 
       // These are arguments to the methods called in traversals
       def lng: Parser[QueryValue[java.lang.Long]] =
@@ -192,6 +193,11 @@ object Query {
         | stringLiteral             ^^ { case s => Raw(StringContext.treatEscapes(s.stripPrefix("\"").stripSuffix("\""))) }
         | "\'" ~! "[^\']*".r ~ "\'" ^^ { case _~s~_ => Raw(s) }
         ).withFailureMessage("string expected (ex: x, \"hello\", 'hello')")
+
+      def bool: Parser[QueryValue[Boolean]] =
+        ( variable[Boolean](bools)
+          | """true|false""".r ^^ { case x => Raw(x.toBoolean) }
+          ).withFailureMessage("boolean expected (ex: true, false)")
 
       // NOTE: this is no longer exactly a UUID - it is a franken-UUID supporting namespaces.
       // For example, it should accept `cdm_cadets_123e4567-e89b-12d3-a456-426655440000`.
@@ -268,6 +274,7 @@ object Query {
             case _~_~_~v~_ => (t: Tr) => HasValue(if (isNeo4j) { HasLabel(t, Raw("Node")) } else { t }, Raw("uuid"), v)
           }
         | ".has(" ~ str ~ "," ~ lit ~ ")"  ^^ { case _~k~_~v~_  => HasValue(_: Tr, k, v) }
+        | ".has(" ~ str ~ "," ~ bool ~ ")"  ^^ { case _~k~_~v~_  => HasValue(_: Tr, k, v) }
         | ".has(" ~ str ~ "," ~ trav ~ ")" ^^ { case _~k~_~t~_  => HasTraversal(_: Tr, k, t) }
         | ".has(" ~ ("'uuid'"|"\"uuid\"") ~ "," ~ pred ~ ")" ^^ {
             case _~_~_~p~_ if isNeo4j => (t: Tr) => HasPredicate(HasLabel(t, Raw("Node")), Raw("uuid"), p)
