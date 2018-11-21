@@ -26,7 +26,11 @@ var starting_queries = [
         default_values : ["/etc/passwd"]
     }, {
         name : "find NetFlow by remote address & port",
-        base_query : "g.V().hasLabel('NetFlowObject').has('remoteAddress','{_}').has('remotePort',{_})",
+        base_query : "g.V().hasLabel('AdmNetFlowObject').has('remoteAddress','{_}').has('remotePort',{_})",
+        default_values : ["127.0.0.1",80]
+    }, {
+        name : "find NetFlow by local address & port",
+        base_query : "g.V().hasLabel('AdmNetFlowObject').has('localAddress','{_}').has('localPort',{_})",
         default_values : ["127.0.0.1",80]
     }
 ]
