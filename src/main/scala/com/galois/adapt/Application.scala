@@ -702,11 +702,15 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       val patienceLevel = 48 hours
       implicit val timeout = Timeout(patienceLevel)
 
-      println(s"Saving PPM trees to disk...")
-      val saveF =
-        if (ppmConfig.shouldsaveppmtrees)
-          ppmManagerActors.values.toList.foldLeft(Future.successful(Ack))((a,b) => a.flatMap(_ => (b ? SaveTrees(true)).mapTo[Ack.type]))
-        else Future.successful( Ack )
+      println(s"Stopping ammonite...")
+      replServer.stopImmediately()
+
+      val saveF = if (ppmConfig.shouldsaveppmtrees) {
+        println(s"Saving PPM trees to disk...")
+        ppmManagerActors.values.toList.foldLeft(Future.successful(Ack))((a, b) => a.flatMap(_ => (b ? SaveTrees(true)).mapTo[Ack.type]))
+      } else {
+        Future.successful( Ack )
+      }
 
       val shutdownF = saveF.flatMap { _ =>
         println("Shutting down the actor system")
