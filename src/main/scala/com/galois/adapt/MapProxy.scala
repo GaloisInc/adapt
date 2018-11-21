@@ -11,6 +11,7 @@ import org.mapdb.serializer.SerializerArrayTuple
 import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 
 import scala.collection.mutable
+import scala.concurrent.Future
 import scala.util.Random
 
 /// Manages all of the detail of large internal maps, exposing interfaces from `MapSetUtils`. If the logic requires
@@ -37,7 +38,7 @@ class MapProxy(
     case Some(p) =>
 
       Option(new File(p).getParent) match {
-        case Some(parentDir) if new File(parentDir).exists() =>
+        case Some(parentDir) if ! new File(parentDir).exists() =>
           println(s"Creating parent directory for map.db file at: $parentDir")
           new File(parentDir).mkdir()
         case _ => { }
@@ -50,30 +51,22 @@ class MapProxy(
 
       val db = maker.make()
 
-      // On shutdown, expire everything to the on-disk map
-
-      // This is now in Application.scala
-
-//      Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
-//        override def run(): Unit = {
-//          println("Expiring MapDB contents to disk...")
-//          mapdbCdm2AdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
-//          mapdbCdm2CdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
-//          db.close()
-//          println("MapDB has been closed.")
-//        }
-//      }))
-
       db
 
     case _ =>
-      val p = "/tmp/map_" + Random.nextLong() + ".db"
-      val fDB = DBMaker.fileDB(p).fileMmapEnable().make()
+      DBMaker.tempFileDB().fileMmapEnable().make()
+  }
 
-      // On shutdown delete the DB
-      new File(p).deleteOnExit()
+  // On shutdown, expire everything to the on-disk map
+  def closeSync(): Unit = {
+    println("Expiring MapDB Cdm2Cdm contents to disk...")
+    mapdbCdm2CdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
 
-      fDB
+    println("Expiring MapDB Cdm2Adm contents to disk...")
+    mapdbCdm2AdmShardsMap.foreach(_._2.foreach(_.clearWithExpire()))
+
+    println("Closing MapDb")
+    fileDb.close()
   }
 
   /***************************************************************************************
@@ -92,7 +85,7 @@ class MapProxy(
       .createOrOpen()
   }).toMap
 
-  val mapdbCdm2CdmShardsMap: Map[HostName, Array[HTreeMap[Array[AnyRef],Array[AnyRef]]]] = numHosts.map(host => host -> Array.tabulate(numShards) { shardId =>
+  private val mapdbCdm2CdmShardsMap: Map[HostName, Array[HTreeMap[Array[AnyRef],Array[AnyRef]]]] = numHosts.map(host => host -> Array.tabulate(numShards) { shardId =>
     memoryDb.hashMap(s"cdm2cdmShard$host$shardId")
       .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
@@ -122,7 +115,7 @@ class MapProxy(
       .createOrOpen()
   }).toMap
 
-  val mapdbCdm2AdmShardsMap: Map[HostName, Array[HTreeMap[Array[AnyRef],Array[AnyRef]]]] = numHosts.map(host => host -> Array.tabulate(numShards) { shardId =>
+  private val mapdbCdm2AdmShardsMap: Map[HostName, Array[HTreeMap[Array[AnyRef],Array[AnyRef]]]] = numHosts.map(host => host -> Array.tabulate(numShards) { shardId =>
     memoryDb.hashMap(s"cdm2admShard$host$shardId")
       .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
       .valueSerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.UUID))
