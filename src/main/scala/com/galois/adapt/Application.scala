@@ -422,8 +422,9 @@ object Application extends App {
 
       val asdasd = implicitly[PickleScheme[String]]
 
-      val graph = GraphService( system,
-        inMemoryNodeLimit = Some(1000),
+      val graph = GraphService(
+        system,
+        inMemorySoftNodeLimit = Some(1000),
         shardCount = 3,
         uiPort = None /*Some(9090)*/ )(
         MapDBMultimap()
