@@ -966,26 +966,27 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         ),
         d => List(
           d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered), // Reading subject name or UUID
-          d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
-            d._3._1 match {
-              case o: AdmSrcSinkObject => s" : ${o.srcSinkType}"
-              case o: AdmFileObject => s" : ${o.fileObjectType}"
-              case o: AdmNetFlowObject => s"  NetFlow: ${o.remoteAddress}:${o.remotePort}"
-              case _ => ""
-            }
-          )
+          d._3._1 match {                                     // Object name or UUID and type
+            case o: AdmSrcSinkObject => d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + s" : ${o.srcSinkType}"
+            case o: AdmFileObject =>    d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + s" : ${o.fileObjectType}"
+            case o: AdmNetFlowObject => s"${o.localAddress.getOrElse("???")}:${o.localPort.map(_.toString).getOrElse("???")} :: ${o.remoteAddress.getOrElse("???")}:${o.remotePort.map(_.toString).getOrElse("???")}"
+            case _ => "other_communication_path_object"
+          }
         )
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
-        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
-          d._3._1 match {
-            case o: AdmSrcSinkObject => s" : ${o.srcSinkType}"
-            case o: AdmFileObject => s" : ${o.fileObjectType}"
-            case o: AdmNetFlowObject => s"  NetFlow: ${o.remoteAddress}:${o.remotePort}"
-            case _ => ""
-          }
-          )))) ++
+        NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
+        NamespacedUuidDetails(
+          d._3._1.uuid,
+          Some(
+            d._3._1 match {                                     // Object name or UUID and type
+              case o: AdmSrcSinkObject => d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + s" : ${o.srcSinkType}"
+              case o: AdmFileObject =>    d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + s" : ${o.fileObjectType}"
+              case o: AdmNetFlowObject => s"${o.localAddress.getOrElse("???")}:${o.localPort.map(_.toString).getOrElse("???")} :: ${o.remoteAddress.getOrElse("???")}:${o.remotePort.map(_.toString).getOrElse("???")}"
+              case _ => "other_communication_path_object"
+            }
+          )
+        )) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       _._1.latestTimestampNanos,
@@ -1431,7 +1432,7 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
 
   def readableString: String = simpleStrings(-1).drop(1).mkString("\n")
   def simpleStrings(passedDepth: Int = 0): List[String] =
-    s"${(0 until (4 * passedDepth)).map(_ => " ").mkString("") + (if (children.isEmpty) s"- ${count} count${if (count>=2)"s"} of:" else "with:")} $key" ::
+    s"${(0 until (4 * passedDepth)).map(_ => " ").mkString("") + (if (children.isEmpty) s"- ${count} count${if (count == 1) "" else "s"} of:" else "with:")} $key" ::
       children.toList.sortBy(r => 1F - r.localProb).flatMap(_.simpleStrings(passedDepth + 1))
 
   def toFlat: List[(Int, ExtractedValue, Float, Float, Int)] = (depth, key, localProb, globalProb, count) :: children.toList.flatMap(_.toFlat)
