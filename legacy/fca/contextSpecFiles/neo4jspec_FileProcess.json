@@ -1,0 +1,6 @@
+{"context specification":{
+"query":"g.V().hasLabel('AdmFileObject').as('file').out('path','(path)').hasLabel('AdmPathNode').as('p').values('path').as('filepath').select('file').in('predicateObject','predicateObject2').hasLabel('AdmEvent').as('y').select('y').out('subject').hasLabel('AdmSubject').has('subjectTypes','SUBJECT_PROCESS').as('x').out('cmdLine','(cmdLine)','exec').hasLabel('AdmPathNode').values('path').as('proc_name').select('filepath','proc_name').dedup()",
+"objects":"filepath",
+"attributes":"proc_name"
+ }
+}

@@ -1,0 +1,12 @@
+{"OLD context specification":{
+"query":"g.V().hasLabel('AdmEvent').as('x').out('subject').hasLabel('AdmSubject').values('uuid').as('id').select('x').out('predicateObject','predicateObject2').hasLabel('AdmFileObject').out('path','(path)').hasLabel('AdmPathNode').values('path').as('filepath').select('id','filepath').dedup()",
+"objects":"id",
+"attributes":["filepath"]
+},
+ "context specification":{
+     "query":"MATCH (x:AdmPathNode)<-[:path|:`(path)`]-(:AdmFileObject)<-[:predicateObject|:predicateObject2]-(:AdmEvent)-[:subject]->(p:AdmSubject) RETURN DISTINCT p.uuid AS id, x.path AS filepath",
+     "endpoint":"cypher",
+"objects":"id",
+"attributes":["filepath"]
+}
+}

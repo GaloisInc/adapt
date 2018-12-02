@@ -1,0 +1,6 @@
+{"context specification":{
+"query":"g.V().hasLabel('AdmSubject').has('subjectType','SUBJECT_PROCESS').as('x').values('uuid').as('id').select('x').in().hasLabel('AdmEvent').as('y').values('eventType').as('type').select('id','type').dedup()",
+"objects":"id",
+"attributes":"type"
+}
+}

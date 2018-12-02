@@ -1,10 +1,14 @@
 package com.galois.adapt.adm
 
+import java.util.UUID
+
 import akka.NotUsed
 import akka.event.LoggingAdapter
-import akka.stream.scaladsl.Flow
+import akka.stream.{FlowShape, OverflowStrategy}
+import akka.stream.scaladsl.{Broadcast, Flow, FlowOps, GraphDSL, Merge, MergePreferred, Partition}
 import com.galois.adapt.MapSetUtils.AlmostMap
 import com.galois.adapt.adm.EntityResolution.{Time, Timed}
+import com.galois.adapt.adm.UuidRemapper.UuidRemapperFlow
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -13,14 +17,349 @@ import scala.collection.mutable.ListBuffer
 object UuidRemapper {
 
   // This describes the type of input that the UUID remapping stage expects to get
-  sealed trait UuidRemapperInfo
+  sealed trait UuidRemapperInfo {
+    // Is this bit of information ready to be emitted downstream?
+    def remapped: Boolean = this match {
+      case _: AnAdm => true
+      case AnEdge(e: EdgeAdm2Adm) => true
+      case AnEdge(e) => false
+      case _: CdmMerge => false
+      case _: Cdm2Adm => false
+      case JustTime => true
+    }
+
+    // Emit downstream a bit of information. This should never be called on input `x` for which `remapped(x) == false`.
+    def extract: List[Either[ADM, EdgeAdm2Adm]] = this match {
+      case AnAdm(a) => List(Left(a))
+      case AnEdge(e: EdgeAdm2Adm) => List(Right(e))
+      case JustTime => List.empty
+      case _: CdmMerge => List.empty
+      case _: Cdm2Adm => List.empty
+      case AnEdge(e) => throw new Exception(s"Edge $e was not done being remapped!")
+    }
+  }
   case class AnAdm(adm: ADM) extends UuidRemapperInfo
   case class AnEdge(edge: Edge) extends UuidRemapperInfo
   case class CdmMerge(merged: CdmUUID, into: CdmUUID) extends UuidRemapperInfo
   case object JustTime extends UuidRemapperInfo
-
+  case class Cdm2Adm(merged: CdmUUID, into: AdmUUID) extends UuidRemapperInfo
 
   type UuidRemapperFlow = Flow[Timed[UuidRemapperInfo], Either[ADM, EdgeAdm2Adm], NotUsed]
+
+
+  /***************************************************************************************
+   * Sharded variant                                                                     *
+   ***************************************************************************************/
+
+  private def uuidPartition1(u: UUID): Int =
+    Math.abs(u.getLeastSignificantBits * 7 ^ u.getMostSignificantBits * 31).intValue()
+
+  private def uuidPartition2(uuid: UUID): Int = {
+
+    val msb = uuid.getMostSignificantBits
+    val lsb = uuid.getLeastSignificantBits
+
+    val buf: Array[Long] = Array(
+      (msb >> 56) & 0xff,
+      (msb >> 48) & 0xff,
+      (msb >> 40) & 0xff,
+      (msb >> 32) & 0xff,
+      (msb >> 24) & 0xff,
+      (msb >> 16) & 0xff,
+      (msb >>  8) & 0xff,
+      (msb >>  0) & 0xff,
+
+      (lsb >> 56) & 0xff,
+      (lsb >> 48) & 0xff,
+      (lsb >> 40) & 0xff,
+      (lsb >> 32) & 0xff,
+      (lsb >> 24) & 0xff,
+      (lsb >> 16) & 0xff,
+      (lsb >>  8) & 0xff,
+      (lsb >>  0) & 0xff
+    )
+
+    var crc: Long = 0xFFFF
+    for (pos <- 0 until 16) {
+      crc ^= buf(pos)
+
+      for (i <- 0 until 8) {
+        if ((crc & 0x0001) != 0) {
+          crc >>= 1
+          crc ^= 0xA001
+        } else {
+          crc >>= 1
+        }
+      }
+    }
+
+    crc.intValue()
+  }
+
+  // Figure out which shard a piece of info should be routed to
+  def partitioner(numShards: Int): UuidRemapperInfo => Int = {
+    case AnAdm(adm) => uuidPartition2(adm.uuid.uuid) % numShards
+    case AnEdge(EdgeCdm2Cdm(src, _, _)) => uuidPartition2(src.uuid) % numShards
+    case AnEdge(EdgeCdm2Adm(src, _, _)) => uuidPartition2(src.uuid) % numShards
+    case AnEdge(EdgeAdm2Cdm(_, _, tgt)) => uuidPartition2(tgt.uuid) % numShards
+    case AnEdge(EdgeAdm2Adm(src, _, _)) => uuidPartition2(src.uuid) % numShards
+    case CdmMerge(cdm, _) => uuidPartition2(cdm.uuid) % numShards
+    case Cdm2Adm(cdm, _) => uuidPartition2(cdm.uuid) % numShards
+    case JustTime => 0 // doesn't matter what this is
+  }
+
+  def sharded(
+      expiryTime: Time,                              // How long to hold on to a CdmUUID until we expire it
+
+      cdm2cdms: Array[AlmostMap[CdmUUID, CdmUUID]],  // Mapping for CDM uuids that have been mapped onto other CDM uuids
+      cdm2adms: Array[AlmostMap[CdmUUID, AdmUUID]],  // Mapping for CDM uuids that have been mapped onto ADM uuids
+      blockedEdges: Array[mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])]],
+      shardCount: Array[Long],
+
+      ignoreEvents: Boolean,
+      log: LoggingAdapter,
+
+      numShards: Int
+  ): UuidRemapperFlow = Flow.fromGraph[Timed[UuidRemapperInfo], Either[ADM, EdgeAdm2Adm], NotUsed](GraphDSL.create() {
+    implicit b =>
+    import GraphDSL.Implicits._
+
+    /*
+     *
+     *           +------------------[small buffer]-------------<--------------------------------------------+
+     *           |                                                                                          |
+     *           |                                                                                          |
+     *           |                                                                                          |
+     *           |                      +----> filterShard(0) +-> oneShard(0, ...) +---+                    |
+     *           |                      |                                              |                    |
+     *           v                      +----> filterShard(1) +-> oneShard(1, ...) +---+                    +
+     * +---> loopBack +---> splitShards |                                              | mergeShards +-> decider +--->
+     *                                  |          ...                                 |
+     *                                  |                                              |
+     *                                  +----> filterShard(n) +-> oneShard(n, ...) +---+
+     *
+     */
+
+    def thisPartitioner = partitioner(numShards)
+
+    def filterShard(shardIndex: Int)(t: Timed[UuidRemapperInfo]): Timed[UuidRemapperInfo] = {
+        val shard = thisPartitioner(t.unwrap)
+        if (shard == shardIndex) {
+          shardCount(shard) += 1
+          t
+        } else {
+          t.copy(unwrap = JustTime)
+        }
+      }
+
+    val expandAdm = b.add(Flow[Timed[UuidRemapperInfo]])
+    val loopBack = b.add(MergePreferred[Timed[UuidRemapperInfo]](1))
+    val splitShards = b.add(Broadcast[Timed[UuidRemapperInfo]](numShards))
+    val mergeShards = b.add(Merge[Timed[UuidRemapperInfo]](numShards))
+    val decider = b.add(Partition[Timed[UuidRemapperInfo]](2, info => if (info.unwrap.remapped) 0 else 1))
+    val ret = b.add(Flow[Either[ADM, EdgeAdm2Adm]])
+
+    loopBack.out ~> splitShards.in
+
+    for (i <- 0 until numShards) {
+      splitShards.out(i) ~>
+        Flow.fromFunction(filterShard(i)) ~>
+        oneShard(i, thisPartitioner, expiryTime, cdm2cdms(i), cdm2adms(i), blockedEdges(i), log) ~>
+        mergeShards.in(i)
+    }
+
+    mergeShards.out ~> decider.in
+
+    decider.out(1).buffer(1000, OverflowStrategy.backpressure) ~> loopBack.preferred
+    decider.out(0).mapConcat[Either[ADM, EdgeAdm2Adm]]((t: Timed[UuidRemapperInfo]) => t.unwrap.extract) ~> ret.in
+
+    expandAdm.out.mapConcat[Timed[UuidRemapperInfo]] {
+      case x @ Timed(t, AnAdm(adm)) if !(adm.isInstanceOf[AdmEvent] && ignoreEvents) =>
+        x :: adm.originalCdmUuids.toList.map(cdmUuuid => Timed(t, Cdm2Adm(cdmUuuid, adm.uuid)))
+      case other => List(other)
+    } ~> loopBack.in(0)
+
+    FlowShape(expandAdm.in, ret.out)
+  })
+
+  def oneShard(
+      thisShardId: Int,
+      thisPartitioner: UuidRemapperInfo => Int,
+
+      expiryTime: Time,                      // How long to hold on to a CdmUUID until we expire it
+
+      cdm2cdm: AlmostMap[CdmUUID, CdmUUID],  // Mapping for CDM uuids that have been mapped onto other CDM uuids
+      cdm2adm: AlmostMap[CdmUUID, AdmUUID],  // Mapping for CDM uuids that have been mapped onto ADM uuids
+      blockedEdges: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])],
+
+      log: LoggingAdapter
+  ): Flow[Timed[UuidRemapperInfo], Timed[UuidRemapperInfo], NotUsed] = Flow[Timed[UuidRemapperInfo]].statefulMapConcat { () =>
+
+    // Keep track of current time art the tip of the stream, along with things that will expire
+    var currentTime: Time = Time(0,0)
+    var expiryTimes: Fridge[CdmUUID] = Fridge.empty
+    var allStateEmitted: Boolean = false
+
+    // Add some 'CDM -> ADM' to the maps and notify those previously blocked
+    def putCdm2Adm(source: CdmUUID, target: AdmUUID, expireInto: ListBuffer[UuidRemapperInfo]): Unit = {
+      // Yell loudly if we are about to overwrite something
+
+      val otherTarget = cdm2cdm.get(source)
+      if (otherTarget.isDefined)
+        log.warning( s"UuidRemapper: $source should not map to $target (since it already maps to $otherTarget")
+
+      val prevTarget = cdm2adm.update(source, target)
+      if (prevTarget.exists(_ != target))
+        log.warning(s"UuidRemapper: $source should not map to $target (since it already maps to $prevTarget")
+
+      for (e <- blockedEdges.remove(source).map(_._1).getOrElse(Nil)) {
+        expireInto += AnEdge(e.applyAdmRemap(source, target))
+      }
+    }
+
+    // Add some 'CDM -> CDM' to the maps and notify those previously blocked
+    def putCdm2Cdm(source: CdmUUID, target: CdmUUID, expireInto: ListBuffer[UuidRemapperInfo]): Unit = {
+      // Yell loudly if we are about to overwrite something
+
+      val otherTarget = cdm2adm.get(source)
+      if (otherTarget.isDefined)
+        log.warning( s"UuidRemapper: $source should not map to $target (since it already maps to $otherTarget")
+
+      val prevTarget = cdm2cdm.update(source, target)
+      if (prevTarget.exists(_ != target))
+        log.warning(s"UuidRemapper: $source cannot map to $target (since it already maps to $prevTarget")
+
+      for (e <- blockedEdges.remove(source).map(_._1).getOrElse(Nil)) {
+        expireInto += AnEdge(e.applyCdmRemap(source, target))
+      }
+    }
+
+    def expireKey(cdmUuid: CdmUUID, cause: String, expireInto: ListBuffer[UuidRemapperInfo]): Unit = {
+      for (edges <- blockedEdges.get(cdmUuid)) {
+        val synthesizedAdm = AdmSynthesized(Seq(cdmUuid))
+
+        println(s"Expired ${synthesizedAdm.uuid} ($cause)")
+
+        expireInto += AnAdm(synthesizedAdm)
+        putCdm2Adm(cdmUuid, synthesizedAdm.uuid, expireInto)
+      }
+    }
+
+    // Expire old UUIDs based on the current time. Note all this does is create a new node and call out to `putCdm2Adm`.
+    def updateTimeAndExpireOldUuids(time: Time, expireInto: ListBuffer[UuidRemapperInfo]): Unit = {
+
+      if (time.nanos > currentTime.nanos) {
+        // Unfortunately time information observed by UuidRemapper can be jittery since it is interacting with several
+        // "tip of the streams".
+        currentTime = currentTime.copy(nanos = time.nanos)
+
+        // Expire based on nanosecond timestamps
+        var keepExpiringNanos: Boolean = true
+        while (keepExpiringNanos) {
+          expiryTimes.popFirstNanosToExpireIf(_ <= currentTime.nanos) match {
+            case None => keepExpiringNanos = false
+            case Some((keysToExpire, _)) => keysToExpire.foreach(k => expireKey(k, "time based", expireInto))
+          }
+        }
+      }
+
+      if (time.count > currentTime.count) {
+        // Unfortunately time information observed by UuidRemapper can be jittery since it is interacting with several
+        // "tip of the streams".
+        currentTime = currentTime.copy(count = time.count)
+
+
+        // Expire based on node counts
+        var keepExpiringCounts: Boolean = true
+        while (keepExpiringCounts) {
+          expiryTimes.popFirstCountToExpireIf(_ <= currentTime.count) match {
+            case None => keepExpiringCounts = false
+            case Some((keysToExpire, _)) => keysToExpire.foreach(k => expireKey(k, "count based", expireInto))
+          }
+        }
+      }
+    }
+
+    {
+      // Don't do anything with ADM nodes
+      case Timed(t, a @ AnAdm(_)) =>
+        val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
+
+        toReturn += a
+        updateTimeAndExpireOldUuids(t, toReturn)
+
+        toReturn.map(Timed(t,_)).toList
+
+      // Add an edge
+      case Timed(t, AnEdge(edge)) =>
+        val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
+
+        def processEdge(): Unit = {
+          val cdmUuid = edge.nextCdmUUID.getOrElse {
+            // No remap needed!
+            toReturn += AnEdge(edge)
+            return
+          }
+
+          for (admUuid <- cdm2adm.get(cdmUuid)) {
+            // Remapped a CDM to ADM endpoint
+            toReturn += AnEdge(edge.applyAdmRemap(cdmUuid, admUuid))
+            return
+          }
+          for (cdmUuidNew <- cdm2cdm.get(cdmUuid)) {
+            // Remapped a CDM to CDM endpoint
+            toReturn += AnEdge(edge.applyCdmRemap(cdmUuid, cdmUuidNew))
+            return
+          }
+
+          // Blocked
+          blockedEdges(cdmUuid) = (edge :: blockedEdges.get(cdmUuid).map(_._1).getOrElse(List.empty), Set.empty)
+        }
+        processEdge()
+        updateTimeAndExpireOldUuids(t, toReturn)
+
+        toReturn.map(Timed(t,_)).toList
+
+      // Add information about a CDM to CDM mapping
+      case Timed(t, CdmMerge(merged, into)) =>
+        val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
+
+        putCdm2Cdm(merged, into, toReturn)
+        updateTimeAndExpireOldUuids(t, toReturn)
+
+        toReturn.map(Timed(t,_)).toList
+
+      // Add information about a CDM to ADM mapping
+      case Timed(t, Cdm2Adm(merged, into)) =>
+        val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
+
+        putCdm2Adm(merged, into, toReturn)
+        updateTimeAndExpireOldUuids(t, toReturn)
+
+        toReturn.map(Timed(t,_)).toList
+
+      // Update just the time
+      case Timed(t, JustTime) =>
+        if (!allStateEmitted) {
+          val toReturn: ListBuffer[UuidRemapperInfo] = ListBuffer.empty
+
+          if (t == Time.max) {
+            println(s"UUID remapping stage (shard $thisShardId) is emitting all its state...")
+            allStateEmitted = true
+          }
+          updateTimeAndExpireOldUuids(t, toReturn)
+
+          toReturn.map(Timed(t, _)).toList
+        } else {
+          List.empty
+        }
+    }
+  }
+
+
+  /***************************************************************************************
+   * Unsharded variant                                                                   *
+   ***************************************************************************************/
 
   def apply(
     expiryTime: Time,                      // How long to hold on to a CdmUUID until we expire it
@@ -29,6 +368,7 @@ object UuidRemapper {
     cdm2adm: AlmostMap[CdmUUID, AdmUUID],  // Mapping for CDM uuids that have been mapped onto ADM uuids
     blockedEdges: mutable.Map[CdmUUID, (List[Edge], Set[CdmUUID])],
 
+    ignoreEvents: Boolean,
     log: LoggingAdapter
   ): UuidRemapperFlow = Flow[Timed[UuidRemapperInfo]].statefulMapConcat[Either[ADM, EdgeAdm2Adm]] { () =>
 
@@ -164,6 +504,15 @@ object UuidRemapper {
 
 
     {
+      // Don't do anything with events if `ignoreEvents`
+      case Timed(t, AnAdm(e: AdmEvent)) if ignoreEvents =>
+        val toReturn: ListBuffer[Either[ADM, EdgeAdm2Adm]] = ListBuffer.empty
+
+        toReturn += Left(e)
+        updateTimeAndExpireOldUuids(t, toReturn)
+
+        toReturn.toList
+
       // Given an ADM node, map all the original CDM UUIDs to an ADM UUID
       case Timed(t, AnAdm(adm)) =>
         val toReturn: ListBuffer[Either[ADM, EdgeAdm2Adm]] = ListBuffer.empty

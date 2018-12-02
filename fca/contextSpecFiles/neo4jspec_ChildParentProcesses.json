@@ -1,6 +1,0 @@
-{"context specification":{
-"query":"g.V().hasLabel('AdmSubject').as('child').values('uuid').as('childUuid').select('child').out('parentSubject').hasLabel('AdmSubject').as('parent').out('cmdLine','(cmdLine)','exec').hasLabel('AdmPathNode').values('path').as('parentProcName').select('childUuid','parentProcName').dedup()",
-"objects":"childUuid",
-"attributes":"parentProcName"
-}
-}

@@ -62,41 +62,19 @@ object Wrapper extends App {
     out.transferFrom(in, 0, Long.MaxValue)
   }.toOption.getOrElse(throw new Exception(s"Failed to download file from $downloadUrl."))
 
-  // Option parser
-  val parser = new OptionParser[Config]("adapt-tester") {
-    help("help").text("Prints this usage text")
-
-    opt[String]('s', "heap-size")
-      .text("Size of heap to use (passed to Java's '-Xmx' option). Default is '6G'.")
-      .optional()
-      .action((s,c) => c.copy(heapSize = s))
-   
-    opt[Unit]('w', "web-ui")
-      .text("If tests with visualiztions fail, open them in the browser.")
-      .optional()
-      .action((_,c) => c.copy(webUi = true))
-    
-    arg[String]("targets...")
-      .text("Either data-files or folders containing data-files")
-      .minOccurs(1)
-      .unbounded()
-      .action((t,c) => c.copy(targets = c.targets :+ t))
-
-    note(
-      """
-        |Very roughly, heap-size should be ~3G of RAM per million CDM statements.
-        |By Java conventions, valid suffixes for heap sizes are 'K', 'M', and 'G'.
-        |""".stripMargin
-    )
-  }
-
   Try {
 
     // Compare the hash of the current 'adapt-tester.jar' to the published one
-    val testerStatedHash = fetchHash(testerHashUrl)
-    val testerActualHash = computeHash(testerJarPath)
+    def testerStatedHash = fetchHash(testerHashUrl)
+    def testerActualHash = computeHash(testerJarPath)
 
-    if (testerStatedHash != testerActualHash) {
+    // See if the hash should be checked. Note that if the command line arguments don't parse, the hash will be checked.
+    val checkHash = Config.parser.parse(args, Config()) match {
+      case Some(config) => !config.skipCheck
+      case None => true
+    }
+
+    if (checkHash && testerStatedHash != testerActualHash) {
      
       // Update 'adapt-tester.jar' 
       print("Your version of 'adapt-tester.jar' is outdated. Downloading the new version... ")
@@ -119,52 +97,109 @@ object Wrapper extends App {
       // Re-run the java program (and stream its output to stdout)
       val cmd = s"java -jar $testerJarPath ${args.mkString(" ")}"
       println("Starting the updated 'adapt-tester.jar'. This may take a while...")
-      cmd ! ProcessLogger(println, println)
+      cmd ! ProcessLogger(System.out.println, System.err.println)
     
     } else {
 
       // Process command-line arguments
-      val opts = parser.parse(args, Config()) match {
+      val opts = Config.parser.parse(args, Config()) match {
         case Some(config) => config
         case None => sys.exit(1);
       }
-      
-      // Download 'adapt.jar'
-      print("Getting latest tests... ")
-      downloadFile(adaptDownloadUrl, adaptJarPath)
-      println("done.")
 
-      // Expected and actual hashes of 'adapt.jar'
-      val adaptStatedHash = fetchHash(adaptHashUrl)
-      val adaptActualHash = computeHash(adaptJarPath)
+      // Find the 'adapt.jar', either from the hidden option, or by downloading it
+      val actualAdaptJarPath = opts.adaptJarPath.getOrElse {
+        // Download 'adapt.jar'
+        print("Getting latest tests... ")
+        downloadFile(adaptDownloadUrl, adaptJarPath)
+        println("done.")
 
-      // Check that 'adapt.jar' matches the newest hash
-      require(
-        adaptStatedHash.equals(adaptActualHash), 
-        s"""Hash comparison failed. The downloaded 'adapt.jar' file is corrupt or there was an error on the server
-           |  Stated hash:   $adaptStatedHash
-           |  Computed hash: $adaptActualHash
-           |""".stripMargin
-      )
-      val file = new File(adaptJarPath)
-      if (file.exists) file.deleteOnExit()
+        // Expected and actual hashes of 'adapt.jar'
+        val adaptStatedHash = fetchHash(adaptHashUrl)
+        val adaptActualHash = computeHash(adaptJarPath)
+
+        // Check that 'adapt.jar' matches the newest hash
+        require(
+          adaptStatedHash.equals(adaptActualHash),
+          s"""Hash comparison failed. The downloaded 'adapt.jar' file is corrupt or there was an error on the server
+             |  Stated hash:   $adaptStatedHash
+             |  Computed hash: $adaptActualHash
+             |""".stripMargin
+        )
+        val file = new File(adaptJarPath)
+        if (file.exists) file.deleteOnExit()
+
+        adaptJarPath
+      }
 
       // Run the tests
-      val loadFiles = opts.targets.zipWithIndex.map { case (t,i) => s"-Dadapt.ingest.loadfiles.$i=$t" }
+      val loadFiles = opts.targets.zipWithIndex.map { case (t,i) => s"-Dadapt.ingest.hosts.0.parallelIngests.0.sequentialUnits.0.paths.$i=$t" }
       val cmd = s"""java -Xmx${opts.heapSize}
                    |     -Dadapt.runflow=accept
-                   |     -Dadapt.ingest.loadlimit=0
+                   |     -Dadapt.test.web-ui=${opts.webUi}
                    |     -Dakka.loglevel=ERROR
+                   |     -Dadapt.ingest.hosts.0.hostName=host
+                   |     -Dadapt.ingest.hosts.0.parallelIngests.0.sequentialUnits.0.type=file
+                   |     -Dadapt.ingest.hosts.0.parallelIngests.0.sequentialUnits.0.namespace=\"\"
                    |     ${loadFiles.mkString(" ")}
-                   |     -jar $adaptJarPath
+                   |     -jar $actualAdaptJarPath
                    |""".stripMargin
       println("Running tests on the data. This could take a moment...")
-      cmd ! ProcessLogger(println, println)
-    } 
-
-  } recover {
-    case e: Throwable => println(s"Something went wrong:\n ${e.getMessage}")
+      cmd ! ProcessLogger(System.out.println, System.err.println)
+    }
+  } match {
+    case Success(exitCode) => sys.exit(exitCode) // Pipe the exit code through
+    case Failure(e: Throwable) =>
+      println(s"Something went unexpectedly wrong:\n ${e.getMessage}")
+      sys.exit(1)
   }
 }
 
-case class Config(heapSize: String = "6G", targets: Seq[String] = Seq(), webUi: Boolean = false)
+case class Config(
+    heapSize: String = "6G",
+    targets: Seq[String] = Seq(),
+    webUi: Boolean = false,
+    skipCheck: Boolean = false,
+    adaptJarPath: Option[String] = None
+)
+object Config {
+  // Option parser
+  val parser = new OptionParser[Config]("adapt-tester") {
+    help("help").text("Prints this usage text")
+
+    opt[String]('s', "heap-size")
+      .text("Size of heap to use (passed to Java's '-Xmx' option). Default is '6G'.")
+      .optional()
+      .action((s,c) => c.copy(heapSize = s))
+
+    opt[Unit]('w', "web-ui")
+      .text("If tests with visualizations fail, open them in the browser.")
+      .optional()
+      .action((_,c) => c.copy(webUi = true))
+
+    opt[Unit]('s', "skip-check")
+      .text("Skip the checksum test that ensures you are testing with the latest `adapt-tester.jar'.")
+      .hidden()
+      .optional()
+      .action((_,c) => c.copy(skipCheck = true))
+
+    opt[String]("adapt-jar-path")
+      .text("Use this particular `adapt.jar' instead of downloading something")
+      .hidden()
+      .optional()
+      .action((s,c) => c.copy(adaptJarPath = Some(s)))
+
+    arg[String]("targets...")
+      .text("Either data-files or folders containing data-files")
+      .minOccurs(1)
+      .unbounded()
+      .action((t,c) => c.copy(targets = c.targets :+ t))
+
+    note(
+      """
+        |Very roughly, heap-size should be ~3G of RAM per million CDM statements.
+        |By Java conventions, valid suffixes for heap sizes are 'K', 'M', and 'G'.
+        |""".stripMargin
+    )
+  }
+}

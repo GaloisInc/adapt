@@ -1,18 +1,29 @@
 package com.galois.adapt
 
-import akka.actor.{Actor, ActorLogging}
+import akka.NotUsed
+import akka.actor.{Actor, ActorLogging, ActorRef}
+import akka.stream.OverflowStrategy
+import akka.stream.scaladsl.{Flow, Keep, Sink}
+import akka.util.Timeout
 import com.galois.adapt.adm.{ADM, EdgeAdm2Adm}
+import com.galois.adapt.cdm18.CDM18
+import com.galois.adapt.cdm19.CDM19
 import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex}
 import spray.json.{JsArray, JsNull, JsNumber, JsObject, JsString, JsValue}
 
+import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Try}
+import scala.concurrent.duration._
 
 trait DBQueryProxyActor extends Actor with ActorLogging {
   implicit val ec: ExecutionContext = context.dispatcher
 
   // The actor is responsible for the graph
   val graph: Graph
+
+  // Mutable set tracking all of the namespaces see so far
+  val namespaces: mutable.Set[String] = mutable.Set.empty
 
   // How to make a future of a transation
   def FutureTx[T](body: => T)(implicit ec: ExecutionContext): Future[T]
@@ -24,7 +35,6 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
 
   var streamsFlowingInToThisActor = 0
 
-
   def receive = {
 
     case Ready => sender() ! Ready
@@ -33,7 +43,7 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
     case NodeQuery(q, shouldParse) =>
       log.debug(s"Received node query: $q")
       sender() ! FutureTx {
-        Query.run[Vertex](q, graph).map { vertices =>
+        Query.run[Vertex](q, graph, namespaces).map { vertices =>
 //          log.info(s"Found: ${vertices.length} nodes")
           if (shouldParse) JsArray(vertices.map(ApiJsonProtocol.vertexToJson).toVector)
           else vertices.toList.toStream
@@ -44,7 +54,7 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
     case EdgeQuery(q, shouldParse) =>
       log.debug(s"Received new edge query: $q")
       sender() ! FutureTx {
-        Query.run[Edge](q, graph).map { edges =>
+        Query.run[Edge](q, graph, namespaces).map { edges =>
 //          log.info(s"Found: ${edges.length} edges")
           if (shouldParse)
             JsArray(edges.map(ApiJsonProtocol.edgeToJson).toVector)
@@ -57,7 +67,7 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
     case StringQuery(q, shouldParse) =>
 //      log.info(s"Received string query: $q")
       sender() ! FutureTx {
-        Query.run[java.lang.Object](q, graph).map { results =>
+        Query.run[java.lang.Object](q, graph, namespaces).map { results =>
 //          log.info(s"Found: ${results.length} items")
           if (shouldParse) {
             DBQueryProxyActor.toJson(results.toList)
@@ -68,13 +78,20 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
       }
 
     // Write a batch of CDM to the DB
-    case WriteCdmToNeo4jDB(cdms) =>
+    case WriteCdmToDB(cdms) =>
       DBNodeableTx(cdms).getOrElse(log.error(s"Failure writing to DB with CDMs: $cdms"))
       sender() ! Ack
 
     // Write a batch of ADM to the DB
-    case WriteAdmToNeo4jDB(adms) =>
+    case WriteAdmToDB(adms: Seq[Either[ADM,EdgeAdm2Adm]]) =>
       AdmTx(adms).getOrElse(log.error(s"Failure writing to DB with ADMs: ")) //$adms"))
+
+      // Register the new namespaces
+      adms.foreach {
+        case Left(adm) => namespaces.add(adm.uuid.namespace)
+        case _ => ;
+      }
+
       sender() ! Ack
 
     case Failure(e: Throwable) =>
@@ -113,8 +130,8 @@ case class CypherQuery(query: String, shouldReturnJson: Boolean = true) extends 
 case class EdgesForNodes(nodeIdList: Seq[Int])
 case object Ready
 
-case class WriteCdmToNeo4jDB(cdms: Seq[DBNodeable[_]])
-case class WriteAdmToNeo4jDB(irs: Seq[Either[ADM,EdgeAdm2Adm]])
+case class WriteCdmToDB(cdms: Seq[DBNodeable[_]])
+case class WriteAdmToDB(irs: Seq[Either[ADM,EdgeAdm2Adm]])
 
 
 case object Ack
@@ -156,4 +173,22 @@ object DBQueryProxyActor {
     case o => JsString(o.toString)
 
   }
+
+  def graphActorCdm18WriteSink(graphActor: ActorRef, completionMsg: Any = CompleteMsg)(implicit timeout: Timeout): Sink[(String,CDM18), NotUsed] = Flow[(String,CDM18)]
+    .collect { case (_, cdm: DBNodeable[_]) => cdm }
+    .groupedWithin(1000, 1 second)
+    .map(WriteCdmToDB.apply)
+    .toMat(Sink.actorRefWithAck[WriteCdmToDB](graphActor, InitMsg, Ack, completionMsg))(Keep.right)
+
+  def graphActorCdm19WriteSink(graphActor: ActorRef, completionMsg: Any = CompleteMsg)(implicit timeout: Timeout): Sink[(String,CDM19), NotUsed] = Flow[(String,CDM19)]
+    .collect { case (_, cdm: DBNodeable[_]) => cdm }
+    .groupedWithin(1000, 1 second)
+    .map(WriteCdmToDB.apply)
+    .toMat(Sink.actorRefWithAck[WriteCdmToDB](graphActor, InitMsg, Ack, completionMsg))(Keep.right)
+
+  def graphActorAdmWriteSink(graphActor: ActorRef, completionMsg: Any = CompleteMsg): Sink[Either[ADM,EdgeAdm2Adm], NotUsed] = Flow[Either[ADM,EdgeAdm2Adm]]
+    .groupedWithin(1000, 1 second)
+    .map(WriteAdmToDB.apply)
+    .buffer(4, OverflowStrategy.backpressure)
+    .toMat(Sink.actorRefWithAck[WriteAdmToDB](graphActor, InitMsg, Ack, completionMsg))(Keep.right)
 }

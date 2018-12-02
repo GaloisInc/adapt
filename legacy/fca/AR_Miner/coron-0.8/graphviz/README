@@ -1,0 +1,11 @@
+GraphViz visualisation
+======================
+
+Batch files for compiling/visualising
+the output of LeCo and VizEq.
+
+Required softwares:
+* graphviz (sudo apt-get install graphviz)
+* gqview (sudo apt-get install gqview)
+* imagemagick (sudo apt-get install imagemagick)
+

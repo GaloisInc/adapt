@@ -1,23 +1,17 @@
 package com.galois.adapt
 
 import java.awt.Desktop
-import java.io.ByteArrayOutputStream
 import java.net.URI
-
 import akka.actor._
-import com.galois.adapt.cdm17._
-import org.apache.tinkerpop.gremlin.structure.io.IoCore
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
-import java.nio.file.{Files, Paths}
 import java.util.UUID
-
 import com.galois.adapt.scepter._
-
 import scala.concurrent.{ExecutionContext, Future}
 import collection.JavaConverters._
-import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Success, Try}
+import AdaptConfig._
+
 
 class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
 
@@ -147,23 +141,28 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
       log.info(s"DBActor received a message to start the tests. Remaining streams.")
 
       var toDisplay = scala.collection.mutable.ListBuffer.empty[String]
+      var somethingFailed = false
+      val updateStatus = (status: Boolean) => { somethingFailed = somethingFailed || status }
+
+      val instrumentationSource = AdaptConfig.ingestConfig.asSingleHost.simpleTa1Name
 
       org.scalatest.run(new General_TA1_Tests(
         Application.failedStatements,
         missingToUuid.toMap,
         graph,
-        Application.instrumentationSource,
-        toDisplay
+        instrumentationSource,
+        toDisplay,
+        updateStatus 
       ))
 
       // Provider specific tests
-      val providerSpecificTests = Application.instrumentationSource match {
-        case "clearscope" => Some(new CLEARSCOPE_Specific_Tests(graph))
-        case "trace" => Some(new TRACE_Specific_Tests(graph))
-        case "cadets" => Some(new CADETS_Specific_Tests(graph))
-        case "faros" => Some(new FAROS_Specific_Tests(graph))
-        case "theia" => Some(new THEIA_Specific_Tests(graph))
-        case "fivedirections" => Some(new FIVEDIRECTIONS_Specific_Tests(graph))
+      val providerSpecificTests = instrumentationSource match {
+        case "clearscope" => Some(new CLEARSCOPE_Specific_Tests(graph, updateStatus))
+        case "trace" => Some(new TRACE_Specific_Tests(graph, updateStatus))
+        case "cadets" => Some(new CADETS_Specific_Tests(graph, updateStatus))
+        case "faros" => Some(new FAROS_Specific_Tests(graph, updateStatus))
+        case "theia" => Some(new THEIA_Specific_Tests(graph, updateStatus))
+        case "fivedirections" => Some(new FIVEDIRECTIONS_Specific_Tests(graph, updateStatus))
         case s => { println(s"No tests for: $s"); None }
       }
       providerSpecificTests.foreach(org.scalatest.run(_))
@@ -172,22 +171,27 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
 
       println(s"\nIf any of these test results surprise you, please email Ryan Wright and the Adapt team at: ryan@galois.com\n")
 
-      if (toDisplay.nonEmpty) {
-        println("Opening up a web browser to display nodes which failed the tests above...  (nodes are color coded)")
-        Desktop.getDesktop.browse(new URI("http://localhost:8080/#" + toDisplay.mkString("&")))
-      } else {
-        println("If you would like to explore your data, open browser at http://localhost:8080 to use our interactive GUI.")
-        println("This GUI uses (a slightly modified version of) the gremlin query language. Try executing a search query in the GUI like any of the following to get started:")
-        println("    g.V().limit(50)")
-        println("    g.V().has('uuid',YOUR-UUID-HERE-NOTINQUOTES)")
-        println("    g.V().has('eventType','EVENT_WRITE')")
-        println("    g.V().hasLabel('FileObject').limit(20)")
-      }
-      println("To navigate the UI, try right-clicking or double-clicking nodes")
-      println("The number in the top right corner of the browser window should be the number of nodes displayed, so if you don't see anything but you have a large number, you may want to try zooming out.")
-      println("")
+      if (testWebUi.`web-ui`) {
+        if (toDisplay.nonEmpty) {
+          println("Opening up a web browser to display nodes which failed the tests above...  (nodes are color coded)")
+          Desktop.getDesktop.browse(new URI("http://localhost:8080/#" + toDisplay.mkString("&")))
+        } else {
+          println("If you would like to explore your data, open browser at http://localhost:8080 to use our interactive GUI.")
+          println("This GUI uses (a slightly modified version of) the gremlin query language. Try executing a search query in the GUI like any of the following to get started:")
+          println("    g.V().limit(50)")
+          println("    g.V().has('uuid',YOUR-UUID-HERE-NOTINQUOTES)")
+          println("    g.V().has('eventType','EVENT_WRITE')")
+          println("    g.V().hasLabel('FileObject').limit(20)")
+        }
+        println("To navigate the UI, try right-clicking or double-clicking nodes")
+        println("The number in the top right corner of the browser window should be the number of nodes displayed, so if you don't see anything but you have a large number, you may want to try zooming out.")
+        println("")
 
-      println("Press CTRL^C to kill the webserver")
+        println("Press CTRL^C to kill the webserver")
+      } else {
+        sys.exit(if (somethingFailed) 1 else 0)
+      }
+
   }
 
 }

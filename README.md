@@ -17,34 +17,27 @@ Once the system has started, you can open up the interactive UI at <http://local
 SBT will allow you to choose the maximum ram to allocate (default is 1 GB).
 Specify how much RAM to use with the `-mem` flag followed by a number in megabytes. e.g.: `sbt -mem 6000 run`
 
-The adapt system is configurable at runtime by using the following command-line flags. Each flag should be preceded 
-with `-D` and followed by a equals sign, then a value; no spaces. For example: `-Dadapt.runflow=db`
+The adapt system is configurable at runtime with configuration files, which are in the [HOCON][4] format (a superset of
+JSON). Then, you can specify the path to the configuration file using the `-Dconfig.file` command line flag. It is
+recommended that you start from the sample configuration file 
+at [`src/main/resources/application.conf`](src/main/resources/application.conf). The adapt-system options are all in the
+`adapt` object. Within that object, you'll be warned about incorrect or misspelled options/values. 
 
 Example:
 
-    sbt -mem 6000 -Dadapt.runflow=db -Dadapt.ingest.loadfiles.0=/Users/ryan/Desktop/ta1-cadets-pandex-cdm17.bin run
+    $ cp src/main/resources/application.conf myconfig.conf
+    $ sbt -mem 6000 -Dconfig.file=myconfig.conf run
 
 #### `-Dadapt.X` Flags
 
 High-level commands about the primary operations of the system
 
-| Command Line Flag | Possible Values                               | Default Value | Description |
+| [Path to Key][3]  | Possible Values                               | Default Value | Description |
 | ----------------- |:---------------------------------------------:|:-------------:|:------------|
 | adapt.runflow     | `ui` `db` `anomaly` `csv` `combined` `accept` | `ui`          | `ui` only starts the UI<br />`db` will run an ingest (must specify files)<br /> `anomaly` will run all the suspicioun score calculations (requires lots of RAM)<br />`csv` will ingest CDM and write it out to multiple CSV files (must specify `loadfiles`)<br />`combined` will run `ui` `db` and `anomaly` simultaneously (as we did in engagement 2)|
 
-
-#### `-Dadapt.ingest.X` Flags
-| Command Line Flag            | Possible Values             | Default Value                                                     | Description |
-| ---------------------------- |:---------------------------:|:-----------------------------------------------------------------:|:------------|
-| adapt.ingest.loadfiles.0     | any full path to a CDM file | A hardcoded file path which probably doesn't apply on your system | The file at this path  will be ingested if the relevant `runflow` option is set. Multiple files can be specified by incrementing the number at the end of this flag. E.g.: `loadfiles.0`, `loadfiles.1`, `loadfiles.2`, etc. |
-| adapt.ingest.startatoffset   | Any integer                 | `0`                                                               | Ingest will begin after skipping this many records in the specified file or kafka queue |
-| adapt.ingest.loadlimit       | Any Integer                 | `0` (no limit)                                                    | Ingest will stop after ingesting this many. Zero means no limit. |
-| adapt.ingest.quitafteringest | `yes` `no`                  | `no`                                                              | If 'yes', the program will exit after ingesting all the data specified. Only applicable when ingesting from a file. |
-| adapt.ingest.produceadm      | `yes` `no`                  | `yes`                                                             | Ingested CDM data will be tranformed in ADM ("Adapt data model") and the ADM data written into the database. Note: This CAN be used together with `producecdm` |
-| adapt.ingest.producecdm      | `yes` `no`                  | `no`                                                              | Ingested CDM data will be written directly into the database structured as it is in the incoming CDM data; entity resolution will not be applied to this data. Note: This CAN be used together with `produceadm` |
-
 #### `-Dadapt.runtime.X` Flags
-| Command Line Flag                          | Possible Values               | Default Value             | Description |
+| [Path to Key][3]                           | Possible Values               | Default Value             | Description |
 | ------------------------------------------ |:-----------------------------:|:-------------------------:|:------------|
 | adapt.runtime.apitimeout                   | Any Integer                   | `301`                     | Number of seconds before a query from the UI should be abandoned. |
 | adapt.runtime.port                         | Any valid port number         | `8080`                    | The UI will run at `localhost` on this port. |
@@ -56,7 +49,7 @@ High-level commands about the primary operations of the system
 
 
 #### `-Dadapt.env.X` Flags
-| Command Line Flag            | Possible Values                                                                   | Default Value                                    | Description |
+| [Path to Key][3]             | Possible Values                                                                   | Default Value                                    | Description |
 | ---------------------------- |:---------------------------------------------------------------------------------:|:------------------------------------------------:|:------------|
 | adapt.env.ta1                | `cadets` `clearscope` `faros` `fivedirections` `theia` `trace` `kafkaTest` `file` | `file`                                           | Defines which TA1 is the source of the data. This affects several other settings and behaviors. It is only relevant during the engagement. You do not need to set this for ingesting a file. |
 | adapt.env.scenario           | `bovia` `pandex`                                                                  | `pandex`                                         | Defines which scenario the data is for. This affects several other settings and behaviors. It is only relevant during the engagement. You do not need to set this for ingesting a file. |
@@ -127,3 +120,6 @@ Obviously we don't support all of the functionality we could. However, if you se
 [0]: http://tinkerpop.apache.org/javadocs/3.2.2/full/org/apache/tinkerpop/gremlin/structure/Graph.html
 [1]: http://tinkerpop.apache.org/javadocs/3.2.2/full/org/apache/tinkerpop/gremlin/process/traversal/dsl/graph/__.html
 [2]: http://tinkerpop.apache.org/javadocs/3.2.2/full/org/apache/tinkerpop/gremlin/process/traversal/dsl/graph/GraphTraversal.html
+[3]: https://github.com/lightbend/config/blob/master/HOCON.md#paths-as-keys
+[4]: https://github.com/lightbend/config/blob/master/HOCON.md
+

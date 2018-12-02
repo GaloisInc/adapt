@@ -1,0 +1,16 @@
+# market basket
+# Objects:
+#    customer_1, etc.
+
+[Relational Context]
+Default Name
+[Binary Relation]
+Name_of_dataset
+c1 | c2 | c3 | c4 | c5
+bread | pasta | cheese | tomato | wine | salad
+0 1 0 1 0 1
+1 0 0 1 1 0
+1 0 1 0 1 1
+0 1 0 1 0 0
+1 0 1 0 1 1
+[END Relational Context]

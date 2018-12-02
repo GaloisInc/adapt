@@ -16,14 +16,23 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.{Success, Try}
 
+trait SignalledTests {
+  val signalStatus: Boolean => Unit
+
+  def assert(b: Boolean, msg: String = ""): Unit = {
+    signalStatus(b)
+    if (msg.isEmpty) Predef.assert(b) else Predef.assert(b,msg)
+  }
+}
 
 class General_TA1_Tests(
   failedStatements: List[(Int,String)],     // position, failed event
   incompleteEdges: Map[UUID, List[(Vertex,String)]],
   graph: TinkerGraph,
   ta1Source: String,
-  toDisplay: scala.collection.mutable.ListBuffer[String]
-) extends FlatSpec {
+  toDisplay: scala.collection.mutable.ListBuffer[String],
+  override val signalStatus: Boolean => Unit
+) extends FlatSpec with SignalledTests {
 
   implicit val timeout = Timeout(30 second)
   
@@ -91,18 +100,25 @@ class General_TA1_Tests(
   // Test uniqueness of... UUIDs
   // Some providers have suggested that they may reuse UUIDs. That would be bad.
   it should "not have any duplicate UUIDs" in {
-    val grouped: java.util.List[java.util.Map[String,java.lang.Long]] = if (ta1Source != "clearscope") {
-      graph.traversal().V()
-        .values("uuid")
-        .groupCount[String]()
-        .toList
-    } else {
+    val grouped: java.util.List[java.util.Map[String,java.lang.Long]] = if (ta1Source == "clearscope") {
       graph.traversal().V()
         .not(__.hasLabel("FileObject")) // FileObjects can duplicate UUIDs
         .values("uuid")
         .groupCount[String]()
         .toList
+    } else if (ta1Source == "theia") {
+      graph.traversal().V()
+        .not(__.hasLabel("FileObject", "NetFlowObject", "Principal")) // TODO: check structural equality
+        .values("uuid")
+        .groupCount[String]()
+        .toList
+    } else {
+      graph.traversal().V()
+        .values("uuid")
+        .groupCount[String]()
+        .toList
     }
+
 
     val offending: List[(String,java.lang.Long)] = grouped.get(0).toList.filter(u_c => u_c._2 > 1).take(20)
     var assertMsg: String = "\n"
@@ -198,19 +214,19 @@ class General_TA1_Tests(
     }
   }
 
-  if ( ! List("theia").contains(ta1Source)) {  // Exclusions go in this list.
+  if ( ! List("theia", "clearscope").contains(ta1Source)) {  // Exclusions go in this list.
     it should "demonstrate using the type: EVENT_ADD_OBJECT_ATTRIBUTE (contact us if you plan not to use this)" in {
       assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_ADD_OBJECT_ATTRIBUTE").count().next() > 0L)
     }
   }
 
-  if ( ! List("faros", "theia").contains(ta1Source)) {  // Exclusions go in this list.
+  if ( ! List("faros", "theia", "clearscope").contains(ta1Source)) {  // Exclusions go in this list.
     it should "demonstrate using the type: EVENT_FLOWS_TO (contact us if you plan not to use this)" in {
       assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_FLOWS_TO").count().next() > 0L)
     }
   }
 
-  if ( ! List("theia").contains(ta1Source)) {  // Exclusions go in this list.
+  if ( ! List("theia", "clearscope", "cadets").contains(ta1Source)) {  // Exclusions go in this list.
     it should "demonstrate using the type: EVENT_UPDATE (contact us if you plan not to use this)" in {
       assert(graph.traversal().V().hasLabel("Event").has("eventType", "EVENT_UPDATE").count().next() > 0L)
     }
@@ -233,7 +249,7 @@ class General_TA1_Tests(
 
       assert(
         eventsWithoutThreadId.length <= 0,
-        s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfEventsWithoutThreadId${Console.RED}\n"
+        s"\nSome (non 'EVENT_ADD_OBJECT_ATTRIBUTE'/'EVENT_FLOWS_TO') events don't have a 'threadId':\n$color$uuidsOfEventsWithoutThreadId${Console.RED}\n"
       )
     }
   }
@@ -259,7 +275,7 @@ class General_TA1_Tests(
 
       assert(
         malformedAddObjectEvents.length <= 0,
-        s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfMalformedAddObjectEvents${Console.RED}\n"
+        s"\nSome 'EVENT_ADD_OBJECT_ATTRIBUTE' events don't have two predicate objects that are 'NetFlowObject's:\n$color$uuidsOfMalformedAddObjectEvents${Console.RED}\n"
       )
     }
   }
@@ -277,27 +293,35 @@ class General_TA1_Tests(
     if (eventsNotOther.nonEmpty) {
       assert(eventsNotOther.nonEmpty)
     } else {
-      val (code, color) = colors.next()
-      toDisplay += s"g.V(${eventsNotOther.map(_.id().toString).take(20).mkString(",")}):$code"
-      val uuidsOfEventsNotOther = eventsNotOther.map(_.value("uuid").toString).take(20).mkString("\n" + color)
-
       assert(
         eventsNotOther.length <= 0,
-        s"\nSome (non 'EVENT_UPDATE') events don't have a 'subjectUuid':\n$color$uuidsOfEventsNotOther${Console.RED}\n"
+        s"\nDidn't find any events with type not 'EVENT_UPDATE'\n"
       )
     }
   }
 
   // Test that EVENT_WRITE and EVENT_READ have predicate objects that are 'FileObject', 'SrcSinkObject', 'RegistryKeyObject', 'UnnamedPipeObject', 'NetFlowObject'
-  "Read and write events" should "have predicate objects that are exclusively: 'FileObject', 'SrcSinkObject', 'RegistryKeyObject', 'UnnamedPipeObject', 'NetFlowObject'" in {
-    val malformedReadWriteEvents: java.util.List[Vertex] = graph.traversal().V()
-      .hasLabel("Event")
-      .has("eventType", P.within("EVENT_READ","EVENT_WRITE"))
-      .as("e")
-      .out("predicateObject","predicateObject2")
-      .where(__.not(__.hasLabel("FileObject", "SrcSinkObject", "RegistryKeyObject", "UnnamedPipeObject", "NetFlowObject")))
-      .select[Vertex]("e")
-      .toList
+  "Read and write events" should "have predicate objects that are exclusively: 'FileObject', 'SrcSinkObject', 'RegistryKeyObject', 'IpcObject', 'NetFlowObject'" in {
+    val malformedReadWriteEvents: java.util.List[Vertex] = if ( ! List("clearscope").contains(ta1Source) ) {
+      graph.traversal().V()
+        .hasLabel("Event")
+        .has("eventType", P.within("EVENT_READ","EVENT_WRITE"))
+        .as("e")
+        .out("predicateObject","predicateObject2")
+        .where(__.not(__.hasLabel("FileObject", "SrcSinkObject", "RegistryKeyObject", "UnnamedPipeObject", "NetFlowObject", "IpcObject")))
+        .select[Vertex]("e")
+        .toList
+    } else {
+      // Clearscope represents getuid and such with a read event that has predicate object and subject that are the same node
+      graph.traversal().V()
+        .hasLabel("Event")
+        .has("eventType", P.within("EVENT_READ","EVENT_WRITE"))
+        .as("e")
+        .out("predicateObject","predicateObject2")
+        .where(__.not(__.hasLabel("FileObject", "Subject", "SrcSinkObject", "RegistryKeyObject", "UnnamedPipeObject", "NetFlowObject", "IpcObject", "PacketSocketObject")))
+        .select[Vertex]("e")
+        .toList
+    }
 
     if (malformedReadWriteEvents.isEmpty) {
       assert(malformedReadWriteEvents.length <= 0)
@@ -322,7 +346,7 @@ class General_TA1_Tests(
 
 // Provider specific test classes:
 
-class TRACE_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
+class TRACE_Specific_Tests(val graph: TinkerGraph, override val signalStatus: Boolean => Unit) extends FlatSpec with SignalledTests {
   implicit val timeout = Timeout(1 second)
   val missing = List(AbstractObject, TagRunLengthTuple, UnnamedPipeObject, CryptographicHash, Value, UnitDependency, TimeMarker)
   val minimum = 50000
@@ -340,7 +364,7 @@ class TRACE_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   }
 }
 
-class CADETS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
+class CADETS_Specific_Tests(val graph: TinkerGraph, override val signalStatus: Boolean => Unit) extends FlatSpec with SignalledTests {
   implicit val timeout = Timeout(1 second)
   val missing = List(AbstractObject, MemoryObject, CryptographicHash, UnnamedPipeObject, TagRunLengthTuple, ProvenanceTagNode, RegistryKeyObject, SrcSinkObject, Value, UnitDependency, TimeMarker)
   val minimum = 50000
@@ -358,7 +382,7 @@ class CADETS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   }
 }
 
-class FAROS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
+class FAROS_Specific_Tests(val graph: TinkerGraph, override val signalStatus: Boolean => Unit) extends FlatSpec with SignalledTests {
   implicit val timeout = Timeout(1 second)
   val missing = List(AbstractObject, TagRunLengthTuple, CryptographicHash, UnnamedPipeObject, MemoryObject, UnitDependency, RegistryKeyObject, Value, TimeMarker, SrcSinkObject)
   val minimum = 50000
@@ -376,7 +400,7 @@ class FAROS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
 
 }
 
-class THEIA_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
+class THEIA_Specific_Tests(val graph: TinkerGraph, override val signalStatus: Boolean => Unit) extends FlatSpec with SignalledTests {
   implicit val timeout = Timeout(1 second)
   val missing = List(AbstractObject, Value, TagRunLengthTuple, CryptographicHash, UnnamedPipeObject, SrcSinkObject, UnitDependency, TimeMarker, RegistryKeyObject)
   val minimum = 50000
@@ -394,7 +418,7 @@ class THEIA_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   }
 }  
 
-class FIVEDIRECTIONS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
+class FIVEDIRECTIONS_Specific_Tests(val graph: TinkerGraph, override val signalStatus: Boolean => Unit) extends FlatSpec with SignalledTests {
   implicit val timeout = Timeout(1 second)
   val missing = List(MemoryObject, Value, TagRunLengthTuple, UnnamedPipeObject, SrcSinkObject, UnitDependency, AbstractObject, UnnamedPipeObject, CryptographicHash, TimeMarker)
   val minimum = 50000
@@ -412,7 +436,7 @@ class FIVEDIRECTIONS_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
   }
 }
 
-class CLEARSCOPE_Specific_Tests(val graph: TinkerGraph) extends FlatSpec {
+class CLEARSCOPE_Specific_Tests(val graph: TinkerGraph, override val signalStatus: Boolean => Unit) extends FlatSpec with SignalledTests {
   implicit val timeout = Timeout(1 second)
   val missing = List(AbstractObject, TagRunLengthTuple, CryptographicHash, MemoryObject, UnitDependency, UnnamedPipeObject, RegistryKeyObject, Value, TimeMarker)
   val minimum = 50000

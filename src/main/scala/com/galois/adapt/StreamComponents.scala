@@ -2,35 +2,23 @@ package com.galois.adapt
 
 import java.nio.file.Paths
 import java.util.UUID
-
 import akka.stream.scaladsl._
-
-import scala.collection.mutable.{Map => MutableMap, Set => MutableSet}
+import scala.collection.mutable.{Map => MutableMap}
 import akka.actor.ActorRef
 import akka.stream.{FlowShape, OverflowStrategy}
 import akka.util.ByteString
-
 import scala.collection.mutable
-import com.galois.adapt.adm.EntityResolution
-import com.galois.adapt.adm.EntityResolution.sampledTime
-import com.galois.adapt.cdm18._
-import com.typesafe.config.ConfigFactory
-
-import collection.JavaConverters._
-import scala.util.Try
+import com.galois.adapt.cdm19._
 
 
 object FlowComponents {
 
-  val config = ConfigFactory.load()
-
-
-  def printCounter[T](counterName: String, statusActor: ActorRef, every: Int = 10000) = Flow[T].statefulMapConcat { () =>
-    val startingCount = Try(config.getLong("adapt.ingest.startatoffset")).getOrElse(0L)
+  def printCounter[T](counterName: String, statusActor: ActorRef, startingCount: Long = 0, every: Int = 10000) = Flow[T].statefulMapConcat { () =>
     var counter = startingCount
     var originalStartTime = 0L
     var lastTimestampNanos = 0L
-    val populationCounter = MutableMap.empty[String, Long]
+    val recentPopulationCounter = MutableMap.empty[String, Long]
+    val totalPopulationCounter = MutableMap.empty[String, Long]
 
     { item: T =>  // Type annotation T is a compilation hack! No runtime effect because it's generic.
       if (lastTimestampNanos == 0L) {
@@ -41,55 +29,30 @@ object FlowComponents {
       val className = item match {
         case (_, e: Event) => e.eventType.toString
         case (_, i: AnyRef) => i.getClass.getSimpleName
+        case e: Event => e.eventType.toString
+        case Left(l) => s"Left[${l.getClass.getSimpleName}]"
+        case Right(r) => s"Right[${r.getClass.getSimpleName}]"
         case i => i.getClass.getSimpleName
       }
-      populationCounter += (className -> (populationCounter.getOrElse(className, 0L) + 1))
+      recentPopulationCounter += (className -> (recentPopulationCounter.getOrElse(className, 0L) + 1))
+      totalPopulationCounter  += (className -> (totalPopulationCounter.getOrElse(className, 0L)  + 1))
 
       if (counter % every == 0) {
         val nowNanos = System.nanoTime()
         val durationSeconds = (nowNanos - lastTimestampNanos) / 1e9
 
-        // Ordering nodes stats
-        val blockEdgesCount = EntityResolution.blockedEdgesCount
-        val blockingNodes = Application.blockedEdges.size
-
-        val currentTime = EntityResolution.monotonicTime
-        val sampledTime = EntityResolution.sampledTime
-
-        // UuidRemapper related stats
-        val uuidsBlocking: Int = Application.blockedEdges.size
-        val blockedUuidResponses: Int = Application.blockedEdges.values.map(_._1.length).sum
-
-        val activeEventChains = EntityResolution.activeChains.size
-
-        val cdm2cdmSize = Application.cdm2cdmMap.size()
-        val cdm2admSize = Application.cdm2admMap.size()
-
-        val seenNodesSize = Application.seenNodes.size()
-        val seenEdgesSize = Application.seenEdges.size()
-
-        println(s"$counterName ingested: $counter   Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${(every / durationSeconds).toInt} items/second. At time: ${System.currentTimeMillis}") //  Rate since beginning: ${((counter - startingCount) / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.") //  Edges waiting: $blockEdgesCount.  Nodes blocking edges: $blockingNodes")
+        println(s"$counterName ingested: $counter   Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${(every / durationSeconds).toInt} items/second. At time: ${System.currentTimeMillis}") //  Rate since beginning: ${((counter - startingCount) / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.")
 
         statusActor ! PopulationLog(
           counterName,
           counter,
           every,
-          populationCounter.toMap,
-          durationSeconds,
-          blockEdgesCount,
-          blockingNodes,
-          uuidsBlocking,
-          blockedUuidResponses,
-          activeEventChains,
-          cdm2cdmSize,
-          cdm2admSize,
-          seenNodesSize,
-          seenEdgesSize,
-          currentTime,
-          sampledTime
+          recentPopulationCounter.toMap,
+          totalPopulationCounter.toMap,
+          durationSeconds
         )
 
-        populationCounter.clear()
+        recentPopulationCounter.clear()
 
         lastTimestampNanos = nowNanos
       }
@@ -152,7 +115,7 @@ object FlowComponents {
 }
 
 
-trait ProcessingCommand extends CDM18
+trait ProcessingCommand extends CurrentCdm
 case class AdaptProcessingInstruction(id: Long) extends ProcessingCommand
 case object EmitCmd extends ProcessingCommand
 case object CleanUp extends ProcessingCommand

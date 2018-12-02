@@ -16,8 +16,8 @@
     	// ********* BEGIN EDITABLE VARIABLES ********* //
     	// Editabe variables for differing contexts.
 
-    	// Where to relay the DB queries if no other URL is specified as 'host' in the query parameters. (should NOT end in a slash)
-    	var defaultQueryBaseUrl = "http://localhost:8080"
+    	// Where to relay the DB queries if no other URL is specified as 'host' in the query parameters. (should NOT end in a slash). Empty will issue all node/edge queries to the same host that is serving the page.
+    	var defaultQueryBaseUrl = ""  // e.g. http://localhost:8080
 
 
     	// NODE PRODUCTION:
@@ -26,41 +26,51 @@
     	var nodeApiPath = "/query/nodes"
     	
     	// A function called immediately after the API endpoint returns nodes. This should transform data into the expected type for rendering: Array[ { id: stringOrInt, label: string, title: string } ]
-    	// Note: special handling for a few specific properties is hardcoded below in the `formatAllData` function. Expect strange behavior if you have custom top-level node properties called "label", "db_label", "queries", "title", or "font".
+    	// Note: special handling for a few specific properties is hardcoded below in the `formatNodes` function. Expect strange behavior if you have custom top-level node properties called "label", "db_label", "queries", "title", or "font".
     	var nodeApiResultTransform = 
-    		function(nodes) { return nodes }
+        // ADAPT: This removes the `[0]['value']` from each element in `properties`:
+    		function(nodes) { 
+                return _.map(nodes, function(n){
+                    return _.mapObject(n, function(val, key){ 
+                        if (key != "properties") { 
+                            return val 
+                        } else {
+                            return _.mapObject(val, function(propArray, k){
+                                return propArray[0]['value']
+                            })
+                        }
+                    })
+                })
+            }
 
 
     	// A query_object is read from the `predicates` in ui_language.js  This function should convert that object into a resolvable query in the appropriate query language. The resulting string will be sent as a query to the 'nodeApiPath' specified above, which should return nodes.
     	var queryStringFromObject = 
-    		function(query_object) { return "x = " + query_object.starting_node_id + "; g.V(x)" + query_object.floating_query + ".dedup()" }  // ADAPT
+    		function(query_object) { return "x = " + query_object.starting_node_id + "; g.V(x)" + query_object.floating_query + ".dedup()" }
+
+    	// Nodes will render in this color if no other color is chosen from the UI color picker.
+        var default_node_color = "#97c2fc"
 
 
 
     	// EDGE PRODUCTION:
 
     	// Edge-producing API POST endpoint: (should begin with a slash)
-    	var edgeApiPath = "/query/edges"   // ADAPT & Quine
+    	var edgeApiPath = "/query/edges"
 
     	// A query to produce edges is issued separately after a query to produce nodes returns results. This function should return a query string in the appropriate language to be issued to the DB and returning edges which will all be rendered together with the new nodes returned. (NOTE: edges to non-existant nodes cannot be rendered. Attempting to render endges multiple times will succeed, creating duplicate edges, and slowing down the renderer.)
     	var produceEdgeQuery = 
-    		function(result_node_ids, existing_nodes_data_set) { return result_node_ids.join(",") }  // Quine
-    		// ADAPT:
-	    	// function(result_node_ids, existing_nodes_data_set) {
-	    	// 	return "new = [" + result_node_ids.join(",") + "];" +
-	     //               "all = [" + existing_nodes_data_set.getIds().concat(result_node_ids).join(",") + "];" +
-	     //               "g.V(new).bothE().where(_.and(_.outV().id().is(within(all)), _.inV().id().is(within(all)))).dedup()"
-	     //    }
-
+	    	function(result_node_ids, existing_nodes_data_set) {
+	    		return "new = [" + result_node_ids.join(",") + "];" +
+	                   "all = [" + existing_nodes_data_set.getIds().concat(result_node_ids).join(",") + "];" +
+	                   "g.V(new).bothE().where(_.and(_.outV().id().is(within(all)), _.inV().id().is(within(all)))).dedup()"
+	        }
 
     	// A function called immediately after the API endpoint returns edges. This should transform data into the expected type for rendering: Array[ { id: string, from: nodeId, to: nodeId, label: string, arrows: "to"/"from"/"both"/"" } ]
+    	// Note: special handling for a few specific properties is hardcoded below in the `formatEdges` function. Expect strange behavior if you have custom top-level edge properties called "color" and "dashes". This function will also be applied to the synthetic edge created from queries defined in ui_language.js
     	var edgeApiResultTransform = 
-	    	function(es, ns) { return es }  // ADAPT & Quine
+    		function(es, ns) { return _.map(es, function(e){ e['from'] = e.outV; e['to'] = e.inV; return e })}
 
-
-
-    	// Nodes will render in this color if no other color is chosen from the UI color picker.
-        var default_node_color = "#97c2fc"
 
     	// ********** END EDITABLE VARIABLES ********** //
 
@@ -75,7 +85,7 @@
 
         // Set host for issuing DB queries; either hard-coded or read in from query parameters.
         var urlParams = new URLSearchParams(window.location.search)
-        if (urlParams.has('host') && ! _.isEmpty(urlParams.get('host'))) {
+        if (urlParams.has('host')) {
 			var hostPrefix = urlParams.get('host')
 		} else {
 			var hostPrefix = defaultQueryBaseUrl
@@ -98,59 +108,60 @@
             } else {
                 query_string = queryStringFromObject(query_object)
             }
-            document.getElementById('query-string').value = query_string.replace(/\.dedup\(\)$/, "")
-            // if (query_string.length == 0) { return UI.failHandler() }
+            var visible_query_string = query_string.replace(/\.dedup\(\)$/, "")
+            document.getElementById('query-string').value = visible_query_string
+            if (query_string.length == 0) { return UI.failHandler() }
  
-            if (UI.alt_is_held) {
-                document.getElementById('query-string').value = query_string
-                UI.loadingUIStop()
-            } else {  
-                $.post(hostPrefix + nodeApiPath, {"query": query_string}, function(raw_node_results) {
-                	var node_results = nodeApiResultTransform(raw_node_results)
-                    var node_results_count = node_results.length
-                    var node_result_size_limit = 50
-                    var confirm_msg = "You are about to render " + node_results_count + " nodes.\n How many do you want to render?"
-                    node_results_count <= node_result_size_limit || function() { 
-                    	var limit_result = prompt(confirm_msg, node_results_count)
-                    	if (limit_result == null || isNaN(parseInt(limit_result)) || parseInt(limit_result) < 0) { 
-                    		node_result_size_limit = 0
-                    		node_results_count = 0
-                    	} else {
-                    		node_result_size_limit = parseInt(limit_result)
-                    		node_results_count = node_result_size_limit
-                    	}
-                    }()
-	                UI.foundNodes(node_results_count)
+            // if (UI.alt_is_held) {
+                // document.getElementById('query-string').value = query_string
+                // UI.loadingUIStop()
+            // } else {  
+            $.post(hostPrefix + nodeApiPath, {"query": query_string}, function(raw_node_results) {
+            	var node_results = nodeApiResultTransform(raw_node_results)
+                var node_results_count = node_results.length
+                var node_result_size_limit = 50
+                var confirm_msg = "You are about to render " + node_results_count + " nodes.\n How many do you want to render?"
+                node_results_count <= node_result_size_limit || function() { 
+                	var limit_result = prompt(confirm_msg, node_results_count)
+                	if (limit_result == null || isNaN(parseInt(limit_result)) || parseInt(limit_result) < 0) { 
+                		node_result_size_limit = 0
+                		node_results_count = 0
+                	} else {
+                		node_result_size_limit = parseInt(limit_result)
+                		node_results_count = node_result_size_limit
+                	}
+                }()
+                UI.foundNodes(node_results_count)
 
-                    if (node_results_count > 0) {
-                    	node_results = _.first(node_results, node_result_size_limit)
-                        var result_node_ids = _.map(node_results, function(n) { return n['id'] })
-                        var edge_query = produceEdgeQuery(result_node_ids, node_data_set)
-                        $.post(hostPrefix + edgeApiPath, {"query": edge_query}, function(raw_edge_results) {
-                        	edge_results = edgeApiResultTransform(raw_edge_results, result_node_ids)
-                        	// Ensure edges all have IDs:
-                        	edge_results = _.map(edge_results, function(e) {
-                        		if ( ! e.hasOwnProperty('id')) {
-                        			e.id = e.from + "-" + e.label + "->" + e.to
-                        		}
-                        		return e 
-                        	})
+                if (node_results_count > 0) {
+                	node_results = _.first(node_results, node_result_size_limit)
+                    var result_node_ids = _.map(node_results, function(n) { return n['id'] })
+                    var edge_query = produceEdgeQuery(result_node_ids, node_data_set)
+                    $.post(hostPrefix + edgeApiPath, {"query": edge_query}, function(raw_edge_results) {
+                    	edge_results = edgeApiResultTransform(raw_edge_results, result_node_ids)
+                    	// Ensure edges all have IDs:
+                    	edge_results = _.map(edge_results, function(e) {
+                    		if ( ! e.hasOwnProperty('id')) {
+                    			e.id = e.from + "-" + e.label + "->" + e.to
+                    		}
+                    		return e 
+                    	})
 
-                            UI.foundEdges(edge_results.length)
-                            var colored_nodes = _.map(node_results, function(n) { n.icon = {"color": query_color}; return n})
-                            var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e}) // TODO: Why doesn't edge coloring work?  Answer: https://github.com/almende/vis/issues/1706
-                            var data = { "type" : "add", "nodes" : colored_nodes, "edges" : colored_edges }
-                            if (query_object.is_collapsed) {
-                                data = addCollapsedEdges(data, query_object.starting_node_id, query_object.floating_query, query_object.name)
-                            }
-                            success_function(data)
-                            UI.loadingUIStop()
-                        }).fail(UI.handler)
-                    } else {
+                        UI.foundEdges(edge_results.length)
+                        var colored_nodes = _.map(node_results, function(n) { n.icon = {"color": query_color}; return n})
+                        var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e}) // TODO: Why doesn't edge coloring work?  Answer: https://github.com/almende/vis/issues/1706
+                        var data = { "type" : "add", "nodes" : colored_nodes, "edges" : colored_edges }
+                        if (query_object.is_collapsed) {
+                            data = addCollapsedEdges(data, query_object.starting_node_id, query_object.floating_query, query_object.name)
+                        }
+                        success_function(data)
                         UI.loadingUIStop()
-                    }
-                }).fail(UI.failHandler)
-            }
+                    }).fail(UI.handler)
+                } else {
+                    UI.loadingUIStop()
+                }
+            }).fail(UI.failHandler)
+            // }
         }
 
 
@@ -244,7 +255,7 @@
         function formatAllData(node_and_edge_data) {
             var data = copy(node_and_edge_data)
             data.nodes = formatNodes(data.nodes)
-            data.edges = formatEdges(data.edges)
+            data.edges = formatEdges(data.edges, data.nodes)
             return data
         }
 
@@ -481,7 +492,7 @@
                         size : getOrElse(n.icon.size, getOrElse(node_spec.size, default_spec.size)),
                     }
                 }
-                n["label"] = getOrElse(node_spec.make_node_label, default_spec.make_node_label)(n)
+                n["label"] = String(getOrElse(node_spec.make_node_label, default_spec.make_node_label)(n))
                 n["title"] = makeNodeTitle(n)
                 // n["font"] = {"strokeWidth" : 3, "strokeColor" : 'white'}
                 return n
@@ -489,10 +500,11 @@
         }
 
 
-        function formatEdges(raw_edge_results) {
+        function formatEdges(raw_edge_results, formatted_nodes) {
             return _.map(raw_edge_results, function(e, i, list) {
             	// This will color/format synthetic redges resulting from queries in ui_language.js:
                 if (typeof e['id'] === 'string' && e['id'].substring(0, 10) === "COLLAPSED-") {
+                	edgeApiResultTransform([e], formatted_nodes)
                     e['color'] = "green"
                     e['dashes'] = true
                 }
@@ -589,7 +601,7 @@
                 }
             },
             shift_is_held : false,
-            alt_is_held : false,
+            // alt_is_held : false,
             failHandler : function(response) {
                 UI.queryInputColor("pink")
                 UI.loadingUIStop()
@@ -761,7 +773,6 @@
                 }, 0, props)
             },
             startDrawSelection : function(props) {
-                console.log("drawing selection")
                 UI.drawing = props.pointer.canvas
                 network.setOptions({ 
                     interaction : {
@@ -772,7 +783,6 @@
                 $('#node-selection-box').show()
             },
             endDrawSelection : function(props) {
-                console.log("stopped drawing selection")
                 network.setOptions({interaction: {
                     dragView : true,
                     zoomView : true
@@ -1182,11 +1192,11 @@
         })
         $(document).bind("keyup", function(event) { 
             if (event.keyCode == 16) { UI.shift_is_held = false }
-            if (event.keyCode == 18) { UI.alt_is_held = false }
+            // if (event.keyCode == 18) { UI.alt_is_held = false }
         })
         $(document).bind("keydown", function(event) { 
             if (event.keyCode == 16) { UI.shift_is_held = true }
-            if (event.keyCode == 18) { UI.alt_is_held = true }
+            // if (event.keyCode == 18) { UI.alt_is_held = true }
             if ($("#query-string").is(":focus")) { UI.queryInputColor() }
             if ((event.keyCode == 8 || event.keyCode == 46) && ! $("#query-string").is(":focus")) {
                 UI.deleteSelectedNodes()

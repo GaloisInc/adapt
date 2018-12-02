@@ -116,6 +116,8 @@ var node_appearance = [
         make_node_label : function(node) {
             var sequence = (node['properties'].hasOwnProperty('sequence') ? node['properties']['sequence'] : "None")
             var type = (node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'] : "None")
+            // var programPoint = (node['properties'].hasOwnProperty('programPoint') ? node['properties']['programPoint'] : "None")
+            // var name = (node['properties'].hasOwnProperty('name') ? node['properties']['name'] : "None")
             return type + "\n# " + sequence
         }
     }, {
@@ -123,7 +125,9 @@ var node_appearance = [
         is_relevant : function(n) { return n.properties.hasOwnProperty("srcSinkType") },
         icon_unicode : "\uf313",
         make_node_label : function(node) {
-            return node['properties']['srcSinkType']
+            // var uuid = (node['properties'].hasOwnProperty('uuid') ? node['properties']['uuid'] : "None")
+            var type = (node['properties'].hasOwnProperty('srcSinkType') ? node['properties']['srcSinkType'] : "None")
+            return type
         }
     }, {
         name : "PTN",
@@ -142,7 +146,7 @@ var node_appearance = [
         icon_unicode : "\uf375",
         make_node_label : function(node) {
             var cid = (node['properties'].hasOwnProperty('cid') ? node['properties']['cid'] : "None")
-            var t = node['properties']['subjectType']
+            var t = (node['properties'].hasOwnProperty('subjectType') ? node['properties']['subjectType'] : "None")
             var cmd = (node['properties'].hasOwnProperty('cmdLine') ? node['properties']['cmdLine'] : "no cmd line")
             // var timestamp = (node['properties'].hasOwnProperty('startTimestampNanos') ? new Date(node['properties']['startTimestampNanos']/1000).toGMTString() + " ." + node['properties']['startTimestampNanos']%1000 : "no timestamp")
             switch(t) {
@@ -166,9 +170,9 @@ var node_appearance = [
         icon_unicode: "\uf390",
         size: 40,
         make_node_label: function(node) {
-            var hostName = node['properties'].hasOwnProperty('hostName') ? node['properties']['hostName']+"\n" : "no_host_name"+"\n"
-            var hostType = node['properties'].hasOwnProperty('hostType') ? node['properties']['hostType'] : "(unknown_type)"
-            return hostName + "(" + hostType + ")"
+            var hostName = node['properties'].hasOwnProperty('hostName') ? node['properties']['hostName'] : "???"
+            var hostType = node['properties'].hasOwnProperty('hostType') ? node['properties']['hostType'] : "(???)"
+            return hostName + "\n" + hostType
         }
     }, {
         name : "ADM Path Node",
@@ -239,6 +243,20 @@ var node_appearance = [
         icon_unicode : "\uf48e",
         make_node_label : function(node) {
             return node['properties'].hasOwnProperty('programPoint') ? node['properties']['programPoint'] : "??"
+        }
+    }, {
+        name : "ADM Address",
+        is_relevant : function(n) { return n.db_label === "AdmAddress" },
+        icon_unicode : "\uf448",
+        make_node_label : function(node) {
+            return node['properties'].hasOwnProperty('address') ? node['properties']['address'] : "??"
+        }
+    }, {
+        name : "ADM Port",
+        is_relevant : function(n) { return n.db_label === "AdmPort" },
+        icon_unicode : "\uf447",
+        make_node_label : function(node) {
+            return node['properties'].hasOwnProperty('port') ? node['properties']['port'] : "??"
         }
     },
 
@@ -401,7 +419,6 @@ var predicates = [
         name : "Principal",
         is_relevant : function(n) {return n.db_label === "Subject" },
         floating_query : ".out('localPrincipal')",
-        is_default : true
     }, {
         name : "Provenance",
         is_relevant : function(n) {return n.db_label === "Subject"},
@@ -579,7 +596,7 @@ var predicates = [
 // Principal
     {
         name : "Processes Owned",
-        is_relevant : function(n) { return n.db_label === "Principal"},
+        is_relevant : function(n) {return n.db_label === "Principal"},
         floating_query : ".in('localPrincipal').hasLabel('Subject')",
         is_default : true
     },
@@ -589,7 +606,7 @@ var predicates = [
 // Both CDM and ADM Hosts:
     {
         name : "Host",
-        is_relevant : function(node) { return node.hasOwnProperty('properties') && node['properties'].hasOwnProperty('host') },
+        is_relevant : function(node) { return node['properties'].hasOwnProperty('host') },
         floating_query : function(node) { return "; g.V().has('uuid', "+ node['properties']['host'] +")" }
     // },{
     //     name: "Between Nodes",
@@ -683,13 +700,17 @@ var predicates = [
 
  // AdmNetFlowObject
     {
-        name : "NetFlow Subject",
+        name : "Subject",
         is_relevant : function(n) {return n.db_label === "AdmNetFlowObject"},
         floating_query : ".in('predicateObject','predicateObject2').out('subject').hasLabel('AdmSubject')"
     }, {
-        name : "NetFlow Principal",
+        name : "Principal",
         is_relevant : function(n) {return n.db_label === "AdmNetFlowObject"},
         floating_query : ".inE('predicateObject','predicateObject2').outV().outE('subject').inV().outE('localPrincipal').inV()"
+    }, {
+        name : "Other Host Connection",
+        is_relevant : function(n) {return n.db_label === "AdmNetFlowObject"},
+        floating_query : ".as('start').out('localPort').in('remotePort').as('portother').out('localPort').in('remotePort').as('portend').where('start',eq('portend')).out('localAddress').in('remoteAddress').as('addyother').out('localAddress').in('remoteAddress').as('addyend').where('start',eq('addyend')).where('portother', eq('addyother')).select('portother')"
     }, 
 
  // AdmProvenanceTagNode

@@ -4,7 +4,8 @@ import java.nio.ByteBuffer
 import java.util
 import java.util.{Arrays, Comparator, UUID}
 
-import com.galois.adapt.cdm18._
+import com.galois.adapt.AdaptConfig.HostName
+import com.galois.adapt.cdm19._
 import org.mapdb.{DataInput2, DataOutput2, Serializer}
 import org.mapdb.serializer.GroupSerializer
 
@@ -15,13 +16,13 @@ import scala.language.implicitConversions
 // TODO: convert `toMap` to use Shapeless. It is _begging_ to be done with shapeless
 package object adm {
 
-  sealed trait ExtendedUuid extends Product {
+  sealed trait NamespacedUuid extends Product {
     val uuid: UUID
     val namespace: String
     def rendered: String
   }
 
-  final case class CdmUUID(uuid: UUID, namespace: String) extends ExtendedUuid with Serializable { // extends AnyVal
+  final case class CdmUUID(uuid: UUID, namespace: String) extends NamespacedUuid with Serializable { // extends AnyVal
     // Raw DB representation with namespace
     def rendered: String = if (this.namespace.isEmpty) { s"cdm_${uuid.toString}" } else { s"cdm_${this.namespace}_${uuid.toString}" }
   }
@@ -33,7 +34,7 @@ package object adm {
     }
   }
 
-  final case class AdmUUID(uuid: UUID, namespace: String) extends ExtendedUuid with Serializable { // extends AnyVal
+  final case class AdmUUID(uuid: UUID, namespace: String) extends NamespacedUuid with Serializable { // extends AnyVal
     // Raw DB representation with namespace
     def rendered: String = if (this.namespace.isEmpty) { uuid.toString } else { s"${this.namespace}_${uuid.toString}" }
   }
@@ -73,6 +74,40 @@ package object adm {
       case EdgeAdm2Cdm(s, l, t) if cdmUuids.contains(t) => EdgeAdm2Adm(s, l, admUUID)
       case e => e
     }
+
+    def applyRemaps(cdmUuids: Seq[CdmUUID], admUUID: AdmUUID): Edge = {
+      var curr = this
+      var next = this.applyRemap(cdmUuids, admUUID)
+      while (curr != next) {
+        curr = next
+        next = curr.applyRemap(cdmUuids, admUUID)
+      }
+      curr
+    }
+
+    // Get the next CdmUUID in the edge (if there is one)
+    def nextCdmUUID: Option[CdmUUID] = this match {
+      case EdgeCdm2Cdm(cdm, _, _) => Some(cdm)
+      case EdgeCdm2Adm(cdm, _, _) => Some(cdm)
+      case EdgeAdm2Cdm(_, _, cdm) => Some(cdm)
+      case EdgeAdm2Adm(_, _, _) => None
+    }
+
+    def applyCdmRemap(cdmUuidOld: CdmUUID, cdmUuidNew: CdmUUID): Edge = this match {
+      case EdgeCdm2Cdm(s, l, t) if cdmUuidOld == s => EdgeCdm2Cdm(cdmUuidNew, l, t)
+      case EdgeCdm2Cdm(s, l, t) if cdmUuidOld == t => EdgeCdm2Cdm(s, l, cdmUuidNew)
+      case EdgeCdm2Adm(s, l, t) if cdmUuidOld == s => EdgeCdm2Adm(cdmUuidNew, l, t)
+      case EdgeAdm2Cdm(s, l, t) if cdmUuidOld == t => EdgeAdm2Cdm(s, l, cdmUuidNew)
+      case e => e
+    }
+
+    def applyAdmRemap(cdmUuid: CdmUUID, admUuid: AdmUUID): Edge = this match {
+      case EdgeCdm2Cdm(s, l, t) if cdmUuid == s => EdgeAdm2Cdm(admUuid, l, t)
+      case EdgeCdm2Cdm(s, l, t) if cdmUuid == t => EdgeCdm2Adm(s, l, admUuid)
+      case EdgeCdm2Adm(s, l, t) if cdmUuid == s => EdgeAdm2Adm(admUuid, l, t)
+      case EdgeAdm2Cdm(s, l, t) if cdmUuid == t => EdgeAdm2Adm(s, l, admUuid)
+      case e => e
+    }
   }
   final case class EdgeCdm2Cdm(src: CdmUUID, label: String, tgt: CdmUUID) extends Edge
   final case class EdgeCdm2Adm(src: CdmUUID, label: String, tgt: AdmUUID) extends Edge
@@ -87,6 +122,8 @@ package object adm {
   sealed trait ADM extends DBWritable with Product {
     val uuid: AdmUUID                  // The current UUID
     val originalCdmUuids: Seq[CdmUUID] // The UUIDs of all the CDM nodes that were merged to produce this node
+
+    def getHostName: Option[HostName]
 
     def toMap: Map[String, Any]        // A property map (keys are constant for a given type
   }
@@ -110,8 +147,16 @@ package object adm {
     earliestTimestampNanos: Long,
     latestTimestampNanos: Long,
 
+    // 5D specific
+    // See <https://git.tc.bbn.com/tc-all/cdm-docs/blob/master/ta1-fivedirections/operations/user_interaction.md>
+    deviceType: Option[String],
+    inputType: Option[String],
+
+    hostName: HostName,
     provider: String
   ) extends ADM with DBWritable {
+
+    def getHostName: Option[HostName] = Some(hostName)
 
     val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
 
@@ -121,8 +166,7 @@ package object adm {
       "eventType" -> eventType.toString,
       "earliestTimestampNanos" -> earliestTimestampNanos,
       "latestTimestampNanos" -> latestTimestampNanos
-    ) ++
-      (if (provider.isEmpty) { Nil } else { List("provider" -> provider) })
+    )  ++ (if (provider.isEmpty) Nil else List("provider" -> provider)) ++ {if (deviceType == None) Nil else List("deviceType" -> deviceType.get)} ++ (if (inputType == None) Nil else List("inputType" -> inputType.get))
 
     def toMap = Map(
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
@@ -149,8 +193,11 @@ package object adm {
     cid: Int,
     startTimestampNanos: Long,
 
+    hostName: HostName,
     provider: String
   ) extends ADM with DBWritable {
+
+    def getHostName: Option[HostName] = Some(hostName)
 
     val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
 
@@ -179,6 +226,8 @@ package object adm {
     val uuid = AdmUUID(DeterministicUUID(path), provider)
     val originalCdmUuids: Seq[CdmUUID] = Nil
 
+    def getHostName: Option[HostName] = None
+
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
@@ -194,15 +243,13 @@ package object adm {
   }
 
   case object AdmPathNode {
-    def normalized(path: String, provider: String): Option[AdmPathNode] = {
+    def normalized(path: String, provider: String, isWindows: Boolean): Option[AdmPathNode] = {
 
       var pathFixed: String = path.trim
 
       // Garbage
       if (pathFixed == "" || pathFixed == "<unknown>" || pathFixed == "unknown")
       return None
-
-      var isWindows = Application.isWindows(provider)
 
       val n: Int = pathFixed.length
 
@@ -329,15 +376,19 @@ package object adm {
      fileObjectType: FileObjectType,
      size: Option[Long],
 
+     hostName: HostName,
      provider: String
   ) extends ADM with DBWritable {
 
     val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
 
+    def getHostName: Option[HostName] = Some(hostName)
+
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
-      "fileObjectType" -> fileObjectType.toString
+      "fileObjectType" -> fileObjectType.toString,
+      "hostName" -> hostName
     ) ++
       size.fold[List[(String,Any)]](Nil)(v => List("size" -> v)) ++
       (if (provider.isEmpty) { Nil } else { List("provider" -> provider) })
@@ -346,7 +397,8 @@ package object adm {
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
       "fileObjectType" -> fileObjectType.toString,
       "size" -> size.getOrElse(""),
-      "provider" -> provider
+      "provider" -> provider,
+      "hostName" -> hostName
     )
   }
 
@@ -360,24 +412,26 @@ package object adm {
   final case class AdmNetFlowObject(
     originalCdmUuids: Seq[CdmUUID],
 
-    localAddress: String,
-    localPort: Int,
-    remoteAddress: String,
-    remotePort: Int,
+    localAddress: Option[String],
+    localPort: Option[Int],
+    remoteAddress: Option[String],
+    remotePort: Option[Int],
 
     provider: String
   ) extends ADM with DBWritable {
 
-    val uuid = AdmUUID(DeterministicUUID(localAddress + localPort + remoteAddress + remotePort), provider)
+    val uuid = AdmUUID(DeterministicUUID(localAddress.toString + localPort.toString + remoteAddress.toString + remotePort.toString), provider)
+
+    def getHostName: Option[HostName] = None
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
-      "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
-      "localAddress" -> localAddress,
-      "localPort" -> localPort,
-      "remoteAddress" -> remoteAddress,
-      "remotePort" -> remotePort
+      "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";")
     ) ++
+      localAddress.fold[List[(String,Any)]](Nil)(v => List("localAddress" -> v)) ++
+      localPort.fold[List[(String,Any)]](Nil)(v => List("localPort" -> v)) ++
+      remoteAddress.fold[List[(String,Any)]](Nil)(v => List("remoteAddress" -> v)) ++
+      remotePort.fold[List[(String,Any)]](Nil)(v => List("remotePort" -> v)) ++
       (if (provider.isEmpty) { Nil } else { List("provider" -> provider) })
 
     def toMap = Map(
@@ -398,6 +452,8 @@ package object adm {
     val uuid = AdmUUID(DeterministicUUID(address), "")
     override val originalCdmUuids: Seq[CdmUUID] = List.empty
 
+    def getHostName: Option[HostName] = None
+
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
@@ -417,6 +473,8 @@ package object adm {
 
     val uuid = AdmUUID(DeterministicUUID(port.toString), "")
     override val originalCdmUuids: Seq[CdmUUID] = List.empty
+
+    def getHostName: Option[HostName] = None
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -439,22 +497,27 @@ package object adm {
 
     srcSinkType: SrcSinkType,
 
+    hostName: String,
     provider: String
   ) extends ADM with DBWritable {
 
     val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
 
+    def getHostName: Option[HostName] = Some(hostName)
+
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
-      "srcSinkType" -> srcSinkType.toString
+      "srcSinkType" -> srcSinkType.toString,
+      "hostName" -> hostName
     ) ++
       (if (provider.isEmpty) { Nil } else { List("provider" -> provider) })
 
     def toMap = Map(
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
       "srcSinkType" -> srcSinkType.toString,
-      "provider" -> provider
+      "provider" -> provider,
+      "hostName" -> hostName
     )
   }
 
@@ -472,16 +535,23 @@ package object adm {
     principalType: PrincipalType = PRINCIPAL_LOCAL,
     username: Option[String] = None,
 
+    hostName: String,
     provider: String
   ) extends ADM with DBWritable {
 
-    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
+    val uuid = AdmUUID(
+      DeterministicUUID(userId + groupIds.sorted.mkString("") + principalType.toString + username + provider),
+      provider
+    )
+
+    def getHostName: Option[HostName] = Some(hostName)
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
       "userId" -> userId,
-      "principalType" -> principalType.toString
+      "principalType" -> principalType.toString,
+      "hostName" -> hostName
     ) ++
       (if (groupIds.nonEmpty) List("groupIds" -> groupIds.mkString(",")) else Nil) ++
       username.fold[List[(String,Any)]](Nil)(v => List("username" -> v)) ++
@@ -493,7 +563,8 @@ package object adm {
       "principalType" -> principalType,
       "groupIds" -> groupIds.toList.sorted.mkString(";"),
       "username" -> username.getOrElse(""),
-      "provider" -> provider
+      "provider" -> provider,
+      "hostName" -> hostName
     )
   }
 
@@ -509,14 +580,18 @@ package object adm {
 
     programPoint: Option[String] = None,
 
+    hostName: String,
     provider: String
   ) extends ADM with DBWritable {
 
     val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
 
+    def getHostName: Option[HostName] = Some(hostName)
+
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
-      "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";")
+      "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
+      "hostName" -> hostName
     ) ++
       programPoint.fold[List[(String,Any)]](Nil)(p => List("programPoint" -> p)) ++
       (if (provider.isEmpty) { Nil } else { List("provider" -> provider) })
@@ -525,7 +600,8 @@ package object adm {
     def toMap = Map(
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
       "programPoint" -> programPoint.getOrElse(""),
-      "provider" -> provider
+      "provider" -> provider,
+      "hostName" -> hostName
     )
   }
 
@@ -534,31 +610,33 @@ package object adm {
 
     hostName: String,                        // hostname or machine name
     hostIdentifiers: Seq[HostIdentifier],    // list of identifiers, such as serial number, IMEI number
-    osDetails: String,                       // OS level details revealed by tools such as uname -a
+    osDetails: Option[String],               // OS level details revealed by tools such as uname -a
     hostType: HostType,                      // host's role or device type, such as mobile, server, desktop
     interfaces: Seq[Interface],              // names and addresses of network interfaces
 
     provider: String
   ) extends ADM with DBWritable {
 
+    def getHostName: Option[HostName] = Some(hostName)
+
     val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
 
-      "hostname" -> hostName,
+      "hostName" -> hostName,
       "hostIdentifiers" -> hostIdentifiers.map(_.toString).mkString(";"),
-      "osDetails" -> osDetails,
       "hostType" -> hostType.toString,
       "interfaces" -> interfaces.map(_.toString).mkString(";"),
 
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";")
     ) ++
+      osDetails.fold[List[(String,Any)]](Nil)(p => List("osDetails" -> p)) ++
       (if (provider.isEmpty) { Nil } else { List("provider" -> provider) })
 
     def toMap = Map(
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
-      "hostname" -> hostName,
+      "hostName" -> hostName,
       "hostIdentifiers" -> hostIdentifiers.map(_.toString).mkString(";"),
       "osDetails" -> osDetails,
       "hostType" -> hostType.toString,
@@ -571,6 +649,8 @@ package object adm {
   final case class AdmSynthesized(
     originalCdmUuids: Seq[CdmUUID]
   ) extends ADM with DBWritable {
+
+    def getHostName: Option[HostName] = None
 
     val uuid = {
       val original = originalCdmUuids.sorted

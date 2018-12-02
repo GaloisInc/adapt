@@ -8,7 +8,7 @@ package com.galois.adapt
 import scala.concurrent.duration._
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
-import com.typesafe.config.Config
+import com.typesafe.config.{Config => TypeSafeConfig}
 import akka.actor.{ ActorContext, ActorRef, ActorSystem, ExtendedActorSystem }
 import akka.dispatch.{ Envelope, MailboxType, MessageQueue, UnboundedMailbox, UnboundedQueueBasedMessageQueue, ProducesMessageQueue }
 import akka.event.Logging
@@ -25,7 +25,7 @@ import akka.event.Logging
   * }
   * </pre>
   */
-class LoggingMailboxType(settings: ActorSystem.Settings, config: Config) extends MailboxType with ProducesMessageQueue[UnboundedMailbox.MessageQueue] {
+class LoggingMailboxType(settings: ActorSystem.Settings, config: TypeSafeConfig) extends MailboxType with ProducesMessageQueue[UnboundedMailbox.MessageQueue] {
   override def create(owner: Option[ActorRef], system: Option[ActorSystem]) = (owner, system) match {
     case (Some(o), Some(s)) =>
       val sizeLimit = config.getInt("size-limit")

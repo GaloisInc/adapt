@@ -4,40 +4,37 @@ import akka.util.Timeout
 import akka.pattern.ask
 import java.io.{File, PrintWriter}
 import java.util.UUID
-
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.cdm18.EventType
 import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWriterSettings}
-
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.sys.process._
-import Application.ppmActor
+import Application.ppmManagerActors
 import akka.actor.ActorSystem
-import com.galois.adapt.adm.{AdmUUID, ExtendedUuid}
-
+import com.galois.adapt.adm.AdmUUID
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success, Try}
+import AdaptConfig._
 
 
 object EventTypeModels {
   type EventTypeCounts = Map[EventType,Int]
-  type EventTypeAlarm = List[(String,Float,Float,Int,Int,Int)] // This is the process and anomaly/fca score, last two tuple entries always zero
   case class Process(name: String,uuid: String) {
     override def toString() = {
       this.name + "_" + this.uuid.toString
     }
   }
 
-  val modelDirIForest = Application.config.getString("adapt.ppm.eventtypemodelsdir")
+  val modelDirIForest = ppmConfig.eventtypemodelsdir
   val dirIForest = new File(modelDirIForest)
-  val baseDirFile = new File(Application.config.getString("adapt.ppm.basedir"))
+  val baseDirFile = new File(ppmConfig.basedir)
   if ( !dirIForest.exists && baseDirFile.exists && baseDirFile.canWrite && baseDirFile.isDirectory) dirIForest.mkdir()
 
 
 
-  val trainFileIForest = Try(Application.config.getString("adapt.ppm.iforesttrainingfile")).getOrElse("train_iforest.csv")
+  val trainFileIForest = ppmConfig.iforesttrainingfile
   val evalFileIForest = "eval_iforest.csv"
 
   val outputFileIForest = "output_iforest.csv"
@@ -50,9 +47,9 @@ object EventTypeModels {
 
   object EventTypeData {
 
-    def query(treeName: String): PpmTreeCountResult = Try {
+    def query(treeName: String, hostName: HostName): PpmTreeCountResult = Try {
       implicit val timeout: Timeout = Timeout(60 seconds)
-      val future: Future[Any] = (ppmActor ? PpmTreeCountQuery(treeName: String)).mapTo[Future[PpmTreeCountResult]].flatMap(identity)
+      val future: Future[Any] = (ppmManagerActors(hostName) ? PpmTreeCountQuery(treeName: String)).mapTo[Future[PpmTreeCountResult]].flatMap(identity)
       val ppmTreeCountFutureResult = Await.ready(future, timeout.duration).value match {
         case Some(Success(result)) => result
         case Some(Failure(msg)) => println(s"Unable to query ProcessEventTypeCounts with failure: ${msg.getMessage}"); None
@@ -88,7 +85,7 @@ object EventTypeModels {
 
     def writeToFile(data: Map[List[ExtractedValue], Int], filePath: String, modelName: String = "iforest"): Unit = {
       val settings = new CsvWriterSettings
-      val file = new File(filePath)
+      val file = new File(filePath)   // TODO: The hostname is not considered when writing to a file. That may overwrite data for multiple hosts!!!!!!!!!!!!!!!!!!!!
       if (file.exists()) file.createNewFile()
       val pw = new PrintWriter(file)
       val writer = new CsvWriter(pw, settings)
@@ -106,7 +103,7 @@ object EventTypeModels {
 
   object EventTypeAlarms {
 
-    def readToAlarmList(filePath: String):  List[(EventTypeAlarm, Set[ExtendedUuid])] = {
+    def readToAlarmList(filePath: String):  List[(Alarm, Set[NamespacedUuidDetails])] = {
       val result = Try {
         val fileHandle = new File(filePath)
         val settings = new CsvParserSettings
@@ -126,13 +123,13 @@ object EventTypeModels {
       rows.map(r => (r(0),r(1),r.last.toFloat)).sortBy(_._3).take(5000)
     }
 
-    def rowToAlarmIForest(extractedRow: (String,String,Float)): (EventTypeAlarm, Set[ExtendedUuid]) = {
+    def rowToAlarmIForest(extractedRow: (String,String,Float)): (Alarm, Set[NamespacedUuidDetails]) = {
        (
         List(
-        (extractedRow._1,extractedRow._3,extractedRow._3,1,0,0),
-        (extractedRow._2,extractedRow._3,extractedRow._3,1,0,0)
+          PpmTreeNodeAlarm(extractedRow._1,extractedRow._3,extractedRow._3,1,0,0,0),
+          PpmTreeNodeAlarm(extractedRow._2,extractedRow._3,extractedRow._3,1,0,0,0)
         ),
-        Set[ExtendedUuid](AdmUUID(UUID.fromString(extractedRow._2),""))
+        Set[NamespacedUuidDetails](NamespacedUuidDetails(AdmUUID(UUID.fromString(extractedRow._2),"")))
       )
     }
   }
@@ -149,8 +146,8 @@ object EventTypeModels {
 
   // Call this function sometime in the beginning of the flow...
   // I'd probably wait ten minutes or so to get real results
-  def evaluateModels(system: ActorSystem): Unit  = {
-    val writeResult = EventTypeData.query("iForestProcessEventType").results match {
+  def evaluateModels(system: ActorSystem, hostName: HostName): Unit  = {
+    val writeResult = EventTypeData.query("iForestProcessEventType", hostName).results match {
       case Some(data) => Try(EventTypeData.writeToFile(data,modelDirIForest+evalFileIForest))
       case _ => println("Query to IForestProcessEventType returned no data.")
         Failure(new RuntimeException("Query to IForestProcessEventType returned no data.")) //If there is no data, we want a failure (this seems hacky)
@@ -162,13 +159,13 @@ object EventTypeModels {
       case Failure(ex) => println(s"Unable to query or write data for IForest: ${ex.getMessage}")
     }
 
-    //PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[ExtendedUuid], dataTimestamp: Long)
+    //PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[ExtendedUuidDetails], dataTimestamp: Long)
     alarmTreeToFile.foreach {
       case (ppmName, file) => Try(getAlarms(file)) match {
         case Success(alarms) => if (alarms.nonEmpty) {
           val alarmsDetectedSet = alarms.map { case (alarmData, collectedUuids) => PpmNodeActorAlarmDetected(ppmName, alarmData, collectedUuids, 0L) }.toSet
           Try {
-            ppmActor ! PpmNodeActorManyAlarmsDetected(alarmsDetectedSet)
+            ppmManagerActors(hostName) ! PpmNodeActorManyAlarmsDetected(alarmsDetectedSet)
           }
         }
         // send alarmsDetectedList to actor
@@ -176,13 +173,13 @@ object EventTypeModels {
       }
     }
 
-    val iforestRunEveryMinutes = Try(Application.config.getInt("adapt.ppm.iforestfreqminutes")).getOrElse(15)
-    Try(system.scheduler.scheduleOnce(iforestRunEveryMinutes minutes)(evaluateModels(system)))
+    val iforestRunEveryMinutes = ppmConfig.iforestfreqminutes
+    Try(system.scheduler.scheduleOnce(iforestRunEveryMinutes minutes)(evaluateModels(system, hostName)))
 
   }
 
 
-  def getAlarms(iforestAlarmFile: String): List[(EventTypeAlarm, Set[ExtendedUuid])]= {
+  def getAlarms(iforestAlarmFile: String): List[(Alarm, Set[NamespacedUuidDetails])]= {
     val iforestAlarms = EventTypeAlarms.readToAlarmList(iforestAlarmFile)
 
     //new File(iforestAlarmFile).delete() //If file doesn't exist, returns false
