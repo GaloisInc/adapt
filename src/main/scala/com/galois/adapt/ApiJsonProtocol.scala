@@ -193,6 +193,7 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   )
 
   implicit val alarmMetadataFormat = jsonFormat2(AlarmEventMetaData)
+  implicit val processDetailsFormat = jsonFormat3(ProcessDetails)
   //implicit val detailedAlarmDataFormat = jsonFormat3(DetailedAlarmData)
 }
 

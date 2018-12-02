@@ -1,6 +1,6 @@
 package com.galois.adapt
 
-import java.io.{ByteArrayInputStream, File}
+import java.io.{ByteArrayInputStream, File, FileNotFoundException}
 import java.util.UUID
 
 import akka.NotUsed
@@ -384,6 +384,10 @@ object AdaptConfig extends Utils {
 
       pathsExpanded.foldLeft(Source.empty[Lazy[(Try[CDM19], Namespace)]]) { case (acc, path) =>
         readCdm19(path) orElse readCdm18(path) orElse readCdm17(path) match {
+          case Failure(_: FileNotFoundException) =>
+            println(s"Failed to find a file at $path. Skipping it for now.")
+            acc
+
           case Failure(_) =>
             println(s"Failed to read file $path as CDM19, CDM18, or CDM17. Skipping it for now.")
             acc
