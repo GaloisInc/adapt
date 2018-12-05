@@ -120,35 +120,29 @@ object Routes {
             complete(
               (statusActor ? GetStats).mapTo[StatusReport]
             )
-          } ~
-<<<<<<< HEAD
-          pathPrefix("ppm") {
-            path("listTrees") {
-              complete(
-                (ppmActor ? ListPpmTrees).mapTo[Future[PpmTreeNames]].flatMap(_.map(_.namesAndCounts))
-              )
-            } ~
-            path("setRatings") {
-              parameter('rating.as(validRating), 'namespace ? "adapt", 'pathsPerTree.as[Map[String, List[String]]]) { setRatings }
-            } ~
-            path(Segment) { treeName =>
-              parameter('query.as[String].?, 'namespace ? "adapt", 'startTime ? 0L, 'forwardFromStartTime ? true, 'resultSizeLimit.as[Int].?, 'excludeRatingBelow.as[Int].?) {
-                (queryString, namespace, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
-                  val query = queryString.map(_.split("∫", -1)).getOrElse(Array.empty[String]).toList
-                  import ApiJsonProtocol._
-                  complete(
-                    (ppmActor ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow))
-                      .mapTo[PpmTreeAlarmResult]
-                      .map(t => List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
-                  )
-              }
-            }
-          } ~
-          pathPrefix("getCdmFilter") {
-            complete(
-              Future.successful(Application.filterAst.toJson)
-            )
           }
+      //    pathPrefix("ppm") {
+      //      path("listTrees") {
+      //        complete(
+      //          (ppmActor ? ListPpmTrees).mapTo[Future[PpmTreeNames]].flatMap(_.map(_.namesAndCounts))
+      //        )
+      //      } ~
+      //      path("setRatings") {
+      //        parameter('rating.as(validRating), 'namespace ? "adapt", 'pathsPerTree.as[Map[String, List[String]]]) { setRatings }
+      //      } ~
+      //      path(Segment) { treeName =>
+      //        parameter('query.as[String].?, 'namespace ? "adapt", 'startTime ? 0L, 'forwardFromStartTime ? true, 'resultSizeLimit.as[Int].?, 'excludeRatingBelow.as[Int].?) {
+      //          (queryString, namespace, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
+      //            val query = queryString.map(_.split("∫", -1)).getOrElse(Array.empty[String]).toList
+      //            import ApiJsonProtocol._
+      //            complete(
+      //              (ppmActor ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow))
+      //                .mapTo[PpmTreeAlarmResult]
+      //                .map(t => List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
+      //            )
+      //        }
+      //      }
+      //    } ~
         } ~
         pathPrefix("query") {
           pathPrefix("nodes") {
@@ -172,7 +166,6 @@ object Routes {
               )
             }
           } ~
-=======
           pathPrefix("ingest") {
             path("terminate"){
               parameters('hostName, 'parallelIndex.as[Int], 'sequentialIndex.as[Int]) { (hostName, parallelIdx, sequentialIdx) =>
@@ -218,7 +211,7 @@ object Routes {
             )
           } ~
           pathPrefix("ppm") {
-            pathPrefix("listTrees") {
+              pathPrefix("listTrees") {
               path(Segment) { hostName =>
                 complete(
                   (ppmActors(hostName) ? ListPpmTrees).mapTo[Future[PpmTreeNames]].flatMap(_.map(_.namesAndCounts))

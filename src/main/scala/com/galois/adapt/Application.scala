@@ -489,18 +489,43 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       val parallelism = 32 // 16
 //        val quineActor = system.actorOf(Props(classOf[QuineDBActor], graph))
 //        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("Quine", 1000)), Sink.actorRefWithAck(quineActor, Init, Ack, Complete, println))
+
+      // println(s"\n\nDemo ingest ${Try(config.getLong("adapt.ingest.loadlimit")).map(s => s"for the first $s items ").getOrElse("")}begun at time: ${System.currentTimeMillis}\n")
+
+  //    CDMSource.cdm17(ta1).map(_._2).concat(Source.single(CompleteMsg))
+  //      .via(FlowComponents.printCounter("Quine demo", statusActor, 100))
+  //      .buffer(10, OverflowStrategy.backpressure)
+  //      .mapAsyncUnordered(parallelism)(cdm => quineRouter ? cdm)
+  //      .recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace()}
+  //      .runWith(Sink.ignore)
+
+        
       val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
+      
+      startWebServer()
+      statusActor ! InitMsg
 
-      startWebServer(quineRouter)
+      // Write out debug states
+      val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
 
-      println(s"\n\nDemo ingest ${Try(config.getLong("adapt.ingest.loadlimit")).map(s => s"for the first $s items ").getOrElse("")}begun at time: ${System.currentTimeMillis}\n")
+      RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
+        import GraphDSL.Implicits._
 
-      CDMSource.cdm17(ta1).map(_._2).concat(Source.single(CompleteMsg))
-        .via(FlowComponents.printCounter("Quine demo", statusActor, 100))
-        .buffer(10, OverflowStrategy.backpressure)
-        .mapAsyncUnordered(parallelism)(cdm => quineRouter ? cdm)
-        .recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace()}
-        .runWith(Sink.ignore)
+        val hostSources = cdmSources.values.toSeq
+
+        for (((host, source), i) <- hostSources.zipWithIndex) {
+          source
+            .via(printCounter(host.hostName, statusActor, 0))
+            .via(debug.debugBuffer(s"[${host.hostName}] 0 before ER"))
+            .mapAsyncUnordered(parallelism)(cdm => quineRouter ? cdm)
+            .recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace()}
+            .runWith(Sink.ignore)
+        }
+
+        ClosedShape
+      }).run()
+
+
 
     case "pre-e4-test" =>
       startWebServer()
