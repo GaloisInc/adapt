@@ -55,14 +55,14 @@ case class Event(
     // For the policy enforcement demo of policy 3 with Clearscope's data
     // we only care about parameters on EVENT_WRITEs where the second elt has valueBytes and tagRunLengthTuples
     val peParam = parameters.filter{
-      p => eventType.toString=="EVENT_WRITE" &&
-            p.lengthCompare(1)>0 && p(1).valueBytes.isDefined &&
-            p(1).tagRunLengthTuples.isDefined
+      p => eventType.toString=="EVENT_SENDTO" &&
+            p.lengthCompare(1)>0 &&  p.last.valueBytes.isDefined &&
+            p.last.tagRunLengthTuples.isDefined
       }
 
 
     val decodedOption: Option[String] = peParam match {
-      case Some(params) => Some(new String(params(1).valueBytes.get))
+      case Some(params) => Some(new String(params.last.valueBytes.get))
       case _ => None
       }
 
