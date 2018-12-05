@@ -124,11 +124,18 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
                 answerPolicy4(fileName, responseUri, requestId, dbActor)
                 StatusCodes.Accepted -> "Started the policy check process, will respond later"
               }
-            }
+            } ~
             parameters('policy ! "originatingUserServer", 'requestId.as(validRequestId), 'responseUri.as(validUri)) { (requestId, responseUri) =>
               complete {
                 println(s"Check Policy originatingUserServer: $responseUri, $requestId")
                 answerPolicyServerOriginatingUser(clientIp, clientPort, serverIp, serverPort, timestamp, responseUri, requestId, dbActor)
+                StatusCodes.Accepted -> "Started the policy check process, will respond later"
+              }
+            } ~
+            parameters('policy ! "fileOriginationServer", 'requestId.as(validRequestId), 'responseUri.as(validUri)) { (requestId, responseUri) =>
+              complete {
+                println(s"Check Policy originatingUserServer: $responseUri, $requestId")
+                answerPolicyServerFileOrigination(clientIp, clientPort, serverIp, serverPort, timestamp, responseUri, requestId, dbActor)
                 StatusCodes.Accepted -> "Started the policy check process, will respond later"
               }
             }
@@ -994,6 +1001,138 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     }
     policyRequests = policyRequests + (requestId -> resultFuture)
   }
+
+  def answerPolicyServerFileOrigination(clientIp: String, clientPort: Int, serverIp: String, serverPort: Int, timestampSeconds: Long, responseUri: String, requestId: Int, dbActor: ActorRef)(implicit system: ActorSystem, materializer: Materializer): Unit = {
+
+    // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/TA2API_FilesRead
+
+    implicit val ec = system.dispatcher
+
+    val fileName = ???
+
+    def alecsQuery(fileName: String): Future[Option[String]] = {
+      import scala.concurrent.duration._
+
+      implicit val _: Timeout = 10.minutes
+
+      val escapedPath = fileName
+
+      // Pure utility
+      def flattenFutureTry[A](futFutTry: Future[Future[Try[A]]]): Future[A] =
+        futFutTry.flatMap(futTry => futTry.flatMap {
+          case Failure(f) => Future.failed(f)
+          case Success(a) => Future.successful(a)
+        })
+
+      def futQuery(query: String): Future[List[JsValue]] = flattenFutureTry[JsValue]((dbActor ? CypherQuery(query)).mapTo[Future[Try[JsValue]]])
+        .map(arr => arr.asInstanceOf[JsArray].elements.toList)
+
+      // Files possible corresponding to the given path
+      val fileIdsFut: Future[List[Long]] = futQuery(s"""MATCH (f: AdmFileO bject)-->(p: AdmPathNode) WHERE p.path =~ '.*${escapedPath}' RETURN ID(f)""")
+        .map(arr => arr
+          .flatMap(obj => obj.asJsObject.getFields("ID(f)"))
+          .map(num => num.asInstanceOf[JsNumber].value.longValue())
+        )
+
+      type ID = Long
+      type TimestampNanos = Long
+
+
+      // I want to have a loop over the monad `Future[_]`. That's not possible with a regular `while`, so the loop is a
+      // recursive function.
+      def loop(toVisit: collection.mutable.Queue[(ID, TimestampNanos)], visited: collection.mutable.Set[ID]): Future[Option[String]] =
+        if (toVisit.isEmpty) {
+          Future.successful(None)
+        } else {
+          val (id: ID, time: TimestampNanos) = toVisit.dequeue()
+
+          val checkEnd = s"MATCH (n: AdmNetFlowObject) WHERE ID(n) = $id RETURN n.remoteAddress, n.remotePort"
+          futQuery(checkEnd).flatMap { netflows =>
+            if (netflows.nonEmpty) {
+
+              val address = netflows.head.asJsObject.getFields("n.remoteAddress").head.toString
+              val port = netflows.head.asJsObject.getFields("n.remotePort").head.toString
+
+              Future.successful(Some(address + ":" + port))
+            } else {
+              //  OR e.eventType = "EVENT_CREATE_OBJECT"
+              val stepWrite =
+                s"""MATCH (o1)<-[:predicateObject]-(e: AdmEvent)-[:subject]->(o2)
+                   |WHERE (e.eventType = "EVENT_WRITE" OR e.eventType = "EVENT_SENDTO" OR e.eventType = "EVENT_SENDMSG") AND ID(o1) = $id AND e.earliestTimestampNanos <= $time
+                   |RETURN ID(o2), e.latestTimestampNanos
+                   |""".stripMargin('|')
+
+              val stepRead =
+                s"""MATCH (o1)<-[:subject]-(e: AdmEvent)-[:predicateObject]->(o2)
+                   |WHERE (e.eventType = "EVENT_READ" OR e.eventType = "EVENT_RECV" OR e.eventType = "EVENT_RECVMSG") AND ID(o1) = $id AND e.earliestTimestampNanos <= $time
+                   |RETURN ID(o2), e.latestTimestampNanos
+                   |""".stripMargin('|')
+
+              val stepRename =
+                s"""MATCH (o1)<-[:predicateObject|predicateObject2]-(e: AdmEvent)-[:predicateObject|predicateObject2]->(o2)
+                   |WHERE e.eventType = "EVENT_RENAME" AND ID(o1) = $id AND ID(o1) <> ID(o2) AND e.earliestTimestampNanos <= $time
+                   |RETURN ID(o2), e.latestTimestampNanos
+                   |""".stripMargin('|')
+
+              val stepParent =
+                s"""MATCH (o1)-[:parentSubject]->(o2)
+                   |WHERE ID(o1) = $id
+                   |RETURN ID(o2)
+                   |""".stripMargin('|')
+
+              val foundFut: Future[List[(ID, TimestampNanos)]] = for {
+                writes <- futQuery(stepWrite)
+                reads <- futQuery(stepRead)
+                rename <- futQuery(stepRename)
+                parent <- futQuery(stepParent)
+              } yield (writes ++ reads ++ rename ++ parent).map(obj => {
+                val id = obj.asJsObject.getFields("ID(o2)").head.asInstanceOf[JsNumber].value.longValue()
+                val timestamp = obj.asJsObject.getFields("e.latestTimestampNanos").headOption.map(_.asInstanceOf[JsNumber].value.longValue())
+                  .getOrElse(time)
+                (id, timestamp)
+              })
+
+              foundFut.flatMap { found =>
+                toVisit ++= found.filter { case (id, _) => !visited.contains(id) }
+                visited ++= found.map(_._1)
+
+                loop(toVisit, visited)
+              }
+            }
+          }
+
+
+        }
+
+      fileIdsFut.flatMap((filesIds: List[Long]) => {
+        // toVisit = the IDs of node which could have contributed to the file being sent out
+        val toVisit: scala.collection.mutable.Queue[(ID, TimestampNanos)] = collection.mutable.Queue.empty
+        val visited: scala.collection.mutable.Set[ID] = scala.collection.mutable.Set.empty
+
+        toVisit ++= filesIds.map(id => (id, Long.MaxValue))
+        visited ++= filesIds
+
+        loop(toVisit, visited)
+      })
+    }
+
+    val resultFuture = alecsQuery(fileName).map {
+      case Some(s) =>
+        val result = 400
+        println(s"Policy 4 Result for requestId: $requestId is: $result with message: $s")
+        returnPolicyResult(result, Some(s), responseUri)
+        result -> Some(s)
+      case None =>
+        val result = 200
+        val message = s"No network source data for the file: $fileName"
+        println(s"Policy 4 Result for requestId: $requestId is: $result with message: $message")
+        returnPolicyResult(result, Some(message), responseUri)
+        result -> Some(message)
+    }
+
+    policyRequests = policyRequests + (requestId -> resultFuture)
+  }
+
 
 
   def returnPolicyResult(responseCode: Int, message: Option[String], responseUri: String)(implicit system: ActorSystem, materializer: Materializer): Future[HttpResponse] = {
