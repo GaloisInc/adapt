@@ -54,11 +54,9 @@ case class Event(
   {
     // For the policy enforcement demo of policy 3 with Clearscope's data
     // we only care about parameters on EVENT_WRITEs where the second elt has valueBytes and tagRunLengthTuples
-    val peParam = parameters.filter{
-      p => eventType.toString=="EVENT_SENDTO" &&
-            p.lengthCompare(1)>0 &&  p.last.valueBytes.isDefined &&
-            p.last.tagRunLengthTuples.isDefined
-      }
+    val peParam = parameters.filter {
+      p => p.lengthCompare(1)>0 && p.last.valueBytes.isDefined && p.last.tagRunLengthTuples.isDefined
+    }
 
 
     val decodedOption: Option[String] = peParam match {
@@ -78,7 +76,23 @@ case class Event(
     predicateObject.map(p => (CDM19.EdgeTypes.predicateObject,p)),
     predicateObject2.map(p => (CDM19.EdgeTypes.predicateObject2,p)),
     foldedParameters.flatMap(value => value.tagsFolded.map(tag => (CDM19.EdgeTypes.parameterTagId, tag.tagId)))
-  )
+  ) ++ {
+    // For the policy enforcement demo of policy 3 with Clearscope's data
+    // we only care about parameters on EVENT_WRITEs where the second elt has valueBytes and tagRunLengthTuples
+    val peParam = parameters
+      .filter(p => p.lastOption.fold(false)(l => l.valueBytes.isDefined && l.tagRunLengthTuples.isDefined))
+
+    val decodedOption: Option[String] = peParam match {
+      case Some(params) => Some(new String(params.last.valueBytes.get))
+      case _ => None
+    }
+
+    if (decodedOption.exists(_.contains("GET "))) {
+      peParam.fold[List[(CDM19.EdgeTypes.Value,UUID)]](List.empty)(v => v(1).tagRunLengthTuples.get.map(t => CDM19.EdgeTypes.peTagId -> t.tagId).toList)
+    } else {
+      List.empty
+    }
+  }
 
   def getUuid: UUID = uuid
 

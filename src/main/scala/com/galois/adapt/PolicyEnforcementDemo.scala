@@ -24,6 +24,8 @@ import spray.json._
 import ApiJsonProtocol._
 import ammonite.runtime.tools.tail
 
+import scala.collection.mutable.ListBuffer
+
 object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
   case class ValueName(name: String)
@@ -780,12 +782,12 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     }
 
 
-    def nicholesQuery(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long): Future[Option[Policy3Result]] = {
-
+    // Alec: The future handling in here is gross and I know it. But it'll work for now and we'll delete this soon anyways :)
+    def nicholesQuery(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long): Future[Option[Policy3Result]] = Future {
 
       // Make this interval bigger?
-      val maxTimestampNanos = (timestampSeconds + 1) * 1000000000
-      val minTimestampNanos = timestampSeconds * 1000000000
+      val maxTimestampNanos = (timestampSeconds + 8) * 1000000000
+      val minTimestampNanos = (timestampSeconds - 2)* 1000000000
 
       // These utility functions Alec wrote are great!
       def flattenFutureTry[A](futFutTry: Future[Future[Try[A]]]): Future[A] =
@@ -794,67 +796,71 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
           case Success(a) => Future.successful(a)
         })
 
-      def futQuerySplitValueToList(query: String, key: String): Future[List[String]] = flattenFutureTry[JsValue]((dbActor ? CypherQuery(query))
-        .mapTo[Future[Try[JsValue]]])
-        .map(arr => arr.asInstanceOf[JsArray].elements.toList).map(arr => arr
-        .flatMap(obj => obj.asJsObject.getFields(key))
-        .flatMap(strUUIDs => Try(strUUIDs.asInstanceOf[JsString].value).getOrElse("").split(",")))
+      // Get PTN corresponding to netflows
+      def startingTagIds: List[Long] = Await.result(flattenFutureTry[JsArray](
+        (dbActor ? StringQuery(
+          s"""g.V()
+             |     .hasLabel('NetFlowObject')
+             |     .has('localAddress', '$localAddress').has('remoteAddress', '$remoteAddress')
+             |     .has('localPort', $localPort)      .has('remotePort', $remotePort)
+             |     .in('predicateObject')
+             |     .hasLabel('Event').has('eventType',within(['EVENT_SENDTO','EVENT_WRITE']))
+             |     .has('timestampNanos', lte($maxTimestampNanos))
+             |     .has('timestampNanos', gte($minTimestampNanos))
+             |     .out('peTagId')
+             |     .id()
+             |     .dedup()
+             |""".stripMargin,
+          true
+        )).mapTo[Future[Try[JsArray]]]), 30.seconds).elements.toList.collect { case JsNumber(n) => n.toLong }
 
-      def futQueryGetValue(query: String, key: String): Future[Option[String]] = flattenFutureTry[JsValue]((dbActor ? CypherQuery(query))
-        .mapTo[Future[Try[JsValue]]])
-        .map(arr => arr.asInstanceOf[JsArray].elements.toList).map(arr => arr
-        .flatMap(obj => obj.asJsObject.getFields(key))
-        .map(str => str.asInstanceOf[JsString].value.toString).headOption)
+      // take one step backward in provenance
+      def provenanceStepBack(ptnId: Long): List[Long] = Await.result(flattenFutureTry[JsArray](
+        (dbActor ? StringQuery(
+          s"""g.V($ptnId)
+             |     .hasLabel('ProvenanceTagNode')
+             |     .out('tagId','prevTagId')
+             |     .id()
+             |     .dedup()
+             |""".stripMargin,
+          true
+        )).mapTo[Future[Try[JsArray]]]), 30.seconds).elements.toList.collect { case JsNumber(n) => n.toLong }
 
+      // check if the flowObject of a PTN is a SrcSinkObject with type SRCSINK_UI
+      def uiFlowObject(ptnId: Long): Boolean = Await.result(flattenFutureTry[JsArray](
+        (dbActor ? StringQuery(
+          s"""g.V($ptnId)
+             |     .out('flowObject')
+             |     .hasLabel('SrcSinkObject')
+             |     .has('srcSinkType','SRCSINK_UI')
+             |     .dedup()
+             |""".stripMargin,
+          true
+        )).mapTo[Future[Try[JsArray]]]), 30.seconds).elements.toList.nonEmpty
 
-      val tagIdsFromEvents =
-        s"""MATCH (n:NetFlowObject)<-[:predicateObject]-(e:Event)
-           |WHERE e.eventType = "EVENT_WRITE" AND n.localAddress = "${localAddress}"
-           |AND n.localPort=${localPort} AND n.remoteAddress="${remoteAddress}"
-           |AND n.remotePort=${remotePort}
-           |AND e.timestampNanos <= $maxTimestampNanos AND e.timestampNanos >= $minTimestampNanos
-           |RETURN e.peTagIds as peTagIds
-           |""".stripMargin('|')
-
-      def getSrcSinkTypesAssociatedWithEvent(tagId: String) =
-        s"""MATCH (p:ProvenanceTagNode)
-           |WHERE p.uuid="$tagId"
-           |AND EXISTS(p.prevTagIdUuid)
-           |MATCH (q:ProvenanceTagNode)
-           |WHERE q.uuid=p.prevTagIdUuid
-           |AND EXISTS(q.flowObjectUuid)
-           |MATCH (s:SrcSinkObject)
-           |WHERE s.uuid=q.flowObjectUuid
-           |RETURN s.srcSinkType as srcSinkType
-                                                                  """.stripMargin('|')
-
-      // Look up the provenance tag ids on the event write node which was
-      // created at 'timestampSeconds' adjacent to the NetFlowObject
-      // with the local and remote addresses and ports given in the request.
-      val initialTagIdsFut: Future[List[String]] = futQuerySplitValueToList(tagIdsFromEvents, "peTagIds")
-
-      initialTagIdsFut.map { i => println(s"initialTagIdsFut: $i") }
-
-      initialTagIdsFut.flatMap {
-        case Nil => println("initialTagIdsFut is empty"); Future.successful(Some(new Policy3InsufficientData {}))
-        case tagIds =>
-
-          println(s"tagIds: $tagIds")
-
-          val hasUISeqFut: Seq[Future[Option[Policy3Result]]] = tagIds.map { tagId =>
-
-            val srcSinkTypeFut = futQueryGetValue(getSrcSinkTypesAssociatedWithEvent(tagId), "srcSinkType")
-
-            srcSinkTypeFut.map {
-              case Some("SRCSINK_UI") => Some(new Policy3Pass {})
-              case _ => None
-            }
+      // search to a certain depth
+      def findUiProvenance(maxDepth: Int): Boolean = {
+        var toExplore: List[Long] = startingTagIds
+        var nextLevelToExplore: ListBuffer[Long] = ListBuffer.empty
+        for (_ <- 0 until maxDepth) {
+          for (ptnId <- toExplore) {
+            if (uiFlowObject(ptnId))
+              return true
+            nextLevelToExplore ++= provenanceStepBack(ptnId)
           }
-
-          // If any of the provenance tag nodes listed on the event node (in the peTagIds field) are associated with
-          // a SRCSINK_UI, then the event was generated from the UI.
-          Future.fold(hasUISeqFut)(None: Option[Policy3Result]) { (acc, inst) => if (inst.isDefined) inst else acc }
+          toExplore = nextLevelToExplore.toList
+          nextLevelToExplore = ListBuffer.empty
+        }
+        false
       }
+
+      Some(if (startingTagIds.isEmpty) {
+        Policy3Fail()
+      } else if (findUiProvenance(20)) {
+        Policy3Pass()
+      } else {
+        Policy3Fail()
+      })
     }
 
 
