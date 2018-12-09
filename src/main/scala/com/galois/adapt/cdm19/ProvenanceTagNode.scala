@@ -38,7 +38,7 @@ case class ProvenanceTagNode(
     ctag.fold[List[(String,Any)]](List.empty)((v => List(("ctag", v.toString)))) ++
     DBOpt.fromKeyValMap(properties)
 
-  def asDBEdges = Nil
+  def asDBEdges =
     List((CDM19.EdgeTypes.subject,subjectUuid)) ++
 //    List((CDM19.EdgeTypes.host,host)) ++
     flowObject.fold[List[(CDM19.EdgeTypes.EdgeTypes,UUID)]](Nil)(f => List((CDM19.EdgeTypes.flowObject, f))) ++
