@@ -617,9 +617,8 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     }
 
 
+    // Alec: The future handling in here is gross and I know it. But it'll work for now and we'll delete this soon anyways :)
     def nicholesQuery(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long): Future[Option[Policy3Result]] = Future {
-      Try {
-      println("HI!?")
 
       // Make this interval bigger?
       val maxTimestampNanos = (timestampSeconds + 8) * 1000000000
@@ -632,11 +631,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
           case Success(a) => Future.successful(a)
         })
 
-        println(maxTimestampNanos)
-        println(minTimestampNanos)
-
-
-        // Get PTN corresponding to netflows
+      // Get PTN corresponding to netflows
       def startingTagIds: List[Long] = Await.result(flattenFutureTry[JsArray](
         (dbActor ? StringQuery(
           s"""g.V()
@@ -680,13 +675,10 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
       // search to a certain depth
       def findUiProvenance(maxDepth: Int): Boolean = {
-        println("HI!??")
         var toExplore: List[Long] = startingTagIds
         var nextLevelToExplore: ListBuffer[Long] = ListBuffer.empty
-        println(s"depth: $maxDepth")
         for (_ <- 0 until maxDepth) {
           for (ptnId <- toExplore) {
-            println(s"Inspecting node id $ptnId")
             if (uiFlowObject(ptnId))
               return true
             nextLevelToExplore ++= provenanceStepBack(ptnId)
@@ -694,24 +686,16 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
           toExplore = nextLevelToExplore.toList
           nextLevelToExplore = ListBuffer.empty
         }
-        println("Ran out of patience")
         false
       }
 
       Some(if (startingTagIds.isEmpty) {
-        println("No starting IDs")
         Policy3Fail()
       } else if (findUiProvenance(20)) {
-        println("FOUND provenance")
         Policy3Pass()
       } else {
-        println("didnt find provenance")
         Policy3Fail()
       })
-      } match {
-        case Success(s) => s
-        case Failure(f) => f.printStackTrace(); throw f
-      }
     }
 
 
