@@ -310,7 +310,8 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     type TimeInterval = (TimestampNanos, TimestampNanos)
 
     val secondToNanosecond = 1000000000
-    def toInterval(t1Seconds: Long, deltaSeconds:Long): TimeInterval = (t1Seconds*secondToNanosecond, (t1Seconds + deltaSeconds) * secondToNanosecond)
+
+    def toInterval(t1Seconds: Long, deltaSeconds: Long): TimeInterval = (t1Seconds * secondToNanosecond, (t1Seconds + deltaSeconds) * secondToNanosecond)
 
     def jsArrayToIntArray(nodesJsArray: Future[JsArray]) = {
       nodesJsArray.map(_.elements.toList.map(_.toString().replaceAll("\"", "").replace("v", "").replace("[", "").replace("]", "").toInt))
@@ -362,7 +363,9 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     }
 
     def hostName = {
-      println(Application.hostNames); assert(Application.hostNames.size == 1); Application.hostNames.head
+      println(Application.hostNames);
+      assert(Application.hostNames.size == 1);
+      Application.hostNames.head
     }
 
     def getNetFlows() = {
@@ -379,7 +382,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     }
 
     //for a process, get their connected process [These could be their parent, children or siblings]
-    def getRelatedProcess(p: ProcessNodeId, maxN:Int): Future[RelatedSubjects] = {
+    def getRelatedProcess(p: ProcessNodeId, maxN: Int): Future[RelatedSubjects] = {
       val queryChildren = s"""g.V(${p.nodeId}).repeat(_.in('parentSubject')).times(${maxN}I).emit().dedup()"""
       val queryAncestors = s"""g.V(${p.nodeId}).repeat(_.out('parentSubject')).times(${maxN}I).emit().dedup()"""
       val querySiblings = s"""g.V(${p.nodeId}).out('parentSubject')""" + queryChildren //g.V(2286).out('parentSubject').repeat(_.in('parentSubject')).emit().dedup()
@@ -396,6 +399,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       val timeWindowSeconds = 60
       //A seemingly large window if 60 seconds was chosen after looking at provided engagement the data
       val tInterval = toInterval(timestampSeconds, timeWindowSeconds)
+
       def queryAllUserEvents = {
         val query =
           s"""g.V().hasLabel('AdmEvent').has('eventType','EVENT_OTHER').has('comesFromUI',true)
@@ -406,7 +410,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       }
 
       def processNamesFut = {
-        if(processNodeIds.isEmpty) Future.successful(Set.empty[String])
+        if (processNodeIds.isEmpty) Future.successful(Set.empty[String])
         else {
           val processNodeIdsString = processNodeIds.map {
             _.nodeId
@@ -422,8 +426,8 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
       //ui events are often recieved by unity-2d and sent to a process running under firefox
       //Whitelist this scenario
-      def unity2dRecvEventAndIsParentOf(eventsNodeIds:List[Int], processPath: Set[String]) = {
-        if (eventsNodeIds.isEmpty) Future.successful(false) else{
+      def unity2dRecvEventAndIsParentOf(eventsNodeIds: List[Int], processPath: Set[String]) = {
+        if (eventsNodeIds.isEmpty) Future.successful(false) else {
           val query =
             s"""g.V(${eventsNodeIds.mkString(",")})
                |.out('subject').as('process')
@@ -436,7 +440,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
           val queryFut = (dbActor ? NodeQuery(query, shouldReturnJson = false)).mapTo[Future[Try[Stream[String]]]].flatMap(identity)
             .map(_.get.toSet)
 
-          queryFut.map{res =>
+          queryFut.map { res =>
             println(s"unity2dRecvEventAndIsParentOf: $res")
             res.intersect(processPath).nonEmpty
           }
@@ -459,6 +463,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
             }.flatMap(identity)
         }.flatMap(identity)
       }
+
       didRecvUIEvents()
     }
 
@@ -516,11 +521,11 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       //        NETFLOW: at t2  (t2 > t1)
       //      It is possible that the human-generated activity is read from memory _after_ the CLOSE event. (but we can ignore this condition for the demo).
 
-//      val processNodeIdsString = processNodeIds.map(_.nodeId).mkString(",")
-//      val query =
-//        s"""g.V($processNodeIdsString).
-//           |
-//         """.stripMargin
+      //      val processNodeIdsString = processNodeIds.map(_.nodeId).mkString(",")
+      //      val query =
+      //        s"""g.V($processNodeIdsString).
+      //           |
+      //         """.stripMargin
 
       //Find all /dev/tty[1-7]. Connection indicates human activity.
       def devttyQuery(): Future[List[Int]] = {
@@ -534,7 +539,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
         getGenericNodesFromQuery(query)
       }
 
-      def connectedXservers(devttyNodeIds:List[Int]) = {
+      def connectedXservers(devttyNodeIds: List[Int]) = {
         val pathXServer = "/usr/bin/X"
         val query =
           s"""g.V(${devttyNodeIds.mkString(",")})
@@ -545,14 +550,18 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
            """.stripMargin
         println(s"Query: $query")
         getUniqueProcessFromQuery(query).map(_.toList)
-    }
+      }
 
-      def processRecvEventsFromProcessViaUnixSocket(xServerNodeIds:List[ProcessNodeId]): Future[Set[ProcessNodeId]] = xServerNodeIds match{
+      def processRecvEventsFromProcessViaUnixSocket(xServerNodeIds: List[ProcessNodeId]): Future[Set[ProcessNodeId]] = xServerNodeIds match {
         case Nil => Future.successful(Set.empty[ProcessNodeId])
         case _ =>
           val query =
-            //.has('eventType', 'EVENT_ACCEPT')?
-            s"""g.V(${xServerNodeIds.map{_.nodeId}.mkString(",")})
+          //.has('eventType', 'EVENT_ACCEPT')?
+            s"""g.V(${
+              xServerNodeIds.map {
+                _.nodeId
+              }.mkString(",")
+            })
                |.in('subject').hasLabel('AdmEvent')
                |.out('predicateObject', 'predicateObject2').hasLabel('AdmFileObject').has('fileObjectType', 'FILE_OBJECT_UNIX_SOCKET')
                |.in('predicateObject', 'predicateObject2').hasLabel('AdmEvent').has('eventType', 'EVENT_CONNECT')
@@ -562,9 +571,11 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
           getUniqueProcessFromQuery(query)
       }
 
-      def checkIfAncestorsIn(processNodeIds:List[ProcessNodeId], pxNodeIds: Set[ProcessNodeId]) = {
-        val allAncestors = processNodeIds.map {getRelatedProcess(_, 5).map(_.ancestors)}
-        Future.sequence(allAncestors).map(_.flatten.toSet | processNodeIds.toSet).map{allProcessInvolvedInRequest =>
+      def checkIfAncestorsIn(processNodeIds: List[ProcessNodeId], pxNodeIds: Set[ProcessNodeId]) = {
+        val allAncestors = processNodeIds.map {
+          getRelatedProcess(_, 5).map(_.ancestors)
+        }
+        Future.sequence(allAncestors).map(_.flatten.toSet | processNodeIds.toSet).map { allProcessInvolvedInRequest =>
           allProcessInvolvedInRequest.intersect(pxNodeIds)
         }
       }
@@ -576,9 +587,9 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
              |.in('cmdLine','exec','(cmdLine)').hasLabel('AdmSubject')""".stripMargin
         println(queryXvnc4)
         val xvnc4NodeIds = getUniqueProcessFromQuery(queryXvnc4)
-        xvnc4NodeIds.map(x => processRecvEventsFromProcessViaUnixSocket(x.toList)).flatMap(identity).map{y =>
-          checkIfAncestorsIn(processNodeIds, y).map{ commonProcess =>
-            if(commonProcess.nonEmpty)
+        xvnc4NodeIds.map(x => processRecvEventsFromProcessViaUnixSocket(x.toList)).flatMap(identity).map { y =>
+          checkIfAncestorsIn(processNodeIds, y).map { commonProcess =>
+            if (commonProcess.nonEmpty)
               Policy3InsufficientData(s"Process $commonProcess received events from $xvnc4.")
             else
               Policy3Fail("No Process received UI events.")
@@ -592,9 +603,9 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
           case devttyNodeIds => connectedXservers(devttyNodeIds).map {
             case Nil => Future.successful(Policy3Fail("No XServer found."))
             case xServers => processRecvEventsFromProcessViaUnixSocket(xServers)
-              .map(pxNodeIds => checkIfAncestorsIn(processNodeIds, pxNodeIds).map{
+              .map(pxNodeIds => checkIfAncestorsIn(processNodeIds, pxNodeIds).map {
                 commonProcess =>
-                  if(commonProcess.nonEmpty)
+                  if (commonProcess.nonEmpty)
                     Policy3Pass(s"Process $commonProcess received UI events.")
                   else
                     Policy3Fail("No Process received UI events.")
@@ -603,11 +614,11 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
         }.flatMap(identity)
       }
 
-      didProcessRecvUIEvents(processNodeIds).map{
+      didProcessRecvUIEvents(processNodeIds).map {
         case Policy3Pass(msg1) => Future.successful(Policy3Pass(msg1))
-        case Policy3Fail(msg1) => checkForXvnc4(processNodeIds).map{
-          case Policy3InsufficientData(msg2) => Policy3InsufficientData(msg1+msg2)
-          case Policy3Fail(msg2) => Policy3Fail(msg1+msg2)
+        case Policy3Fail(msg1) => checkForXvnc4(processNodeIds).map {
+          case Policy3InsufficientData(msg2) => Policy3InsufficientData(msg1 + msg2)
+          case Policy3Fail(msg2) => Policy3Fail(msg1 + msg2)
           case _ => Policy3Fail()
         }
         case _ => Future.successful(Policy3Fail())
@@ -788,7 +799,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
       // Make this interval bigger?
       val maxTimestampNanos = (timestampSeconds + 8) * 1000000000
-      val minTimestampNanos = (timestampSeconds - 2)* 1000000000
+      val minTimestampNanos = (timestampSeconds - 2) * 1000000000
 
       // These utility functions Alec wrote are great!
       def flattenFutureTry[A](futFutTry: Future[Future[Try[A]]]): Future[A] =
@@ -796,8 +807,8 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
           case Failure(f) => Future.failed(f)
           case Success(a) => Future.successful(a)
         })
-//          .has('timestampNanos', lte($maxTimestampNanos))
-//      .has('timestampNanos', gte($minTimestampNanos))
+      //          .has('timestampNanos', lte($maxTimestampNanos))
+      //      .has('timestampNanos', gte($minTimestampNanos))
 
       // Get PTN corresponding to netflows
       def startingTagIds: List[Long] = Await.result(flattenFutureTry[JsArray](
@@ -951,7 +962,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     policyRequests = policyRequests + (requestId -> resultFuture)
   }
 
-  def checkFileOrigination(fileName: String, responseUri: String, requestId: Int, dbActor: ActorRef)(implicit system: ActorSystem, materializer: Materializer) = {
+  def checkFileOrigination(fileName: String, responseUri: String, requestId: Int, dbActor: ActorRef)(implicit system: ActorSystem, materializer: Materializer): Future[(RequestId, Some[String])] = {
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_NetData
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy4V1
     // TODO
@@ -966,14 +977,15 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       println(fileName)
       val escapedPath = fileName
         .replaceAll("\\\\", "\\\\\\\\\\\\\\\\")
-//              .replaceAll("\\", "\\\\")
+      //              .replaceAll("\\", "\\\\")
       //        .replaceAll("\b", "\\b")
       //        .replaceAll("\n", "\\n")
       //        .replaceAll("\t", "\\t")
       //        .replaceAll("\r", "\\r")
-//              .replaceAll("\"", "\\\"")
+      //              .replaceAll("\"", "\\\"")
 
       println(escapedPath)
+
       // Pure utility
       def flattenFutureTry[A](futFutTry: Future[Future[Try[A]]]): Future[A] =
         futFutTry.flatMap(futTry => futTry.flatMap {
@@ -1143,11 +1155,11 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     //       |.select('pId', 'pName','uId','gIds')
     //     """.stripMargin//.replaceAll("\n", "")
     val originatingProcessAndUserFromNetflow =
-      s""".in('predicateObject','predicateObject2').out('subject').dedup().as('pId')
-         |.out('cmdLine','(cmdLine)','exec').values('path').as('pName')
-         |.select('pId').out('localPrincipal').as('p')
-         |.values('userId').as('uId').select('p')
-         |.select('pId', 'pName','uId')
+    s""".in('predicateObject','predicateObject2').out('subject').dedup().as('pId')
+       |.out('cmdLine','(cmdLine)','exec').values('path').as('pName')
+       |.select('pId').out('localPrincipal').as('p')
+       |.values('userId').as('uId').select('p')
+       |.select('pId', 'pName','uId')
      """.stripMargin
 
     def getAncestorProcessUserDetails(pId: Int) = {
@@ -1168,7 +1180,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
          |.where('start', eq('addyend')).where('portother', eq('addyother')).select('portother').dedup()
        """.stripMargin
 
-    def sendResponse(responseCode:Int, result: String, msg: Option[String]) = {
+    def sendResponse(responseCode: Int, result: String, msg: Option[String]) = {
       println(s"Policy 1 Result for requestId: $requestId is: $result with message: $msg")
       returnPolicyResult(responseCode, msg, responseUri)
       responseCode -> msg
@@ -1186,29 +1198,35 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
     val processUserMainServer = userMainServerQueryResult
       .map(_.get.elements.toList)
-      .map{_.map{i: JsValue => i.convertTo[Map[String, String]]}}
+      .map {
+        _.map { i: JsValue => i.convertTo[Map[String, String]] }
+      }
 
     val processUserSecondaryServer: Future[List[Map[String, String]]] = userSecondaryServerQueryResult
       .map(_.get.elements.toList)
-      .map{_.map{i: JsValue => i.convertTo[Map[String, String]]}}
+      .map {
+        _.map { i: JsValue => i.convertTo[Map[String, String]] }
+      }
 
-    val result = for(x1 <- processUserMainServer; x2 <- processUserSecondaryServer)yield{x1 ++ x2}
+    val result = for (x1 <- processUserMainServer; x2 <- processUserSecondaryServer) yield {
+      x1 ++ x2
+    }
 
-    val resultFuture = result.map{
+    val resultFuture = result.map {
       case l@(hd :: tail) => {
         println(s"l: ${l.toString}")
-        val result = l.map(i => PolicyServerOriginatingUserReply(i.filterKeys(Set("pName","uId").contains))).toJson
+        val result = l.map(i => PolicyServerOriginatingUserReply(i.filterKeys(Set("pName", "uId").contains))).toJson
         sendResponse(200, result.toString, Some(result.toString))
       }
       case Nil => {
         sendResponse(400, "No result", None)
       }
 
-//      case x =>
-//        val message = Some(s"Found ${if (x.isEmpty) "no" else "multiple"} Principal nodes with a username for the process(es) communicating with that netflow: $x")
-//        println(s"Policy 2 Result for requestId: $requestId is: ERROR with message: $message")
-//        returnPolicyResult(500, message, responseUri)
-//        500 -> message
+      //      case x =>
+      //        val message = Some(s"Found ${if (x.isEmpty) "no" else "multiple"} Principal nodes with a username for the process(es) communicating with that netflow: $x")
+      //        println(s"Policy 2 Result for requestId: $requestId is: ERROR with message: $message")
+      //        returnPolicyResult(500, message, responseUri)
+      //        500 -> message
     }.recover {
       case e: Throwable =>
         val message = Some(s"An error occurred during the processing of the request: ${e.getMessage}")
@@ -1231,14 +1249,15 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       result.mapTo[Future[Try[JsArray]]].flatMap(identity).map(_.getOrElse(JsArray.empty))
     }
 
-    def jsArrayToList(nodesJsArray: Future[JsArray]): Future[List[String]] = {
-      nodesJsArray.map(_.elements.toList.map((i: JsValue) => i.toString().replaceAll("\"", "")))
+    def jsArrayToList(nodesJsArray   : Future[JsArray]): Future[List[String]] = {
+      nodesJsArray.map(_.elements.toList.map((i                                : JsValue) => i.toString().replaceAll("\"", "")))
     }
 
-    def getNodeIdsFromQuery(query: String): Future[List[Int]] = {
+    def getNodeIdsFromQuery(query        : String): Future[List[Int]] = {
       jsArrayToList(sendQueryAndTypeResultAsJsonArray(query)).map(_.map(_.replace("v", "").replace("[", "").replace("]", "").toInt))
     }
-    def getStringsFromQuery(query: String): Future[List[String]] = {
+
+    def getStringsFromQuery(query     : String): Future[List[String]] = {
       jsArrayToList(sendQueryAndTypeResultAsJsonArray(query))
     }
 
@@ -1278,10 +1297,10 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       getNodeIdsFromQuery(query)
     }
 
-    def filesAffected(processNodeIds:List[Int]) = {
+    def filesAffected(processNodeIds: List[Int]) = {
       val secondToNanosecond = 1000000000
       val deltaSeconds = 10
-      val t1 = timestampSeconds*secondToNanosecond
+      val t1 = timestampSeconds * secondToNanosecond
       val t2 = (timestampSeconds + deltaSeconds) * secondToNanosecond
 
       val query =
@@ -1294,44 +1313,44 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       getStringsFromQuery(query)
     }
 
-    def otherHostConnectionsFromNetflow (netflowNodeIds: List[Int])= {
+    def otherHostConnectionsFromNetflow(netflowNodeIds: List[Int]) = {
       val query =
-      s"""g.V(${netflowNodeIds.mkString(",")})
-         |.in('predicateObject', 'predicateObject2').out('subject').hasLabel('AdmSubject').dedup()
-         |.in('subject').hasLabel('AdmEvent').out('predicateObject', 'predicateObject2').hasLabel('AdmNetFlowObject').dedup()
-         |.as('start').out('localPort').in('remotePort').as('portother').out('localPort').in('remotePort').as('portend')
-         |.where('start', eq('portend')).out('localAddress').in('remoteAddress').as('addyother').out('localAddress').in('remoteAddress').as('addyend')
-         |.where('start', eq('addyend')).where('portother', eq('addyother')).select('portother').dedup()
+        s"""g.V(${netflowNodeIds.mkString(",")})
+           |.in('predicateObject', 'predicateObject2').out('subject').hasLabel('AdmSubject').dedup()
+           |.in('subject').hasLabel('AdmEvent').out('predicateObject', 'predicateObject2').hasLabel('AdmNetFlowObject').dedup()
+           |.as('start').out('localPort').in('remotePort').as('portother').out('localPort').in('remotePort').as('portend')
+           |.where('start', eq('portend')).out('localAddress').in('remoteAddress').as('addyother').out('localAddress').in('remoteAddress').as('addyend')
+           |.where('start', eq('addyend')).where('portother', eq('addyother')).select('portother').dedup()
        """.stripMargin
 
       println(s"Query: $query")
       getNodeIdsFromQuery(query)
     }
 
-    def associatedNetflows(processIds:List[Int]) = {
+    def associatedNetflows(processIds: List[Int]) = {
       // Get all netflows associated with the process of the netflow in question.
       val query =
         s"""g.V(${processIds.mkString(",")})
-         |.in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').hasLabel('AdmNetFlowObject').dedup()
+           |.in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').hasLabel('AdmNetFlowObject').dedup()
        """.stripMargin
 
       println(s"Query: $query")
       getNodeIdsFromQuery(query)
     }
 
-    val requestedHostprocesses = netFlows().flatMap{nFlowId => Future.sequence(nFlowId.map(getProcessWhichTriggeredNetflow))}.map(_.flatten)
-    val netflowsAssociatedWithHostprocesses = requestedHostprocesses.flatMap{pNodeIds => associatedNetflows(pNodeIds)}
+    val requestedHostprocesses = netFlows().flatMap { nFlowId => Future.sequence(nFlowId.map(getProcessWhichTriggeredNetflow)) }.map(_.flatten)
+    val netflowsAssociatedWithHostprocesses = requestedHostprocesses.flatMap { pNodeIds => associatedNetflows(pNodeIds) }
 
-    val otherHostprocessList = netflowsAssociatedWithHostprocesses.flatMap{nNodeIds => otherHostConnectionsFromNetflow(nNodeIds)}
-      .flatMap{nFlowId => Future.sequence(nFlowId.map(getProcessWhichTriggeredNetflow))}.map(_.flatten)
+    val otherHostprocessList = netflowsAssociatedWithHostprocesses.flatMap { nNodeIds => otherHostConnectionsFromNetflow(nNodeIds) }
+      .flatMap { nFlowId => Future.sequence(nFlowId.map(getProcessWhichTriggeredNetflow)) }.map(_.flatten)
 
-    val processList = for(hl1 <- requestedHostprocesses; hl2 <- otherHostprocessList)yield hl1 ++ hl2
+    val processList = for (hl1 <- requestedHostprocesses; hl2 <- otherHostprocessList) yield hl1 ++ hl2
     val fileNames: Future[List[String]] = processList.flatMap(filesAffected)
 
-    val msgsFut = fileNames.flatMap{f =>
-      val result = f.map {fName: String =>
+    val msgsFut = fileNames.flatMap { f =>
+      val result = f.map { fName          : String =>
         checkFileOrigination(fName, responseUri: String, requestId: Int, dbActor: ActorRef)
-          .map{
+          .map {
             case (400, Some(msg)) => s"$fName <- $msg"
             case (200, _) => s"$fName <- localhost"
           }
@@ -1339,10 +1358,10 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       Future.sequence(result)
     }.map(_.mkString("\n"))
 
-    val resultFuture = msgsFut.map {msgs =>
+    val resultFuture = msgsFut.map { msgs =>
       returnPolicyResult(200, Some(msgs), responseUri)
       200 -> Some(msgs)
-    }.recover{
+    }.recover {
       case e: Throwable =>
         val result = 500
         val msg = Some(s"An error occurred during the processing of the request: ${e.getMessage}")
@@ -1353,171 +1372,127 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
     policyRequests = policyRequests + (requestId -> resultFuture)
   }
-//  def answerPolicyServerCommunication(clientIp: String, clientPort: Int, serverIp: String, serverPort: Int, timestampSeconds: Long, responseUri: String, requestId: Int, dbActor: ActorRef)
-//    (implicit timeout: Timeout, ec: ExecutionContext, system: ActorSystem, materializer: Materializer): Unit = {
-//    // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/TA2API_CommunicationQuery
-//
-//    val secondToNanosecond = 1000000000
-//    val t1 = timestampSeconds*secondToNanosecond
-//    val t2 = (timestampSeconds + 20) * secondToNanosecond
-//    //.hasLabel('AdmEvent').has('earliestTimestampNanos',gte($t1)).has('earliestTimestampNanos',lte($t2))
-//    //todo: add parent process and add netflows on other hosts
-//    val associatedProcesses = {
-//      // Get all netflows associated with the process of the netflow in question.
-//      s"""g.V().hasLabel('AdmNetFlowObject')
-//         |.has('remoteAddress',regex('(::ffff:|)$clientIp')).has('remotePort',$clientPort)
-//         |.has('localAddress',regex('(::ffff:|)$serverIp')).has('localPort',$serverPort)
-//         |.in('predicateObject','predicateObject2')
-//         |.out('subject').dedup()
-//       """.stripMargin('|')
-//    }
-//
-//    def processName(processId:String) = s"""g.V($processId).out('cmdLine','(cmdLine)','exec').values('path').dedup()"""
-//
-//    def associatedNetflows(processId:String) = {
-//      // Get all netflows associated with the process of the netflow in question.
-//      s"""g.V($processId)
-//         |.in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').hasLabel('AdmNetFlowObject').dedup()
-//         |.values('remoteAddress')
-//       """.stripMargin('|')
-//    }
-////      .as('remoteAddress')
-////    .values('remotePort').as('remotePort')
-////    .values('localAddress').as('localAddress')
-////    .values('localPort').as('localPort')
-////    .select('localAddress', 'localPort', 'remoteAddress', 'remotePort')
-//    println(s"Query: $associatedProcesses")
-//    val allProcessFut: Future[List[String]] = (dbActor ? NodeQuery(associatedProcesses, shouldReturnJson = false)).mapTo[Future[Try[Stream[String]]]].flatMap(identity).map(_.get.toList)
-//      .map{_.map{_.mkString(",").replace("v]","").replace("]","")}}
-//
-//    def legendFut = allProcessFut.map{allProcess => Future.sequence{allProcess.map{p =>
-//      (dbActor ? NodeQuery(processName(p), shouldReturnJson = false)).mapTo[Future[Try[Stream[String]]]].flatMap(identity).map(_.get.toList).map(v => p-> v)}}}.flatMap(identity)
-//
-//    def allNetflowsFut = allProcessFut.map{allProcess => Future.sequence{allProcess.map{p =>
-//      (dbActor ? NodeQuery(associatedNetflows(p), shouldReturnJson = false)).mapTo[Future[Try[Stream[String]]]].flatMap(identity).map(_.get.toList).map(v => p-> v)}}}.flatMap(identity)
-//
-//    allProcessFut.map{i => println(i)}
-//    legendFut.map{println}
-//    allNetflowsFut.map{println}
-//
-//    val message: Future[String] = for{allNetflows <- allNetflowsFut; legend <- legendFut} yield allNetflows.toString + "Legend" + legend.toString
-//    //val message = Future.successful("")
-//
-//    val resultFuture: Future[(Int, Option[String])] = message.map { message =>
-//      val msg = Some(message)
-//      val result = 200
-//      println(s"Policy 2 Result for requestId: $requestId is: $result with message: $msg")
-//      returnPolicyResult(result, msg, responseUri) // should allow
-//      result -> msg
-//
-//    }.recover {
-//      case e: Throwable =>
-//        val result = 500
-//        val msg = Some(s"An error occurred during the processing of the request: ${e.getMessage}")
-//        println(s"Policy 2 Result for requestId: $requestId is: $result with message: $msg")
-//        returnPolicyResult(result, msg, responseUri)
-//        result -> msg
-//    }
-//    policyRequests = policyRequests + (requestId -> resultFuture)
-//  }
-def answerPolicyServerCommunication(clientIp: String, clientPort: Int, serverIp: String, serverPort: Int, timestampSeconds: Long, responseUri: String, requestId: Int, dbActor: ActorRef)
-  (implicit timeout: Timeout, ec: ExecutionContext, system: ActorSystem, materializer: Materializer): Unit = {
-  // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/TA2API_CommunicationQuery
 
-  val secondToNanosecond = 1000000000
-  val t1 = timestampSeconds*secondToNanosecond
-  val t2 = (timestampSeconds + 20) * secondToNanosecond
-  //.hasLabel('AdmEvent').has('earliestTimestampNanos',gte($t1)).has('earliestTimestampNanos',lte($t2))
-  //todo: add netflows on other hosts
+  def answerPolicyServerCommunication(clientIp: String, clientPort: Int, serverIp: String, serverPort: Int, timestampSeconds: Long, responseUri: String, requestId: Int, dbActor: ActorRef)
+    (implicit timeout: Timeout, ec: ExecutionContext, system: ActorSystem, materializer: Materializer): Unit = {
+    // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/TA2API_CommunicationQuery
 
-
-  def sendQueryAndTypeResultAsJsonArray(query: String) = {
-    val result = dbActor ? StringQuery(query, shouldReturnJson = true)
-    result.mapTo[Future[Try[JsArray]]].flatMap(identity).map(_.getOrElse(JsArray.empty))
-  }
-
-  def jsArrayToIntArray(nodesJsArray: Future[JsArray]) = {
-    nodesJsArray.map(_.elements.toList.map(_.toString().replaceAll("\"", "").replace("v", "").replace("[", "").replace("]", "").toInt))
-  }
-
-  val maxN = 10
-  val associatedProcesses = {
-    // Get all netflows associated with the process of the netflow in question.
-    s"""g.V().hasLabel('AdmNetFlowObject')
-       |.has('remoteAddress',regex('(::ffff:|)$clientIp')).has('remotePort',$clientPort)
-       |.has('localAddress',regex('(::ffff:|)$serverIp')).has('localPort',$serverPort)
-       |.in('predicateObject','predicateObject2')
-       |.out('subject').dedup()
-       """.stripMargin('|')
-  }
-
-  val associatedProcessesAncestors = {
-    // Get all netflows associated with the process of the netflow in question.
-    s"""g.V().hasLabel('AdmNetFlowObject')
-       |.has('remoteAddress',regex('(::ffff:|)$clientIp')).has('remotePort',$clientPort)
-       |.has('localAddress',regex('(::ffff:|)$serverIp')).has('localPort',$serverPort)
-       |.in('predicateObject','predicateObject2')
-       |.out('subject').repeat(_.out('parentSubject')).times(${maxN}I).emit().dedup()
-       """.stripMargin('|')
-  }
-
-//  .repeat(_.out('parentSubject')).times(${maxN}I).emit().dedup()"""
-  def processName(processId:String) = s"""g.V($processId).out('cmdLine','(cmdLine)','exec').values('path').dedup()"""
-
-  def associatedNetflows(processId:String) = {
     val secondToNanosecond = 1000000000
-    val deltaSeconds = 60
-    val t1 = timestampSeconds*secondToNanosecond
-    val t2 = (timestampSeconds + deltaSeconds) * secondToNanosecond
-    // Get all netflows associated with the process of the netflow in question.
-
-    //todo: wrong timestamps?? Remove??
-    //.has('earliestTimestampNanos',gte($t1)).has('earliestTimestampNanos',lte($t2))
+    val t1 = timestampSeconds * secondToNanosecond
+    val t2 = (timestampSeconds + 20) * secondToNanosecond
+    //.hasLabel('AdmEvent').has('earliestTimestampNanos',gte($t1)).has('earliestTimestampNanos',lte($t2))
+    //todo: add netflows on other hosts
 
 
-    s"""g.V($processId)
-       |.in('subject').hasLabel('AdmEvent')
-       |.out('predicateObject','predicateObject2').hasLabel('AdmNetFlowObject').dedup()
-       |.values('remoteAddress').dedup()
+    def sendQueryAndTypeResultAsJsonArray(query: String) = {
+      val result = dbActor ? StringQuery(query, shouldReturnJson = true)
+      result.mapTo[Future[Try[JsArray]]].flatMap(identity).map(_.getOrElse(JsArray.empty))
+    }
+
+    def jsArrayToIntArray(nodesJsArray: Future[JsArray]) = {
+      nodesJsArray.map(_.elements.toList.map(_.toString().replaceAll("\"", "").replace("v", "").replace("[", "").replace("]", "").toInt))
+    }
+
+    val maxN = 10
+    val associatedProcesses = {
+      // Get all netflows associated with the process of the netflow in question.
+      s"""g.V().hasLabel('AdmNetFlowObject')
+         |.has('remoteAddress',regex('(::ffff:|)$clientIp')).has('remotePort',$clientPort)
+         |.has('localAddress',regex('(::ffff:|)$serverIp')).has('localPort',$serverPort)
+         |.in('predicateObject','predicateObject2')
+         |.out('subject').dedup()
        """.stripMargin('|')
-  }
+    }
 
-  println(s"Query: $associatedProcesses")
-  val allProcessFut: Future[List[Int]] = jsArrayToIntArray(sendQueryAndTypeResultAsJsonArray(associatedProcesses))
-  val allProcessAncestorsFut: Future[List[Int]] = jsArrayToIntArray(sendQueryAndTypeResultAsJsonArray(associatedProcessesAncestors))
+    val associatedProcessesAncestors = {
+      // Get all netflows associated with the process of the netflow in question.
+      s"""g.V().hasLabel('AdmNetFlowObject')
+         |.has('remoteAddress',regex('(::ffff:|)$clientIp')).has('remotePort',$clientPort)
+         |.has('localAddress',regex('(::ffff:|)$serverIp')).has('localPort',$serverPort)
+         |.in('predicateObject','predicateObject2')
+         |.out('subject').repeat(_.out('parentSubject')).times(${maxN}I).emit().dedup()
+       """.stripMargin('|')
+    }
 
-  val allP: Future[List[Int]] = allProcessFut.map{p => allProcessAncestorsFut.map{p ++ _}}.flatMap(identity)
+    //  .repeat(_.out('parentSubject')).times(${maxN}I).emit().dedup()"""
+    def processName(processId: String) =
+      s"""g.V($processId).out('cmdLine','(cmdLine)','exec').values('path').dedup()"""
 
-  def legendFut = allP.map{allProcess => Future.sequence{allProcess.map{p =>
-    (dbActor ? NodeQuery(processName(p.toString), shouldReturnJson = false)).mapTo[Future[Try[Stream[String]]]].flatMap(identity).map(_.get.toList).map(v => p-> v)}}}.flatMap(identity).map{_.toMap}
+    def associatedNetflows(processId: String) = {
+      val secondToNanosecond = 1000000000
+      val deltaSeconds = 60
+      val t1 = timestampSeconds * secondToNanosecond
+      val t2 = (timestampSeconds + deltaSeconds) * secondToNanosecond
+      // Get all netflows associated with the process of the netflow in question.
 
-  def allNetflowsFut = allP.map{allProcess => Future.sequence{allProcess.map{p =>
-    (dbActor ? NodeQuery(associatedNetflows(p.toString), shouldReturnJson = false)).mapTo[Future[Try[Stream[String]]]].flatMap(identity).map(_.get.toList).map(v => p-> v)}}}.flatMap(identity).map{_.toMap}
+      //todo: wrong timestamps?? Remove??
+      //.has('earliestTimestampNanos',gte($t1)).has('earliestTimestampNanos',lte($t2))
 
-  allP.map{i => println(i)}
-  legendFut.map{println}
-  allNetflowsFut.map{println}
 
-  val message: Future[String] = for{allNetflows <- allNetflowsFut; legend <- legendFut} yield allNetflows.toString + "\nLegend:\n" + legend.toString
-  //val message = Future.successful("")
+      s"""g.V($processId)
+         |.in('subject').hasLabel('AdmEvent')
+         |.out('predicateObject','predicateObject2').hasLabel('AdmNetFlowObject').dedup()
+         |.values('remoteAddress').dedup()
+       """.stripMargin('|')
+    }
 
-  val resultFuture: Future[(Int, Option[String])] = message.map { message =>
-    val msg = Some(message)
-    val result = 200
-    println(s"Policy 2 Result for requestId: $requestId is: $result with message: $msg")
-    returnPolicyResult(result, msg, responseUri) // should allow
-    result -> msg
+    println(s"Query: $associatedProcesses")
+    val allProcessFut: Future[List[Int]] = jsArrayToIntArray(sendQueryAndTypeResultAsJsonArray(associatedProcesses))
+    val allProcessAncestorsFut: Future[List[Int]] = jsArrayToIntArray(sendQueryAndTypeResultAsJsonArray(associatedProcessesAncestors))
 
-  }.recover {
-    case e: Throwable =>
-      val result = 500
-      val msg = Some(s"An error occurred during the processing of the request: ${e.getMessage}")
+    val allP: Future[List[Int]] = allProcessFut.map { p => allProcessAncestorsFut.map {
+      p ++ _
+    }
+    }.flatMap(identity)
+
+    def legendFut = allP.map { allProcess =>
+      Future.sequence {
+        allProcess.map { p =>
+          (dbActor ? NodeQuery(processName(p.toString), shouldReturnJson = false)).mapTo[Future[Try[Stream[String]]]].flatMap(identity).map(_.get.toList).map(v => p -> v)
+        }
+      }
+    }.flatMap(identity).map {
+      _.toMap
+    }
+
+    def allNetflowsFut = allP.map { allProcess =>
+      Future.sequence {
+        allProcess.map { p =>
+          (dbActor ? NodeQuery(associatedNetflows(p.toString), shouldReturnJson = false)).mapTo[Future[Try[Stream[String]]]].flatMap(identity).map(_.get.toList).map(v => p -> v)
+        }
+      }
+    }.flatMap(identity).map {
+      _.toMap
+    }
+
+    allP.map { i => println(i) }
+    legendFut.map {
+      println
+    }
+    allNetflowsFut.map {
+      println
+    }
+
+    val message: Future[String] = for {allNetflows <- allNetflowsFut; legend <- legendFut} yield allNetflows.toString + "\nLegend:\n" + legend.toString
+    //val message = Future.successful("")
+
+    val resultFuture: Future[(Int, Option[String])] = message.map { message =>
+      val msg = Some(message)
+      val result = 200
       println(s"Policy 2 Result for requestId: $requestId is: $result with message: $msg")
-      returnPolicyResult(result, msg, responseUri)
+      returnPolicyResult(result, msg, responseUri) // should allow
       result -> msg
+
+    }.recover {
+      case e: Throwable =>
+        val result = 500
+        val msg = Some(s"An error occurred during the processing of the request: ${e.getMessage}")
+        println(s"Policy 2 Result for requestId: $requestId is: $result with message: $msg")
+        returnPolicyResult(result, msg, responseUri)
+        result -> msg
+    }
+    policyRequests = policyRequests + (requestId -> resultFuture)
   }
-  policyRequests = policyRequests + (requestId -> resultFuture)
-}
 
   def returnPolicyResult(responseCode: Int, message: Option[String], responseUri: String)(implicit system: ActorSystem, materializer: Materializer): Future[HttpResponse] = {
     implicit val ec = system.dispatcher
