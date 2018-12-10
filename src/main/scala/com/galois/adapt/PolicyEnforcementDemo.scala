@@ -97,6 +97,16 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
           ValueName("ADAPT")
         )
       } ~
+      path("userInterfaceAction") {
+        parameters('clientIp.as(validIpAddress), 'clientPort.as[Int], 'serverIp.as(validIpAddress), 'serverPort.as[Int], 'timestamp.as[Long], 'requestId.as(validRequestId), 'responseUri.as(validUri)) {
+          (clientIp, clientPort, serverIp, serverPort, timestamp, requestId, responseUri) =>
+          complete {
+            println(s"Check Policy 3: $responseUri, $requestId")
+            answerPolicy3(clientIp, clientPort, serverIp, serverPort, timestamp, responseUri, requestId, dbActor)
+            StatusCodes.Accepted -> "Started the policy check process, will respond later"
+          }
+        }
+      } ~
       path("checkPolicy") {
         parameters('clientIp.as(validIpAddress), 'clientPort.as[Int], 'serverIp.as(validIpAddress), 'serverPort.as[Int], 'timestamp.as[Long], 'requestId.as(validRequestId), 'responseUri.as(validUri)) {
           (clientIp, clientPort, serverIp, serverPort, timestamp, requestId, responseUri) =>
@@ -114,6 +124,8 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
                 StatusCodes.Accepted -> "Started the policy check process, will respond later"
               }
             } ~
+            //new: http://128.55.12.72:8400/userInterfaceAction?clientIp=128.55.12.57&clientPort=54542&serverIp=128.55.12.83&serverPort=80&timestamp=1541698907&requestId=93&responseUri=http://128.55.12.83:8081/reply?requestId=93
+            //older: http://0.0.0.0:8080/checkPolicy?responseUri=http://0.0.0.0&policy=fileOriginationServer&clientIp=128.55.12.83&clientPort=46786&serverIp=128.55.12.105&serverPort=80&timestamp=1541459771&requestId=1
             parameters('policy ! 3, 'requestId.as(validRequestId), 'responseUri.as(validUri)) { (requestId, responseUri) =>
               complete {
                 println(s"Check Policy 3: $responseUri, $requestId")
@@ -961,7 +973,6 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
     policyRequests = policyRequests + (requestId -> resultFuture)
   }
-
   def checkFileOrigination(fileName: String, responseUri: String, requestId: Int, dbActor: ActorRef)(implicit system: ActorSystem, materializer: Materializer): Future[(RequestId, Some[String])] = {
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_NetData
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy4V1
