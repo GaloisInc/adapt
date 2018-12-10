@@ -102,9 +102,40 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
           (clientIp, clientPort, serverIp, serverPort, timestamp, requestId, responseUri) =>
           complete {
             println(s"Check Policy 3: $responseUri, $requestId")
+            println(s"Parameters: clientIp: $clientIp, clientPort: $clientPort, serverIp: $serverIp, serverPort: $serverPort, timestamp:$timestamp, responseUri:$responseUri, requestId:$requestId")
             answerPolicy3(clientIp, clientPort, serverIp, serverPort, timestamp, responseUri, requestId, dbActor)
             StatusCodes.Accepted -> "Started the policy check process, will respond later"
           }
+        }
+      } ~
+      path("filesReadAndOrigination") {
+        parameters('clientIp.as(validIpAddress), 'clientPort.as[Int], 'serverIp.as(validIpAddress), 'serverPort.as[Int], 'timestamp.as[Long], 'requestId.as(validRequestId), 'responseUri.as(validUri)) {
+          (clientIp, clientPort, serverIp, serverPort, timestamp, requestId, responseUri) =>
+            complete {
+              println(s"Check Policy filesReadAndOrigination: $responseUri, $requestId")
+              answerPolicyServerFileOrigination(clientIp, clientPort, serverIp, serverPort, timestamp, responseUri, requestId, dbActor)
+              StatusCodes.Accepted -> "Started the policy check process, will respond later"
+            }
+        }
+      } ~
+      path("remoteCommunication") {
+        parameters('clientIp.as(validIpAddress), 'clientPort.as[Int], 'serverIp.as(validIpAddress), 'serverPort.as[Int], 'timestamp.as[Long], 'requestId.as(validRequestId), 'responseUri.as(validUri)) {
+          (clientIp, clientPort, serverIp, serverPort, timestamp, requestId, responseUri) =>
+            complete {
+              println(s"Check Policy remoteCommunication: $responseUri, $requestId")
+              answerPolicyServerCommunication(clientIp, clientPort, serverIp, serverPort, timestamp, responseUri, requestId, dbActor)
+              StatusCodes.Accepted -> "Started the policy check process, will respond later"
+            }
+        }
+      } ~
+      path("originatingUser") {
+        parameters('clientIp.as(validIpAddress), 'clientPort.as[Int], 'serverIp.as(validIpAddress), 'serverPort.as[Int], 'timestamp.as[Long], 'requestId.as(validRequestId), 'responseUri.as(validUri)) {
+          (clientIp, clientPort, serverIp, serverPort, timestamp, requestId, responseUri) =>
+            complete {
+              println(s"Check Policy originatingUser: $responseUri, $requestId")
+              answerPolicyServerOriginatingUser(clientIp, clientPort, serverIp, serverPort, timestamp, responseUri, requestId, dbActor)
+              StatusCodes.Accepted -> "Started the policy check process, will respond later"
+            }
         }
       } ~
       path("checkPolicy") {
