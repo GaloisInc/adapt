@@ -22,6 +22,7 @@ import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Futu
 import scala.util.{Failure, Success, Try}
 import spray.json._
 import ApiJsonProtocol._
+import ammonite.ops.ln.s
 import ammonite.runtime.tools.tail
 
 import scala.collection.mutable.ListBuffer
@@ -795,6 +796,8 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
           case Failure(f) => Future.failed(f)
           case Success(a) => Future.successful(a)
         })
+//          .has('timestampNanos', lte($maxTimestampNanos))
+//      .has('timestampNanos', gte($minTimestampNanos))
 
       // Get PTN corresponding to netflows
       def startingTagIds: List[Long] = Await.result(flattenFutureTry[JsArray](
@@ -802,7 +805,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
           s"""g.V()
              |     .hasLabel('NetFlowObject')
              |     .has('localAddress', '$localAddress').has('remoteAddress', '$remoteAddress')
-             |     .has('localPort', $localPort)      .has('remotePort', $remotePort)
+             |     .has('localPort', $localPort).has('remotePort', $remotePort)
              |     .in('predicateObject')
              |     .hasLabel('Event').has('eventType',within(['EVENT_SENDTO','EVENT_WRITE']))
              |     .has('timestampNanos', lte($maxTimestampNanos))
@@ -855,6 +858,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       }
 
       Some(if (startingTagIds.isEmpty) {
+        println("startingTagIds isEmpty")
         Policy3Fail()
       } else if (findUiProvenance(20)) {
         Policy3Pass()
@@ -935,13 +939,19 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
         val messageOpt: Option[String] = Some("No UI provenance associated with the query parameters.")
         returnPolicyResult(result, messageOpt, responseUri)
         result -> messageOpt
+    }.recover {
+      case e: Throwable =>
+        val result = 500
+        val msg = Some(s"An error occurred during the processing of the request: ${e.getMessage}")
+        println(s"Policy 3 Result for requestId: $requestId is: $result with message: $msg")
+        returnPolicyResult(result, msg, responseUri)
+        result -> msg
     }
 
     policyRequests = policyRequests + (requestId -> resultFuture)
   }
 
-
-  def answerPolicy4(fileName: String, responseUri: String, requestId: Int, dbActor: ActorRef)(implicit system: ActorSystem, materializer: Materializer): Unit = {
+  def checkFileOrigination(fileName: String, responseUri: String, requestId: Int, dbActor: ActorRef)(implicit system: ActorSystem, materializer: Materializer) = {
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_NetData
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy4V1
     // TODO
@@ -952,14 +962,18 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
       implicit val _: Timeout = 10.minutes
 
+      println("===============================================")
+      println(fileName)
       val escapedPath = fileName
-      //        .replaceAll("\\", "\\\\")
+        .replaceAll("\\\\", "\\\\\\\\\\\\\\\\")
+//              .replaceAll("\\", "\\\\")
       //        .replaceAll("\b", "\\b")
       //        .replaceAll("\n", "\\n")
       //        .replaceAll("\t", "\\t")
       //        .replaceAll("\r", "\\r")
-      //        .replaceAll("\"", "\\\"")
+//              .replaceAll("\"", "\\\"")
 
+      println(escapedPath)
       // Pure utility
       def flattenFutureTry[A](futFutTry: Future[Future[Try[A]]]): Future[A] =
         futFutTry.flatMap(futTry => futTry.flatMap {
@@ -970,6 +984,8 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       def futQuery(query: String): Future[List[JsValue]] = flattenFutureTry[JsValue]((dbActor ? CypherQuery(query)).mapTo[Future[Try[JsValue]]])
         .map(arr => arr.asInstanceOf[JsArray].elements.toList)
 
+      val qq = s"""MATCH (f: AdmFileObject)-->(p: AdmPathNode) WHERE p.path =~ '.*${escapedPath}' RETURN ID(f)"""
+      println(qq)
       // Files possible corresponding to the given path
       val fileIdsFut: Future[List[Long]] = futQuery(s"""MATCH (f: AdmFileObject)-->(p: AdmPathNode) WHERE p.path =~ '.*${escapedPath}' RETURN ID(f)""")
         .map(arr => arr
@@ -1050,8 +1066,6 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
               }
             }
           }
-
-
         }
 
       fileIdsFut.flatMap((filesIds: List[Long]) => {
@@ -1066,20 +1080,28 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       })
     }
 
-    val resultFuture = alecsQuery(fileName).map {
+    alecsQuery(fileName).map {
       case Some(s) =>
         val result = 400
         println(s"Policy 4 Result for requestId: $requestId is: $result with message: $s")
-        returnPolicyResult(result, Some(s), responseUri)
-        result -> Some(s)
+        (result, Some(s))
       case None =>
         val result = 200
         val message = s"No network source data for the file: $fileName"
         println(s"Policy 4 Result for requestId: $requestId is: $result with message: $message")
-        returnPolicyResult(result, Some(message), responseUri)
-        result -> Some(message)
+        (result, Some(message))
     }
+  }
 
+  def answerPolicy4(fileName: String, responseUri: String, requestId: Int, dbActor: ActorRef)(implicit system: ActorSystem, materializer: Materializer): Unit = {
+    implicit val ec = system.dispatcher
+
+    val resultFuture: Future[(RequestId, Some[String])] = checkFileOrigination(fileName, responseUri, requestId, dbActor)
+      .map{
+      case (result, msgOpt) =>
+        returnPolicyResult(result, msgOpt, responseUri)
+        result -> msgOpt
+    }
     policyRequests = policyRequests + (requestId -> resultFuture)
   }
 
@@ -1200,130 +1222,133 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
   def answerPolicyServerFileOrigination(clientIp: String, clientPort: Int, serverIp: String, serverPort: Int, timestampSeconds: Long, responseUri: String, requestId: Int, dbActor: ActorRef)(implicit system: ActorSystem, materializer: Materializer): Unit = {
 
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/TA2API_FilesRead
-
     implicit val ec = system.dispatcher
+    import scala.concurrent.duration._
+    implicit val timeout: Timeout = 10.minutes
 
-    val netFlow = s"""MATCH (n:AdmNetFlowObject) WHERE n.localAddress = "$serverIp" AND n.localPort=$serverPort AND n.remoteAddress="$clientIp" AND n.remotePort=$clientPort RETURN n"""
-    val fileName = ""
-
-    def alecsQuery(fileName: String): Future[Option[String]] = {
-      import scala.concurrent.duration._
-
-      implicit val _: Timeout = 10.minutes
-
-      val escapedPath = fileName
-
-      // Pure utility
-      def flattenFutureTry[A](futFutTry: Future[Future[Try[A]]]): Future[A] =
-        futFutTry.flatMap(futTry => futTry.flatMap {
-          case Failure(f) => Future.failed(f)
-          case Success(a) => Future.successful(a)
-        })
-
-      def futQuery(query: String): Future[List[JsValue]] = flattenFutureTry[JsValue]((dbActor ? CypherQuery(query)).mapTo[Future[Try[JsValue]]])
-        .map(arr => arr.asInstanceOf[JsArray].elements.toList)
-
-      // Files possible corresponding to the given path
-      val fileIdsFut: Future[List[Long]] = futQuery(s"""MATCH (f: AdmFileObject)-->(p: AdmPathNode) WHERE p.path =~ '.*${escapedPath}' RETURN ID(f)""")
-        .map(arr => arr
-          .flatMap(obj => obj.asJsObject.getFields("ID(f)"))
-          .map(num => num.asInstanceOf[JsNumber].value.longValue())
-        )
-
-      type ID = Long
-      type TimestampNanos = Long
-
-
-      // I want to have a loop over the monad `Future[_]`. That's not possible with a regular `while`, so the loop is a
-      // recursive function.
-      def loop(toVisit: collection.mutable.Queue[(ID, TimestampNanos)], visited: collection.mutable.Set[ID]): Future[Option[String]] =
-        if (toVisit.isEmpty) {
-          Future.successful(None)
-        } else {
-          val (id: ID, time: TimestampNanos) = toVisit.dequeue()
-
-          val checkEnd = s"MATCH (n: AdmNetFlowObject) WHERE ID(n) = $id RETURN n.remoteAddress, n.remotePort"
-          futQuery(checkEnd).flatMap { netflows =>
-            if (netflows.nonEmpty) {
-
-              val address = netflows.head.asJsObject.getFields("n.remoteAddress").head.toString
-              val port = netflows.head.asJsObject.getFields("n.remotePort").head.toString
-
-              Future.successful(Some(address + ":" + port))
-            } else {
-              //  OR e.eventType = "EVENT_CREATE_OBJECT"
-              val stepWrite =
-                s"""MATCH (o1)<-[:predicateObject]-(e: AdmEvent)-[:subject]->(o2)
-                   |WHERE (e.eventType = "EVENT_WRITE" OR e.eventType = "EVENT_SENDTO" OR e.eventType = "EVENT_SENDMSG") AND ID(o1) = $id AND e.earliestTimestampNanos <= $time
-                   |RETURN ID(o2), e.latestTimestampNanos
-                   |""".stripMargin('|')
-
-              val stepRead =
-                s"""MATCH (o1)<-[:subject]-(e: AdmEvent)-[:predicateObject]->(o2)
-                   |WHERE (e.eventType = "EVENT_READ" OR e.eventType = "EVENT_RECV" OR e.eventType = "EVENT_RECVMSG") AND ID(o1) = $id AND e.earliestTimestampNanos <= $time
-                   |RETURN ID(o2), e.latestTimestampNanos
-                   |""".stripMargin('|')
-
-              val stepRename =
-                s"""MATCH (o1)<-[:predicateObject|predicateObject2]-(e: AdmEvent)-[:predicateObject|predicateObject2]->(o2)
-                   |WHERE e.eventType = "EVENT_RENAME" AND ID(o1) = $id AND ID(o1) <> ID(o2) AND e.earliestTimestampNanos <= $time
-                   |RETURN ID(o2), e.latestTimestampNanos
-                   |""".stripMargin('|')
-
-              val stepParent =
-                s"""MATCH (o1)-[:parentSubject]->(o2)
-                   |WHERE ID(o1) = $id
-                   |RETURN ID(o2)
-                   |""".stripMargin('|')
-
-              val foundFut: Future[List[(ID, TimestampNanos)]] = for {
-                writes <- futQuery(stepWrite)
-                reads <- futQuery(stepRead)
-                rename <- futQuery(stepRename)
-                parent <- futQuery(stepParent)
-              } yield (writes ++ reads ++ rename ++ parent).map(obj => {
-                val id = obj.asJsObject.getFields("ID(o2)").head.asInstanceOf[JsNumber].value.longValue()
-                val timestamp = obj.asJsObject.getFields("e.latestTimestampNanos").headOption.map(_.asInstanceOf[JsNumber].value.longValue())
-                  .getOrElse(time)
-                (id, timestamp)
-              })
-
-              foundFut.flatMap { found =>
-                toVisit ++= found.filter { case (id, _) => !visited.contains(id) }
-                visited ++= found.map(_._1)
-
-                loop(toVisit, visited)
-              }
-            }
-          }
-
-
-        }
-
-      fileIdsFut.flatMap((filesIds: List[Long]) => {
-        // toVisit = the IDs of node which could have contributed to the file being sent out
-        val toVisit: scala.collection.mutable.Queue[(ID, TimestampNanos)] = collection.mutable.Queue.empty
-        val visited: scala.collection.mutable.Set[ID] = scala.collection.mutable.Set.empty
-
-        toVisit ++= filesIds.map(id => (id, Long.MaxValue))
-        visited ++= filesIds
-
-        loop(toVisit, visited)
-      })
+    def sendQueryAndTypeResultAsJsonArray(query: String) = {
+      val result = dbActor ? StringQuery(query, shouldReturnJson = true)
+      result.mapTo[Future[Try[JsArray]]].flatMap(identity).map(_.getOrElse(JsArray.empty))
     }
 
-    val resultFuture = alecsQuery(fileName).map {
-      case Some(s) =>
-        val result = 400
-        println(s"Policy 4 Result for requestId: $requestId is: $result with message: $s")
-        returnPolicyResult(result, Some(s), responseUri)
-        result -> Some(s)
-      case None =>
-        val result = 200
-        val message = s"No network source data for the file: $fileName"
-        println(s"Policy 4 Result for requestId: $requestId is: $result with message: $message")
-        returnPolicyResult(result, Some(message), responseUri)
-        result -> Some(message)
+    def jsArrayToList(nodesJsArray: Future[JsArray]): Future[List[String]] = {
+      nodesJsArray.map(_.elements.toList.map((i: JsValue) => i.toString().replaceAll("\"", "")))
+    }
+
+    def getNodeIdsFromQuery(query: String): Future[List[Int]] = {
+      jsArrayToList(sendQueryAndTypeResultAsJsonArray(query)).map(_.map(_.replace("v", "").replace("[", "").replace("]", "").toInt))
+    }
+    def getStringsFromQuery(query: String): Future[List[String]] = {
+      jsArrayToList(sendQueryAndTypeResultAsJsonArray(query))
+    }
+
+    def getProcessWhichTriggeredNetflow(netflowNodeId: Int) = {
+      //4 different request lead to 4 different cases
+      //case 1: netflow <- predicateObject2- EVENT_ADD_OBJECT_ATTRIBUTE -predicateObject ->  FILE_OBJECT_UNIX_SOCKET <-predicateObject-EVENT(recv/send)-subjsect->AdmSubject
+      //case 2: netflow <- predicateObject2- EVENT_ADD_OBJECT_ATTRIBUTE -predicateObject ->  Netflow with Local None:None and same remote<-predicateObject->EVENT(write/connect)-subjsect->AdmSubject
+      //case 3: netflow <- predicateObject2- EVENT_ADD_OBJECT_ATTRIBUTE -predicateObject ->  FILE_OBJECT_UNIX_SOCKET <-predicateObject-EVENT(recv/send/close)-subjsect->AdmSubject
+      //case 4: netflow <-predicateObject-EVENT(close/recv)-subject->AdmSubject
+
+      val netflowQuery = s"g.V($netflowNodeId)"
+      val update = ".in('predicateObject2').hasLabel('AdmEvent').has('eventType','EVENT_ADD_OBJECT_ATTRIBUTE').out('predicateObject')"
+      val unixSocket = ".hasLabel('AdmFileObject').has('fileObjectType','FILE_OBJECT_UNIX_SOCKET')"
+      val netflow = ".hasLabel('AdmNetFlowObject')"
+      val getProcess = ".in('predicateObject').hasLabel('AdmEvent').out('subject').hasLabel('AdmSubject').dedup()"
+
+      val q1 = netflowQuery + update + unixSocket + getProcess
+      val q2 = netflowQuery + update + netflow + getProcess
+      val q3 = netflowQuery + getProcess
+
+      val queries = List(q1, q2, q3)
+      queries.foreach(println)
+
+      val queryResFuture: List[Future[List[Int]]] = queries.map(getNodeIdsFromQuery)
+      val res = Future.sequence(queryResFuture)
+      res.foreach(p => println(s"process found: $p"))
+      res.map(_.flatten.distinct)
+    }
+
+    def netFlows() = {
+      val query =
+        s"""g.V().hasLabel('AdmNetFlowObject')
+           |.has('remoteAddress','$clientIp').has('remotePort',$clientPort)
+           |.has('localAddress','$serverIp').has('localPort',$serverPort)
+           |""".stripMargin
+      print(s"Query: $query")
+      getNodeIdsFromQuery(query)
+    }
+
+    def filesAffected(processNodeIds:List[Int]) = {
+      val secondToNanosecond = 1000000000
+      val deltaSeconds = 10
+      val t1 = timestampSeconds*secondToNanosecond
+      val t2 = (timestampSeconds + deltaSeconds) * secondToNanosecond
+
+      val query =
+        s"""g.V(${processNodeIds.mkString(",")}).in('subject').hasLabel('AdmEvent')
+           |.has('earliestTimestampNanos',gte($t1)).has('earliestTimestampNanos',lte($t2))
+           |.out('predicateObject','predicateObject2').hasLabel('AdmFileObject').as('file')
+           |.out('path','(path)').hasLabel('AdmPathNode').values('path').as('fileNames').select('fileNames').dedup()
+           |""".stripMargin
+      print(s"Query: $query")
+      getStringsFromQuery(query)
+    }
+
+    def otherHostConnectionsFromNetflow (netflowNodeIds: List[Int])= {
+      val query =
+      s"""g.V(${netflowNodeIds.mkString(",")})
+         |.in('predicateObject', 'predicateObject2').out('subject').hasLabel('AdmSubject').dedup()
+         |.in('subject').hasLabel('AdmEvent').out('predicateObject', 'predicateObject2').hasLabel('AdmNetFlowObject').dedup()
+         |.as('start').out('localPort').in('remotePort').as('portother').out('localPort').in('remotePort').as('portend')
+         |.where('start', eq('portend')).out('localAddress').in('remoteAddress').as('addyother').out('localAddress').in('remoteAddress').as('addyend')
+         |.where('start', eq('addyend')).where('portother', eq('addyother')).select('portother').dedup()
+       """.stripMargin
+
+      println(s"Query: $query")
+      getNodeIdsFromQuery(query)
+    }
+
+    def associatedNetflows(processIds:List[Int]) = {
+      // Get all netflows associated with the process of the netflow in question.
+      val query =
+        s"""g.V(${processIds.mkString(",")})
+         |.in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').hasLabel('AdmNetFlowObject').dedup()
+       """.stripMargin
+
+      println(s"Query: $query")
+      getNodeIdsFromQuery(query)
+    }
+
+    val requestedHostprocesses = netFlows().flatMap{nFlowId => Future.sequence(nFlowId.map(getProcessWhichTriggeredNetflow))}.map(_.flatten)
+    val netflowsAssociatedWithHostprocesses = requestedHostprocesses.flatMap{pNodeIds => associatedNetflows(pNodeIds)}
+
+    val otherHostprocessList = netflowsAssociatedWithHostprocesses.flatMap{nNodeIds => otherHostConnectionsFromNetflow(nNodeIds)}
+      .flatMap{nFlowId => Future.sequence(nFlowId.map(getProcessWhichTriggeredNetflow))}.map(_.flatten)
+
+    val processList = for(hl1 <- requestedHostprocesses; hl2 <- otherHostprocessList)yield hl1 ++ hl2
+    val fileNames: Future[List[String]] = processList.flatMap(filesAffected)
+
+    val msgsFut = fileNames.flatMap{f =>
+      val result = f.map {fName: String =>
+        checkFileOrigination(fName, responseUri: String, requestId: Int, dbActor: ActorRef)
+          .map{
+            case (400, Some(msg)) => s"$fName <- $msg"
+            case (200, _) => s"$fName <- localhost"
+          }
+      }
+      Future.sequence(result)
+    }.map(_.mkString("\n"))
+
+    val resultFuture = msgsFut.map {msgs =>
+      returnPolicyResult(200, Some(msgs), responseUri)
+      200 -> Some(msgs)
+    }.recover{
+      case e: Throwable =>
+        val result = 500
+        val msg = Some(s"An error occurred during the processing of the request: ${e.getMessage}")
+        println(s"Policy fileOrigination Result for requestId: $requestId is: $result with message: $msg")
+        returnPolicyResult(result, msg, responseUri)
+        result -> msg
     }
 
     policyRequests = policyRequests + (requestId -> resultFuture)
@@ -1403,8 +1428,7 @@ def answerPolicyServerCommunication(clientIp: String, clientPort: Int, serverIp:
   val t1 = timestampSeconds*secondToNanosecond
   val t2 = (timestampSeconds + 20) * secondToNanosecond
   //.hasLabel('AdmEvent').has('earliestTimestampNanos',gte($t1)).has('earliestTimestampNanos',lte($t2))
-  //todo: add parent process and add netflows on other hosts
-
+  //todo: add netflows on other hosts
 
 
   def sendQueryAndTypeResultAsJsonArray(query: String) = {
@@ -1441,17 +1465,23 @@ def answerPolicyServerCommunication(clientIp: String, clientPort: Int, serverIp:
   def processName(processId:String) = s"""g.V($processId).out('cmdLine','(cmdLine)','exec').values('path').dedup()"""
 
   def associatedNetflows(processId:String) = {
+    val secondToNanosecond = 1000000000
+    val deltaSeconds = 60
+    val t1 = timestampSeconds*secondToNanosecond
+    val t2 = (timestampSeconds + deltaSeconds) * secondToNanosecond
     // Get all netflows associated with the process of the netflow in question.
+
+    //todo: wrong timestamps?? Remove??
+    //.has('earliestTimestampNanos',gte($t1)).has('earliestTimestampNanos',lte($t2))
+
+
     s"""g.V($processId)
-       |.in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').hasLabel('AdmNetFlowObject').dedup()
+       |.in('subject').hasLabel('AdmEvent')
+       |.out('predicateObject','predicateObject2').hasLabel('AdmNetFlowObject').dedup()
        |.values('remoteAddress').dedup()
        """.stripMargin('|')
   }
-  //      .as('remoteAddress')
-  //    .values('remotePort').as('remotePort')
-  //    .values('localAddress').as('localAddress')
-  //    .values('localPort').as('localPort')
-  //    .select('localAddress', 'localPort', 'remoteAddress', 'remotePort')
+
   println(s"Query: $associatedProcesses")
   val allProcessFut: Future[List[Int]] = jsArrayToIntArray(sendQueryAndTypeResultAsJsonArray(associatedProcesses))
   val allProcessAncestorsFut: Future[List[Int]] = jsArrayToIntArray(sendQueryAndTypeResultAsJsonArray(associatedProcessesAncestors))
