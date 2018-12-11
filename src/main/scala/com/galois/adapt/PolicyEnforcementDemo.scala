@@ -89,7 +89,6 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     }
   }
 
-
   def route(dbActor: ActorRef)(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer, timeout: Timeout) = {
     get {
       path("ping") {
@@ -112,7 +111,8 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
         parameters('clientIp.as(validIpAddress), 'clientPort.as[Int], 'serverIp.as(validIpAddress), 'serverPort.as[Int], 'timestamp.as[Long], 'requestId.as(validRequestId), 'responseUri.as(validUri)) {
           (clientIp, clientPort, serverIp, serverPort, timestamp, requestId, responseUri) =>
             complete {
-              println(s"Check Policy filesReadAndOrigination: $responseUri, $requestId")
+              println(s"Check Policy filesReadAndOrigination")
+              println(s"Parameters: client: $clientIp:$clientPort, server: $serverIp:$serverPort, timestamp:$timestamp, responseUri:$responseUri, requestId:$requestId")
               answerPolicyServerFileOrigination(clientIp, clientPort, serverIp, serverPort, timestamp, responseUri, requestId, dbActor)
               StatusCodes.Accepted -> "Started the policy check process, will respond later"
             }
@@ -122,7 +122,8 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
         parameters('clientIp.as(validIpAddress), 'clientPort.as[Int], 'serverIp.as(validIpAddress), 'serverPort.as[Int], 'timestamp.as[Long], 'requestId.as(validRequestId), 'responseUri.as(validUri)) {
           (clientIp, clientPort, serverIp, serverPort, timestamp, requestId, responseUri) =>
             complete {
-              println(s"Check Policy remoteCommunication: $responseUri, $requestId")
+              println(s"Check Policy remoteCommunication")
+              println(s"Parameters: client: $clientIp:$clientPort, server: $serverIp:$serverPort, timestamp:$timestamp, responseUri:$responseUri, requestId:$requestId")
               answerPolicyServerCommunication(clientIp, clientPort, serverIp, serverPort, timestamp, responseUri, requestId, dbActor)
               StatusCodes.Accepted -> "Started the policy check process, will respond later"
             }
@@ -132,7 +133,8 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
         parameters('clientIp.as(validIpAddress), 'clientPort.as[Int], 'serverIp.as(validIpAddress), 'serverPort.as[Int], 'timestamp.as[Long], 'requestId.as(validRequestId), 'responseUri.as(validUri)) {
           (clientIp, clientPort, serverIp, serverPort, timestamp, requestId, responseUri) =>
             complete {
-              println(s"Check Policy originatingUser: $responseUri, $requestId")
+              println(s"Check Policy originatingUser")
+              println(s"Parameters: client: $clientIp:$clientPort, server: $serverIp:$serverPort, timestamp:$timestamp, responseUri:$responseUri, requestId:$requestId")
               answerPolicyServerOriginatingUser(clientIp, clientPort, serverIp, serverPort, timestamp, responseUri, requestId, dbActor)
               StatusCodes.Accepted -> "Started the policy check process, will respond later"
             }
@@ -223,6 +225,12 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     }
   }
 
+  def timeInterval(timestampSeconds:Long, deltaSeconds:Long): (Long, Long) = {
+    val secondToNanosecond = 1000000000L
+    val t1 = timestampSeconds * secondToNanosecond
+    val t2 = (timestampSeconds + deltaSeconds) * secondToNanosecond
+    (t1,t2)
+  }
 
   def answerPolicy1(permissionType: String, permissionList: Seq[String], serverIp: String, serverPort: Int, clientIp: String, clientPort: Int, responseUri: String, requestId: Int, dbActor: ActorRef)
     (implicit timeout: Timeout, ec: ExecutionContext, system: ActorSystem, materializer: Materializer): Unit = {
@@ -843,7 +851,8 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       // Make this interval bigger?
       val maxTimestampNanos = (timestampSeconds + 8) * 1000000000
       val minTimestampNanos = (timestampSeconds - 2) * 1000000000
-
+      //req: 1544476345 000000000
+      //dat: 1544476550 772000000
       // These utility functions Alec wrote are great!
       def flattenFutureTry[A](futFutTry: Future[Future[Try[A]]]): Future[A] =
         futFutTry.flatMap(futTry => futTry.flatMap {
@@ -1004,6 +1013,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
     policyRequests = policyRequests + (requestId -> resultFuture)
   }
+  
   def checkFileOrigination(fileName: String, responseUri: String, requestId: Int, dbActor: ActorRef)(implicit system: ActorSystem, materializer: Materializer): Future[(RequestId, Some[String])] = {
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_NetData
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy4V1
@@ -1073,31 +1083,31 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
                 s"""MATCH (o1)<-[:predicateObject]-(e: AdmEvent)-[:subject]->(o2)
                    |WHERE (e.eventType = "EVENT_WRITE" OR e.eventType = "EVENT_SENDTO" OR e.eventType = "EVENT_SENDMSG") AND ID(o1) = $id AND e.earliestTimestampNanos <= $time
                    |RETURN ID(o2), e.latestTimestampNanos
-                   |""".stripMargin('|')
+                   |""".stripMargin.replaceAll("\n","")
 
               val stepRead =
                 s"""MATCH (o1)<-[:subject]-(e: AdmEvent)-[:predicateObject]->(o2)
                    |WHERE (e.eventType = "EVENT_READ" OR e.eventType = "EVENT_RECV" OR e.eventType = "EVENT_RECVMSG") AND ID(o1) = $id AND e.earliestTimestampNanos <= $time
                    |RETURN ID(o2), e.latestTimestampNanos
-                   |""".stripMargin('|')
+                   |""".stripMargin.replaceAll("\n","")
 
               val stepRename =
                 s"""MATCH (o1)<-[:predicateObject|predicateObject2]-(e: AdmEvent)-[:predicateObject|predicateObject2]->(o2)
                    |WHERE e.eventType = "EVENT_RENAME" AND ID(o1) = $id AND ID(o1) <> ID(o2) AND e.earliestTimestampNanos <= $time
                    |RETURN ID(o2), e.latestTimestampNanos
-                   |""".stripMargin('|')
+                   |""".stripMargin.replaceAll("\n","")
 
               val stepParent =
                 s"""MATCH (o1)-[:parentSubject]->(o2)
                    |WHERE ID(o1) = $id
                    |RETURN ID(o2)
-                   |""".stripMargin('|')
+                   |""".stripMargin.replaceAll("\n","")
 
               val stepOpen =
                 s"""MATCH (o1)<-[:predicateObject]-(e: AdmEvent)-[:subject]->(o2)
                    |WHERE (e.eventType = "EVENT_OPEN") AND ID(o1) = $id AND e.earliestTimestampNanos <= $time
                    |RETURN ID(o2), e.latestTimestampNanos
-                   |""".stripMargin('|')
+                   |""".stripMargin.replaceAll("\n","")
 
               val foundFut: Future[List[(ID, TimestampNanos)]] = for {
                 writes <- futQuery(stepWrite)
@@ -1177,66 +1187,68 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     //    {"users":{"apache2":"admin","mysql":"admin"},
     //      "extra":"optional place to store any extra explanation information"}
 
-    def sendQueryAndTypeResultAsJsonIntArray(query: String) = {
-      val result = dbActor ? StringQuery(query, shouldReturnJson = true)
-      result.mapTo[Future[Try[JsArray]]].flatMap(identity).map(_.getOrElse(JsArray.empty))
-        .map(_.elements.toList.map(_.toString().replaceAll("\"", "").replace("v", "").replace("[", "").replace("]", "").toInt))
-    }
-
     val queryNetflow =
-      s"""g.V().hasLabel('AdmNetFlowObject').has('remoteAddress','$clientIp').has('remotePort',$clientPort)
-         |.has('localAddress','$serverIp').has('localPort',$serverPort)
-       """.stripMargin
+        s"""g.V().hasLabel('AdmNetFlowObject').has('remoteAddress','$clientIp').has('remotePort',$clientPort)
+           |.has('localAddress','$serverIp').has('localPort',$serverPort)
+       """.stripMargin.replaceAll("\n","")
 
     //todo: translate to cypher and add gIds,username, hostName
-    //    val originatingUserFromNetflow =
-    //    s""".in('predicateObject','predicateObject2').out('subject').dedup().as('pId')
-    //       |.out('cmdLine','(cmdLine)','exec').values('path').as('pName')
-    //       |.select('pId').out('localPrincipal').as('p')
-    //       |.values('userId').as('uId').select('p').values('groupIds').as('gIds')
-    //       |.select('pId', 'pName','uId','gIds')
-    //     """.stripMargin//.replaceAll("\n", "")
     val originatingProcessAndUserFromNetflow =
-    s""".in('predicateObject','predicateObject2').out('subject').dedup().as('pId')
-       |.out('cmdLine','(cmdLine)','exec').values('path').as('pName')
-       |.select('pId').out('localPrincipal').as('p')
-       |.values('userId').as('uId').select('p')
-       |.select('pId', 'pName','uId')
-     """.stripMargin
+    s""".in('predicateObject','predicateObject2').out('subject').dedup().as('processId')
+       |.out('cmdLine','(cmdLine)','exec').values('path').as('processPath')
+       |.select('processId').out('localPrincipal').as('p')
+       |.values('userId').as('userId').select('p')
+       |.select('processId', 'processPath','userId')
+     """.stripMargin.replaceAll("\n","")
 
-    def getAncestorProcessUserDetails(pId: Int) = {
-      val maxN = 10
-      s"""g.V($pId).out('subject').repeat(_.out('parentSubject')).times(${maxN}I).emit().dedup().as('pId')
-         |.out('cmdLine','(cmdLine)','exec').values('path').as('pName')
-         |.select('pId').out('localPrincipal').as('p')
-         |.values('userId').as('uId').select('p')
-         |.select('pId', 'pName','uId')
-     """.stripMargin
-    }
+//    def ancestorProcessUserDetailsQuery = {
+//      val maxN = 10
+//      s""".in('predicateObject','predicateObject2').out('subject').dedup()
+//         |.repeat(_.out('parentSubject')).times(${maxN}I).emit().dedup().as('processId')
+//         |.out('cmdLine','(cmdLine)','exec').values('path').as('processPath')
+//         |.select('processId').out('localPrincipal').as('p')
+//         |.values('userId').as('userId').select('p')
+//         |.select('processId', 'processPath','userId')
+//     """.stripMargin.replaceAll("\n","")
+//    }
+
+    val (t1,t2) = timeInterval(timestampSeconds, 60)
 
     val otherHostConnectionsFromNetflow =
       s""".in('predicateObject', 'predicateObject2').out('subject').hasLabel('AdmSubject').dedup()
-         |.in('subject').hasLabel('AdmEvent').out('predicateObject', 'predicateObject2').hasLabel('AdmNetFlowObject').dedup()
+         |.in('subject').hasLabel('AdmEvent')
+         |.has('earliestTimestampNanos',gte($t1)).has('earliestTimestampNanos',lte($t2))
+         |.out('predicateObject', 'predicateObject2').hasLabel('AdmNetFlowObject').dedup()
          |.as('start').out('localPort').in('remotePort').as('portother').out('localPort').in('remotePort').as('portend')
          |.where('start', eq('portend')).out('localAddress').in('remoteAddress').as('addyother').out('localAddress').in('remoteAddress').as('addyend')
          |.where('start', eq('addyend')).where('portother', eq('addyother')).select('portother').dedup()
-       """.stripMargin
-
+       """.stripMargin.replaceAll("\n","")
     def sendResponse(responseCode: Int, result: String, msg: Option[String]) = {
       println(s"Policy 1 Result for requestId: $requestId is: $result with message: $msg")
       returnPolicyResult(responseCode, msg, responseUri)
       responseCode -> msg
     }
 
-    println(s"querying: $queryNetflow")
-    val nflowMainServerQueryResult = (dbActor ? StringQuery(queryNetflow, shouldReturnJson = true)).mapTo[Future[Try[JsArray]]].flatMap(identity)
-    println(s"querying: $queryNetflow$otherHostConnectionsFromNetflow")
-    val nflowSecondaryServerQueryResult = (dbActor ? StringQuery(queryNetflow + otherHostConnectionsFromNetflow, shouldReturnJson = true)).mapTo[Future[Try[JsArray]]].flatMap(identity)
+//    println(s"Query: $queryNetflow")
+//    val nflowMainServerQueryResult = (dbActor ? StringQuery(queryNetflow, shouldReturnJson = true)).mapTo[Future[Try[JsArray]]].flatMap(identity)
+//    println(s"Query: $queryNetflow()$otherHostConnectionsFromNetflow")
+//    val nflowSecondaryServerQueryResult = (dbActor ? StringQuery(queryNetflow + otherHostConnectionsFromNetflow, shouldReturnJson = true)).mapTo[Future[Try[JsArray]]].flatMap(identity)
 
-    println(s"querying: $queryNetflow$originatingProcessAndUserFromNetflow")
-    val userMainServerQueryResult = (dbActor ? StringQuery(queryNetflow + originatingProcessAndUserFromNetflow, shouldReturnJson = true)).mapTo[Future[Try[JsArray]]].flatMap(identity)
-    println(s"querying: $queryNetflow$otherHostConnectionsFromNetflow$originatingProcessAndUserFromNetflow")
-    val userSecondaryServerQueryResult = (dbActor ? StringQuery(queryNetflow + otherHostConnectionsFromNetflow + originatingProcessAndUserFromNetflow, shouldReturnJson = true)).mapTo[Future[Try[JsArray]]].flatMap(identity)
+    val nFlowsFut: Future[List[JsValue]] = (dbActor ? StringQuery(queryNetflow, shouldReturnJson = true)).mapTo[Future[Try[JsArray]]].flatMap(identity).map(_.get.elements.toList)
+    nFlowsFut.map{nFlows =>
+      if(nFlows.isEmpty)
+        println("No netflow found")
+      else
+        println(s"Netflows found:$nFlows")
+    }
+
+    val userMainServerQuery = queryNetflow + originatingProcessAndUserFromNetflow
+    println(s"Query: $userMainServerQuery")
+    val userMainServerQueryResult = (dbActor ? StringQuery(userMainServerQuery, shouldReturnJson = true)).mapTo[Future[Try[JsArray]]].flatMap(identity)
+
+    val userSecondaryServerQuery = queryNetflow + otherHostConnectionsFromNetflow + originatingProcessAndUserFromNetflow
+    println(s"Query: $userSecondaryServerQuery")
+    val userSecondaryServerQueryResult = (dbActor ? StringQuery(userSecondaryServerQuery, shouldReturnJson = true)).mapTo[Future[Try[JsArray]]].flatMap(identity)
 
     val processUserMainServer = userMainServerQueryResult
       .map(_.get.elements.toList)
@@ -1257,12 +1269,10 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     val resultFuture = result.map {
       case l@(hd :: tail) => {
         println(s"l: ${l.toString}")
-        val result = l.map(i => PolicyServerOriginatingUserReply(i.filterKeys(Set("pName", "uId").contains))).toJson
+        val result = l.map(i => PolicyServerOriginatingUserReply(i.filterKeys(Set("processPath", "userId").contains))).toJson
         sendResponse(200, result.toString, Some(result.toString))
       }
-      case Nil => {
-        sendResponse(400, "No result", None)
-      }
+      case Nil => sendResponse(400, "No processes involved in the request.", None)
 
       //      case x =>
       //        val message = Some(s"Found ${if (x.isEmpty) "no" else "multiple"} Principal nodes with a username for the process(es) communicating with that netflow: $x")
@@ -1292,7 +1302,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     }
 
     def jsArrayToList(nodesJsArray   : Future[JsArray]): Future[List[String]] = {
-      nodesJsArray.map(_.elements.toList.map((i                                : JsValue) => i.toString().replaceAll("\"", "")))
+      nodesJsArray.map(_.elements.toList.map((i: JsValue) => i.toString().replaceAll("\"", "")))
     }
 
     def getNodeIdsFromQuery(query        : String): Future[List[Int]] = {
@@ -1321,7 +1331,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       val q3 = netflowQuery + getProcess
 
       val queries = List(q1, q2, q3)
-      queries.foreach(println)
+      queries.foreach(q => println(s"Queries: $q"))
 
       val queryResFuture: List[Future[List[Int]]] = queries.map(getNodeIdsFromQuery)
       val res = Future.sequence(queryResFuture)
@@ -1334,23 +1344,20 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
         s"""g.V().hasLabel('AdmNetFlowObject')
            |.has('remoteAddress','$clientIp').has('remotePort',$clientPort)
            |.has('localAddress','$serverIp').has('localPort',$serverPort)
-           |""".stripMargin
+           |""".stripMargin.replaceAll("\n","")
       print(s"Query: $query")
       getNodeIdsFromQuery(query)
     }
 
     def filesAffected(processNodeIds: List[Int]) = {
-      val secondToNanosecond = 1000000000
-      val deltaSeconds = 10
-      val t1 = timestampSeconds * secondToNanosecond
-      val t2 = (timestampSeconds + deltaSeconds) * secondToNanosecond
+      val (t1,t2) = timeInterval(timestampSeconds-10, 20) // [t-20,t+20]
 
       val query =
         s"""g.V(${processNodeIds.mkString(",")}).in('subject').hasLabel('AdmEvent')
            |.has('earliestTimestampNanos',gte($t1)).has('earliestTimestampNanos',lte($t2))
            |.out('predicateObject','predicateObject2').hasLabel('AdmFileObject').as('file')
            |.out('path','(path)').hasLabel('AdmPathNode').values('path').as('fileNames').select('fileNames').dedup()
-           |""".stripMargin
+           |""".stripMargin.replaceAll("\n","")
       print(s"Query: $query")
       getStringsFromQuery(query)
     }
@@ -1363,8 +1370,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
            |.as('start').out('localPort').in('remotePort').as('portother').out('localPort').in('remotePort').as('portend')
            |.where('start', eq('portend')).out('localAddress').in('remoteAddress').as('addyother').out('localAddress').in('remoteAddress').as('addyend')
            |.where('start', eq('addyend')).where('portother', eq('addyother')).select('portother').dedup()
-       """.stripMargin
-
+       """.stripMargin.replaceAll("\n","")
       println(s"Query: $query")
       getNodeIdsFromQuery(query)
     }
@@ -1374,8 +1380,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       val query =
         s"""g.V(${processIds.mkString(",")})
            |.in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').hasLabel('AdmNetFlowObject').dedup()
-       """.stripMargin
-
+       """.stripMargin.replaceAll("\n","")
       println(s"Query: $query")
       getNodeIdsFromQuery(query)
     }
@@ -1419,12 +1424,10 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     (implicit timeout: Timeout, ec: ExecutionContext, system: ActorSystem, materializer: Materializer): Unit = {
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/TA2API_CommunicationQuery
 
-    val secondToNanosecond = 1000000000
-    val t1 = timestampSeconds * secondToNanosecond
-    val t2 = (timestampSeconds + 20) * secondToNanosecond
+    val (t1,t2) = timeInterval(timestampSeconds-60, 120) // [t-60,t+60]
+
     //.hasLabel('AdmEvent').has('earliestTimestampNanos',gte($t1)).has('earliestTimestampNanos',lte($t2))
     //todo: add netflows on other hosts
-
 
     def sendQueryAndTypeResultAsJsonArray(query: String) = {
       val result = dbActor ? StringQuery(query, shouldReturnJson = true)
@@ -1443,7 +1446,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
          |.has('localAddress',regex('(::ffff:|)$serverIp')).has('localPort',$serverPort)
          |.in('predicateObject','predicateObject2')
          |.out('subject').dedup()
-       """.stripMargin('|')
+       """.stripMargin.replaceAll("\n","")
     }
 
     val associatedProcessesAncestors = {
@@ -1453,7 +1456,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
          |.has('localAddress',regex('(::ffff:|)$serverIp')).has('localPort',$serverPort)
          |.in('predicateObject','predicateObject2')
          |.out('subject').repeat(_.out('parentSubject')).times(${maxN}I).emit().dedup()
-       """.stripMargin('|')
+       """.stripMargin.replaceAll("\n","")
     }
 
     //  .repeat(_.out('parentSubject')).times(${maxN}I).emit().dedup()"""
@@ -1461,25 +1464,23 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       s"""g.V($processId).out('cmdLine','(cmdLine)','exec').values('path').dedup()"""
 
     def associatedNetflows(processId: String) = {
-      val secondToNanosecond = 1000000000
-      val deltaSeconds = 60
-      val t1 = timestampSeconds * secondToNanosecond
-      val t2 = (timestampSeconds + deltaSeconds) * secondToNanosecond
       // Get all netflows associated with the process of the netflow in question.
-
       //todo: wrong timestamps?? Remove??
       //.has('earliestTimestampNanos',gte($t1)).has('earliestTimestampNanos',lte($t2))
-
-
+      val query =
       s"""g.V($processId)
          |.in('subject').hasLabel('AdmEvent')
+         |.has('earliestTimestampNanos',gte($t1)).has('earliestTimestampNanos',lte($t2))
          |.out('predicateObject','predicateObject2').hasLabel('AdmNetFlowObject').dedup()
          |.values('remoteAddress').dedup()
-       """.stripMargin('|')
+       """.stripMargin.replaceAll("\n","")
+      println(s"Query: $query")
+      query
     }
 
     println(s"Query: $associatedProcesses")
     val allProcessFut: Future[List[Int]] = jsArrayToIntArray(sendQueryAndTypeResultAsJsonArray(associatedProcesses))
+    println(s"Query: $associatedProcessesAncestors")
     val allProcessAncestorsFut: Future[List[Int]] = jsArrayToIntArray(sendQueryAndTypeResultAsJsonArray(associatedProcessesAncestors))
 
     val allP: Future[List[Int]] = allProcessFut.map { p => allProcessAncestorsFut.map {
@@ -1507,15 +1508,17 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
       _.toMap
     }
 
-    allP.map { i => println(i) }
-    legendFut.map {
-      println
-    }
-    allNetflowsFut.map {
-      println
-    }
+    allP.map ( i => println(s"All processes: $i") )
+    legendFut.map (i => println(s"Legend:\n$i"))
+    allNetflowsFut.map (i => println(s"All Netflows: $i"))
 
-    val message: Future[String] = for {allNetflows <- allNetflowsFut; legend <- legendFut} yield allNetflows.toString + "\nLegend:\n" + legend.toString
+    val message: Future[String] = for {allNetflows <- allNetflowsFut; legend <- legendFut} //yield allNetflows.toString + "\nLegend:\n" + legend.toString
+      yield{
+        legend.foldLeft(allNetflows.toString) {
+          case (str, (key, value)) => str.replaceAll(key.toString, value.toString)
+        }
+      }
+      //yield legend.toString  allNetflows.toString
     //val message = Future.successful("")
 
     val resultFuture: Future[(Int, Option[String])] = message.map { message =>
