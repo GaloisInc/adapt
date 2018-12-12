@@ -31,7 +31,6 @@ lazy val adapt = (project in file(".")).settings(
     "com.typesafe.akka" %% "akka-stream" % akkaV,
 
     "com.rrwright" %% "quine" % "0.1-SNAPSHOT",
-    "com.rrwright" %% "quine-scala-pickling" % "0.1-SNAPSHOT",
 
     "com.typesafe.akka" %% "akka-stream-kafka" % "0.22",
     "org.scala-lang.modules" %% "scala-parser-combinators" % "1.1.1",
@@ -43,8 +42,6 @@ lazy val adapt = (project in file(".")).settings(
     "org.neo4j" % "neo4j-tinkerpop-api-impl" % "0.7-3.2.3" exclude("org.neo4j", "neo4j-enterprise"),
     "org.apache.tinkerpop" % "neo4j-gremlin" % neoV,
     "org.apache.tinkerpop" % "tinkergraph-gremlin" % neoV,
-
-
 
 //  , "com.bbn" % "tc-avro" % "1.0-SNAPSHOT"
     "commons-io" % "commons-io" % "2.6",

@@ -26,10 +26,6 @@ import scala.language.postfixOps
 import scala.util.{Failure, Random, Success, Try}
 import sys.process._
 import com.rrwright.quine.runtime._
-import scala.pickling.PicklerUnpickler
-
-import scala.pickling.static._  // Static serialization without reflection
-import scala.pickling.shareNothing._  // Disables cyclic object graphs
 
 import AdaptConfig._
 import com.galois.adapt.PpmFlowComponents.CompletedESO

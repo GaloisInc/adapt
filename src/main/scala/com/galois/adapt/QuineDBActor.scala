@@ -50,180 +50,41 @@ class QuineDBActor(graphService: GraphService, idx: Int) extends DBQueryProxyAct
 
   implicit val timeout = Timeout(21 seconds)
 
-  override def DBNodeableTx(cdms: Seq[DBNodeable[_]]): Try[Unit] = ???
+  def DBNodeableTx(cdms: Seq[DBNodeable[_]]): Try[Unit] = ??? 
+  
+  // TODO Make an async interface for this - the 'Await' is gross.
   def AdmTx(adms: Seq[Either[ADM,EdgeAdm2Adm]]): Try[Unit] = Try(Await.result(
     Future.sequence(adms.map {
-     //   case Left(anAdm: ADM) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-        case Left(anAdm: AdmEvent) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-        case Left(anAdm: AdmSubject) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-        case Left(anAdm: AdmPrincipal) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-        case Left(anAdm: AdmFileObject) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-        case Left(anAdm: AdmNetFlowObject) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-        case Left(anAdm: AdmPathNode) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-        case Left(anAdm: AdmPort) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-        case Left(anAdm: AdmAddress) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-        case Left(anAdm: AdmSrcSinkObject) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-        case Left(anAdm: AdmProvenanceTagNode) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-        case Left(anAdm: AdmHost) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-        case Left(anAdm: AdmSynthesized) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-        case Right(EdgeAdm2Adm(src, label, tgt)) => graphService.dumbOps.addEdge(src, tgt, label)
+      case Left(a: ADM) => writeAdm(a)
+      case Right(e: EdgeAdm2Adm) => writeAdmEdge(e) 
     }),
     Duration.Inf
-  )).map(_ => ())
+  ))
+
+  def writeAdm(a: ADM): Future[Unit] = (a match {
+    case anAdm: AdmEvent => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmSubject => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmPrincipal => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmFileObject => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmNetFlowObject => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmPathNode => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmPort => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmAddress => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmSrcSinkObject => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmProvenanceTagNode => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmHost => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmSynthesized => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case _ => throw new Exception("Unexpected ADM")
+  }).flatMap {
+    case Success(s) => Future.successful(s)
+    case Failure(f) => Future.failed(f)
+  }
+
+  def writeAdmEdge(e: EdgeAdm2Adm): Future[Unit] = graphService.dumbOps.addEdge(e.src, e.tgt, e.label)
 
   def FutureTx[T](body: => T)(implicit ec: ExecutionContext): Future[T] = Future(body)
 
   override def receive = {
-/*
-    case cdm: Event =>
-      val s = sender()
-      val now = System.currentTimeMillis
-      cdm.create(Some(cdm.getUuid)).onComplete {
-        case Failure(ex) => ex.printStackTrace(); s ! Ack
-        case Success(_) =>
-
-          // Mutations over time:
-          val doneF = cdm.eventType match {
-            case EVENT_CLOSE =>
-              // FileObject: Maybe delete events with same subject and preceding sequence numbers until you get to an EVENT_OPEN
-              // SrcSinkObject: Maybe delete events with same subject and preceding sequence numbers (there is no EVENT_OPEN) Should delete the SrcSink?
-              // NetFlowObject: Delete Node and events (with same subject?) to the the NetFlow.  (Close is essentially like UNLINK.)
-
-//              val objectUuid: QuineId = cdm.predicateObject.get.target
-//              val b = branchOf[FileObject]()
-//              val fileObjectBranch: DomainGraphBranch = b.identifyRoot(objectUuid).refine(
-//                'predicateObject <-- branchOf[Event]().refine( 'subjectUuid --> cdm.subjectUuid.target )
-//              )
-//              val f = graph.deleteFromBranch(fileObjectBranch).flatMap[Unit]{ x =>
-//                val fileObjectIds = x.foldLeft(Set.empty[QuineId])((a,b) => a ++ b.allIds)
-//                if (fileObjectIds.nonEmpty) Future.successful( log.info(s"Deleted ${fileObjectIds.size} nodes from a FileObject's EVENT_CLOSE: $objectUuid") )
-//                else {
-//                  val srcSinkBranch: DomainGraphBranch = branchOf[SrcSinkObject]().identifyRoot(objectUuid).refine(
-//                    'predicateObject <-- branchOf[Event]().refine('subjectUuid --> cdm.subjectUuid.target)
-//                  )
-//                  graph.deleteFromBranch(srcSinkBranch).flatMap[Unit]{ x =>
-//                    val srcSinkIds = x.foldLeft(Set.empty[QuineId])((a,b) => a ++ b.allIds)
-//                    if (srcSinkIds.nonEmpty) Future.successful( log.info(s"Deleted ${srcSinkIds.size} nodes from a SrcSinkObject's EVENT_CLOSE: $objectUuid") )
-//                    else {
-//                      val netFlowBranch: DomainGraphBranch = branchOf[NetFlowObject]().identifyRoot(objectUuid).refine(
-//                        'predicateObject <-- branchOf[Event]().refine('subjectUuid --> cdm.subjectUuid.target)
-//                      )
-//                      graph.deleteFromBranch(netFlowBranch).map[Unit] { x =>
-//                        val netFlowIds = x.foldLeft(Set.empty[QuineId])((a, b) => a ++ b.allIds)
-//                        if (netFlowIds.nonEmpty) log.info(s"Deleted ${netFlowIds.size} nodes from a NetFlowObject's EVENT_CLOSE: $objectUuid")
-//                        else log.warning(s"Zero deleted from an EVENT_CLOSE after trying all three kinds")
-//                      }
-//                    }
-//                  }
-//                }
-//              }
-
-//              val branch = DomainGraphBranch.empty.identifyRoot(objectUuid).refine(
-//                'predicateObject <-- branchOf[Event]().refine('subjectUuid --> cdm.subjectUuid.target)
-//              )
-//              graph.deleteFromBranch(branch).map { x =>
-//                val ids = x.foldLeft(Set.empty[QuineId])((a, b) => a ++ b.allIds)
-//                log.info(s"Deleted ${ids.size} nodes from an EVENT_CLOSE: $objectUuid")
-//              }
-              Future.successful(())
-
-//            case EVENT_UNLINK =>
-//              // A file is deleted. The file node and all its events should be deleted.
-//              val objectId: QuineId = cdm.predicateObject.get.target
-//              val branch = branchOf[FileObject]().identifyRoot(objectId).refine( 'predicateObject <-- branchOf[Event]() )
-//              graph.deleteFromBranch(branch).flatMap { x =>
-//                val ids = x.foldLeft(Set.empty[QuineId])((a,b) => a ++ b.allIds)
-//                log.info(s"Deleted ${ids.size} nodes from EVENT_UNLINK after time: $now")
-////                if (ids.size == 0) log.warning(s"Zero deleted from 'predicateObject on EVENT_UNLINK ${cdm.getUuid}")
-//                graph.dumbOps.deleteNode(objectId)
-//              }
-//
-//            case EVENT_EXIT =>
-//              // A process exits. The process node and all its events should be deleted.
-//              val objectId: QuineId = cdm.predicateObject.get.target
-//              val branch = branchOf[Subject]().identifyRoot(objectId).refine( 'subjectUuid <-- branchOf[Event]() )
-//              graph.deleteFromBranch(branch).map { x =>
-//                val size = x.foldLeft(0)((a,b) => a + b.allIds.size)
-//                if (size > 0) log.info(s"Deleted $size nodes from EVENT_EXIT 'subjectUuid after time: $now")
-////                  if (size == 0) log.warning(s"Zero deleted from 'subjectUuid on EVENT_EXIT ${cdm.getUuid}")
-//              }
-
-  //        case EVENT_RENAME => // A file is renamed. Nothing to do here. There is only one predicate edge in Cadets data.
-            case _ => Future.successful(())
-          }
-        doneF.ackOnComplete(s)
-      }
-//      Event types in the Cadets Bovia CDM data:
-//        [
-//          "EVENT_READ",
-//          "EVENT_SENDTO",
-//          "EVENT_RECVFROM",
-//          "EVENT_OPEN",
-//          "EVENT_MMAP",
-//          "EVENT_CLOSE",
-//          "EVENT_LSEEK",
-//          "EVENT_FCNTL",
-//          "EVENT_WRITE",
-//          "EVENT_EXIT",
-//          "EVENT_RENAME",
-//          "EVENT_SIGNAL",
-//          "EVENT_FORK",
-//          "EVENT_CREATE_OBJECT",
-//          "EVENT_OTHER",
-//          "EVENT_MPROTECT",
-//          "EVENT_MODIFY_PROCESS",
-//          "EVENT_CHANGE_PRINCIPAL",
-//          "EVENT_CONNECT",
-//          "EVENT_ACCEPT",
-//          "EVENT_LOGIN",
-//          "EVENT_EXECUTE",
-//          "EVENT_UNLINK",
-//          "EVENT_MODIFY_FILE_ATTRIBUTES",
-//          "EVENT_SENDMSG",
-//          "EVENT_RECVMSG",
-//          "EVENT_LINK",
-//          "EVENT_BIND"
-//        ]
-
-    case cdm: Principal =>
-      val s = sender()
-      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
-
-    case cdm: FileObject =>
-      val s = sender()
-      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
-
-    case cdm: Subject =>
-      val s = sender()
-      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
-
-    case cdm: NetFlowObject =>
-      val s = sender()
-      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
-
-    case cdm: MemoryObject =>
-      val s = sender()
-      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
-
-    case cdm: ProvenanceTagNode =>
-      val s = sender()
-      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
-
-    case cdm: RegistryKeyObject =>
-      val s = sender()
-      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
-
-    case cdm: SrcSinkObject =>
-      val s = sender()
-      cdm.create(Some(cdm.getUuid)).ackOnComplete(s)
-
-    case cdm: TimeMarker =>  // Don't care about these.
-      sender() ! Ack
-
-    case cdm: CDM17 =>
-      log.info(s"Unhandled CDM: $cdm")
-      sender() ! Ack
-*/
 
     case InitMsg => sender() ! Ack
 
@@ -238,26 +99,6 @@ class QuineDBActor(graphService: GraphService, idx: Int) extends DBQueryProxyAct
 
   }
 }
-
-
-case class EventLookup(
-  uuid: UUID,
-//  sequence: Long = 0,
-//  eventType: EventType,
-//  threadId: Int,
-//  subjectUuid: -->[UUID],
-//  timestampNanos: Long,
-//  predicateObject: Option[-->[UUID]] = None,
-  predicateObjectPath: Option[String]
-//  predicateObject2: Option[-->[UUID]] = None,
-//  predicateObject2Path: Option[String] = None,
-//  name: Option[String] = None,
-//  parameters: Option[List[Value]] = None,
-//  location: Option[Long] = None,
-//  size: Option[Long] = None,
-//  programPoint: Option[String] = None,
-//  properties: Option[Map[String,String]] = None
-) extends NoConstantsDomainNode
 
 
 
