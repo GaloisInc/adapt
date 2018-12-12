@@ -13,6 +13,10 @@ import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
 import scala.language.implicitConversions
 
+import com.rrwright.quine.language._
+import shapeless._
+import shapeless.record.Record
+
 // TODO: convert `toMap` to use Shapeless. It is _begging_ to be done with shapeless
 package object adm {
 
@@ -119,7 +123,7 @@ package object adm {
    *   - throwing out some structure that we don't know how to use
    *   - performing entity resolution
    */
-  sealed trait ADM extends DBWritable with Product {
+  sealed trait ADM extends DBWritable with Product with DomainNode {
     val uuid: AdmUUID                  // The current UUID
     val originalCdmUuids: Seq[CdmUUID] // The UUIDs of all the CDM nodes that were merged to produce this node
 
@@ -154,7 +158,7 @@ package object adm {
 
     hostName: HostName,
     provider: String
-  ) extends ADM with DBWritable {
+  ) extends ADM with DBWritable with DomainNode {
 
     def getHostName: Option[HostName] = Some(hostName)
 
@@ -175,7 +179,10 @@ package object adm {
       "latestTimestampNanos" -> latestTimestampNanos,
       "provider" -> provider
     )
+
+    val nodeConstants = AdmEvent
   }
+  object AdmEvent extends NodeConstants(Record(type_of = "AdmEvent"))
 
 
   /* Compared to 'cdm.Subject', the following are omitted
@@ -195,7 +202,7 @@ package object adm {
 
     hostName: HostName,
     provider: String
-  ) extends ADM with DBWritable {
+  ) extends ADM with DBWritable with DomainNode {
 
     def getHostName: Option[HostName] = Some(hostName)
 
@@ -217,12 +224,15 @@ package object adm {
       "startTimestampNanos" -> startTimestampNanos,
       "provider" -> provider
     )
+
+    val nodeConstants = AdmSubject
   }
+  object AdmSubject extends NodeConstants(Record(type_of = "AdmSubject"))
 
   case class AdmPathNode(
      path: String,
      provider: String
-   ) extends ADM with DBWritable {
+   ) extends ADM with DBWritable with DomainNode {
     val uuid = AdmUUID(DeterministicUUID(path), provider)
     val originalCdmUuids: Seq[CdmUUID] = Nil
 
@@ -240,9 +250,11 @@ package object adm {
       "path"-> path,
       "provider" -> provider
     )
+
+    val nodeConstants = AdmPathNode
   }
 
-  case object AdmPathNode {
+  case object AdmPathNode extends NodeConstants(Record(type_of = "AdmPathNode")) {
     def normalized(path: String, provider: String, isWindows: Boolean): Option[AdmPathNode] = {
 
       var pathFixed: String = path.trim
@@ -378,7 +390,7 @@ package object adm {
 
      hostName: HostName,
      provider: String
-  ) extends ADM with DBWritable {
+  ) extends ADM with DBWritable with DomainNode {
 
     val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
 
@@ -400,7 +412,10 @@ package object adm {
       "provider" -> provider,
       "hostName" -> hostName
     )
+
+    val nodeConstants = AdmFileObject
   }
+  object AdmFileObject extends NodeConstants(Record(type_of = "AdmFileObject"))
 
   /* Compared to 'cdm.NetFlowObject' this leaves out
    *
@@ -418,7 +433,7 @@ package object adm {
     remotePort: Option[Int],
 
     provider: String
-  ) extends ADM with DBWritable {
+  ) extends ADM with DBWritable with DomainNode {
 
     val uuid = AdmUUID(DeterministicUUID(localAddress.toString + localPort.toString + remoteAddress.toString + remotePort.toString), provider)
 
@@ -442,12 +457,15 @@ package object adm {
       "remotePort" -> remotePort,
       "provider" -> provider
     )
+
+    val nodeConstants = AdmNetFlowObject
   }
+  object AdmNetFlowObject extends NodeConstants(Record(type_of = "AdmNetFlowObject"))
 
   // Represents a local and/or remote address of netflows
   final case class AdmAddress(
     address: String
-  ) extends ADM with DBWritable {
+  ) extends ADM with DBWritable with DomainNode {
 
     val uuid = AdmUUID(DeterministicUUID(address), "")
     override val originalCdmUuids: Seq[CdmUUID] = List.empty
@@ -464,12 +482,15 @@ package object adm {
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
       "address" -> address
     )
+
+    val nodeConstants = AdmAddress
   }
+  object AdmAddress extends NodeConstants(Record(type_of = "AdmAddress"))
 
   // Represents a local and/or remote port of netflows
   final case class AdmPort(
     port: Int
-  ) extends ADM with DBWritable {
+  ) extends ADM with DBWritable with DomainNode {
 
     val uuid = AdmUUID(DeterministicUUID(port.toString), "")
     override val originalCdmUuids: Seq[CdmUUID] = List.empty
@@ -486,7 +507,10 @@ package object adm {
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";"),
       "port" -> port
     )
+
+    val nodeConstants = AdmPort
   }
+  object AdmPort extends NodeConstants(Record(type_of = "AdmPort"))
 
   /* Compared to 'cdm.SrcSinkObject' this leaves out
    *
@@ -499,7 +523,7 @@ package object adm {
 
     hostName: String,
     provider: String
-  ) extends ADM with DBWritable {
+  ) extends ADM with DBWritable with DomainNode {
 
     val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
 
@@ -519,7 +543,10 @@ package object adm {
       "provider" -> provider,
       "hostName" -> hostName
     )
+
+    val nodeConstants = AdmSrcSinkObject
   }
+  object AdmSrcSinkObject extends NodeConstants(Record(type_of = "AdmSrcSinkObject"))
 
   /* These don't occur very much, so we are likely to do lots of analysis on them. Still worth
    * distinguishing the regular and super users. Compared to 'cdm.Principal', this only omits the
@@ -537,7 +564,7 @@ package object adm {
 
     hostName: String,
     provider: String
-  ) extends ADM with DBWritable {
+  ) extends ADM with DBWritable with DomainNode {
 
     val uuid = AdmUUID(
       DeterministicUUID(userId + groupIds.sorted.mkString("") + principalType.toString + username + provider),
@@ -566,7 +593,10 @@ package object adm {
       "provider" -> provider,
       "hostName" -> hostName
     )
+
+    val nodeConstants = AdmPrincipal
   }
+  object AdmPrincipal extends NodeConstants(Record(type_of = "AdmPrincipal"))
 
   /* Compared to 'cdm.ProvenanceTagNode', this leaves out
    *
@@ -582,7 +612,7 @@ package object adm {
 
     hostName: String,
     provider: String
-  ) extends ADM with DBWritable {
+  ) extends ADM with DBWritable with DomainNode {
 
     val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
 
@@ -603,7 +633,10 @@ package object adm {
       "provider" -> provider,
       "hostName" -> hostName
     )
+
+    val nodeConstants = AdmProvenanceTagNode
   }
+  object AdmProvenanceTagNode extends NodeConstants(Record(type_of = "AdmProvenanceTagNode"))
 
   final case class AdmHost(
     originalCdmUuids: Seq[CdmUUID],          // universally unique identifier for the host
@@ -615,7 +648,7 @@ package object adm {
     interfaces: Seq[Interface],              // names and addresses of network interfaces
 
     provider: String
-  ) extends ADM with DBWritable {
+  ) extends ADM with DBWritable with DomainNode {
 
     def getHostName: Option[HostName] = Some(hostName)
 
@@ -643,12 +676,15 @@ package object adm {
       "interfaces" -> interfaces.map(_.toString).mkString(";"),
       "provider" -> provider
     )
+
+    val nodeConstants = AdmHost
   }
+  object AdmHost extends NodeConstants(Record(type_of = "AdmHost"))
 
   // TODO: make this deterministic
   final case class AdmSynthesized(
     originalCdmUuids: Seq[CdmUUID]
-  ) extends ADM with DBWritable {
+  ) extends ADM with DBWritable with DomainNode {
 
     def getHostName: Option[HostName] = None
 
@@ -665,7 +701,10 @@ package object adm {
     def toMap = Map(
       "originalCdmUuids" -> originalCdmUuids.map(_.uuid).toList.sorted.mkString(";")
     )
+
+    val nodeConstants = AdmSynthesized
   }
+  object AdmSynthesized extends NodeConstants(Record(type_of = "AdmSynthesized"))
 
 }
 

@@ -9,12 +9,14 @@ import com.rrwright.quine.language.EdgeDirections.{-->, <--}
 import com.rrwright.quine.language._
 import com.rrwright.quine.runtime.GraphService
 import spray.json.{JsArray, JsObject, JsString, JsValue}
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future, Await}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 import shapeless._
 import shapeless.syntax.singleton._
 import scala.pickling.{PickleFormat, PicklerUnpickler}
+import com.galois.adapt.adm._
+import scala.util.{Try, Success, Failure}
 //import scala.pickling.shareNothing._
 //import scala.pickling.static._        // Avoid run-time reflection
 
@@ -28,10 +30,10 @@ case class FileEvent(eventType: EventType, predicateObject: FileObject) extends 
 case class ProcessFileActivity(pid: Int, subject: <--[FileEvent]) extends NoConstantsDomainNode
 
 
-class QuineDBActor(graph: GraphService, idx: Int) extends Actor with ActorLogging {
+class QuineDBActor(graphService: GraphService, idx: Int) extends DBQueryProxyActor {
 
-  implicit val implicitGraph = graph //GraphService(context.system, uiPort = 9090)(EmptyPersistor)
-  implicit val ec = context.dispatcher
+  implicit val service = graphService
+  val graph: org.apache.tinkerpop.gremlin.structure.Graph = ???
 
 //  log.info(s"QuineDB actor init")
 
@@ -43,19 +45,21 @@ class QuineDBActor(graph: GraphService, idx: Int) extends Actor with ActorLoggin
   }
 
   import com.rrwright.quine.language._
-  import CDM17Implicits._
 
   implicit val timeout = Timeout(21 seconds)
 
+  def AdmTx(adms: Seq[Either[ADM,EdgeAdm2Adm]]): Try[Unit] = Await.result(
+    Future.sequence(adms.map {
+        case Left(anAdm: ADM) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+        case Right(EdgeAdm2Adm(src, label, tgt)) => graphService.dumbOps.addEdge(src, tgt, label)
+    }),
+    Duration.Inf
+  )
 
-//  case class EventToObject(eventType: EventType, timestampNanos: Long, predicateObject: -->[QuineId]) extends NoConstantsDomainNode
-  case class EventToFile(eventType: EventType, timestampNanos: Long, predicateObject: FileObject) extends NoConstantsDomainNode
-//  case class EventToObjectWithSubject(eventType: EventType, timestampNanos: Long, predicateObject: -->[QuineId], subject: -->[QuineId]) extends NoConstantsDomainNode
-//
-
+  def FutureTx[T](body: => T)(implicit ec: ExecutionContext): Future[T] = Future(body)
 
   override def receive = {
-
+/*
     case cdm: Event =>
       val s = sender()
       val now = System.currentTimeMillis
@@ -204,7 +208,7 @@ class QuineDBActor(graph: GraphService, idx: Int) extends Actor with ActorLoggin
     case cdm: CDM17 =>
       log.info(s"Unhandled CDM: $cdm")
       sender() ! Ack
-
+*/
 
     case InitMsg => sender() ! Ack
 
@@ -213,51 +217,6 @@ class QuineDBActor(graph: GraphService, idx: Int) extends Actor with ActorLoggin
     case CompleteMsg =>
       println(s"Data loading complete: $idx")
       sender() ! Ack
-//      if (idx == 0) {
-        println(s"Index 0 complete. Begining context aggregation in 5 seconds.")
-        context.system.scheduler.scheduleOnce(5 seconds) {
-          println(s"Begining context aggregation now.")
-//          graph.saveStratifiedContexts("/Users/ryan/Desktop/adapt-contexts.tsv", 2, 3, 1, Set(knowledgeOf[EventToFile]()), 8, 10 minutes)
-//          graph.saveBiasedContextSentences2("/Users/ryan/Desktop/adapt-contexts.tsv", List(1 -> branchOf[EventToFile]()), 8, 10 minutes)
-          graph.saveStratifiedContexts2("/Users/ryan/Desktop/adapt-contexts.tsv", 1, 5, 1, "testColumn", Set(knowledgeOf[EventToFile]()), 12, 300 minutes)
-            .recover{ case e => e.printStackTrace() }
-//          graph.saveBiasedContextSentences("/Users/ryan/Desktop/adapt-contexts.tsv", 10, 10, List(/*5F -> branchOf[Subject](), 5F -> branchOf[FileObject]()*/), 6, Timeout(300 seconds))
-        }
-//      }
-//      graph.printRandomContextSentences(100, 10, 100, Timeout(1001 seconds))
-
-
-
-    case NodeQuery(queryString, shouldReturnJson) =>
-      def go(): Future[Try[JsValue]] = {
-        val idsOpt = if (queryString.nonEmpty) Try(queryString.split(",").map(s => UUID.fromString(s.trim)).toSet).toOption else None
-        val uiDataF = graph.getUiData(idsOpt, None, false)
-        uiDataF.map{uiData => Try {
-          JsArray( uiData._1.map{ datum =>
-            val uiNode = UINode(datum.id.toString, datum.label, datum.title)
-            val jso = ApiJsonProtocol.uiNodeFormat.write(uiNode).asJsObject
-            val props = datum.properties.map{ case (k,p) => k.name -> JsString(unpickleToString(p)) }
-            jso.copy(jso.fields + ("properties" -> JsObject(props)) )
-//            datum.properties.mapValues(unpickleToString)
-//            com.rrwright.quine.runtime.UiJsonFormat.nodeFormat.write(datum)
-          }.toVector)
-        } }
-      }
-      sender() ! go()
-
-    case EdgeQuery(queryString, shouldReturnJson) =>
-      def go(): Future[Try[JsValue]] = {
-        val idsOpt = if (queryString.nonEmpty) Try(queryString.split(",").map(s => UUID.fromString(s.trim)).toSet).toOption else None
-        val uiDataF = graph.getUiData(idsOpt, None, false)
-        uiDataF.map{uiData => Try {
-          JsArray( uiData._2.map{ edge =>
-//            val uiEdge = UIEdge(edge.from.toString, edge.to.toString, edge.label.name)
-//            ApiJsonProtocol.uiEdgeFormat.write(uiEdge)
-            com.rrwright.quine.runtime.UiJsonFormat.edgeFormat.write(edge)
-          }.toVector)
-        } }
-      }
-      sender() ! go()
 
 
     case msg => log.warning(s"Unknown message: $msg")
