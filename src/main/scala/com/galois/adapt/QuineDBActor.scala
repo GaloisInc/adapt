@@ -7,6 +7,7 @@ import akka.util.Timeout
 import com.galois.adapt.cdm17._
 import com.rrwright.quine.language.EdgeDirections.{-->, <--}
 import com.rrwright.quine.language._
+import com.rrwright.quine.language._
 import com.rrwright.quine.runtime.GraphService
 import spray.json.{JsArray, JsObject, JsString, JsValue}
 import scala.concurrent.{ExecutionContext, Future, Await}
@@ -14,7 +15,8 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 import shapeless._
 import shapeless.syntax.singleton._
-import scala.pickling.{PickleFormat, PicklerUnpickler}
+import com.rrwright.quine.language.JavaObjectSerializationScheme._
+// import scala.pickling.{PickleFormat, PicklerUnpickler}
 import com.galois.adapt.adm._
 import scala.util.{Try, Success, Failure}
 //import scala.pickling.shareNothing._
@@ -48,13 +50,26 @@ class QuineDBActor(graphService: GraphService, idx: Int) extends DBQueryProxyAct
 
   implicit val timeout = Timeout(21 seconds)
 
-  def AdmTx(adms: Seq[Either[ADM,EdgeAdm2Adm]]): Try[Unit] = Await.result(
+  override def DBNodeableTx(cdms: Seq[DBNodeable[_]]): Try[Unit] = ???
+  def AdmTx(adms: Seq[Either[ADM,EdgeAdm2Adm]]): Try[Unit] = Try(Await.result(
     Future.sequence(adms.map {
-        case Left(anAdm: ADM) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+     //   case Left(anAdm: ADM) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+        case Left(anAdm: AdmEvent) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+        case Left(anAdm: AdmSubject) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+        case Left(anAdm: AdmPrincipal) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+        case Left(anAdm: AdmFileObject) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+        case Left(anAdm: AdmNetFlowObject) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+        case Left(anAdm: AdmPathNode) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+        case Left(anAdm: AdmPort) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+        case Left(anAdm: AdmAddress) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+        case Left(anAdm: AdmSrcSinkObject) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+        case Left(anAdm: AdmProvenanceTagNode) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+        case Left(anAdm: AdmHost) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+        case Left(anAdm: AdmSynthesized) => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
         case Right(EdgeAdm2Adm(src, label, tgt)) => graphService.dumbOps.addEdge(src, tgt, label)
     }),
     Duration.Inf
-  )
+  )).map(_ => ())
 
   def FutureTx[T](body: => T)(implicit ec: ExecutionContext): Future[T] = Future(body)
 
@@ -273,112 +288,3 @@ class QuineRouter(count: Int, graph: GraphService) extends Actor with ActorLoggi
   }
 }
 
-
-
-object CDM17Implicits extends ScalaPicklingScheme {
-
-  implicit val aaa = PicklerUnpickler.generate[Option[Map[String, String]]]
-  implicit val bbb = PicklerUnpickler.generate[Option[String]]
-  implicit val ccc = PicklerUnpickler.generate[AbstractObject]
-
-  implicit val ddd = PicklerUnpickler.generate[PrincipalType]
-  implicit val eee = PicklerUnpickler.generate[List[String]]  // canNOT also have this in scope: scala.pickling.Defaults.stringPickler
-
-  implicit val fff = PicklerUnpickler.generate[Option[Int]]
-  implicit val ggg = PicklerUnpickler.generate[Option[Long]]
-  implicit val hhh = PicklerUnpickler.generate[FileObjectType]
-  implicit val iii = PicklerUnpickler.generate[CryptographicHash]
-  implicit val jjj = PicklerUnpickler.generate[Option[Seq[CryptographicHash]]]
-
-  implicit val kkk = PicklerUnpickler.generate[EventType]
-  implicit val lll = PicklerUnpickler.generate[Option[List[Value]]]   // Scala pickling doesn't like Option[Seq[Value]]
-
-  implicit val mmm = PicklerUnpickler.generate[SubjectType]
-  implicit val nnn = PicklerUnpickler.generate[Option[PrivilegeLevel]]
-  implicit val ooo = PicklerUnpickler.generate[Option[List[String]]]
-  implicit val ppp = PicklerUnpickler.generate[Option[UUID]]
-
-  implicit val qqq = PicklerUnpickler.generate[Option[TagOpCode]]
-  implicit val rrr = PicklerUnpickler.generate[Option[List[UUID]]]
-  implicit val ttt = PicklerUnpickler.generate[Option[IntegrityTag]]
-  implicit val uuu = PicklerUnpickler.generate[Option[ConfidentialityTag]]
-
-  implicit val vvv = PicklerUnpickler.generate[Option[Value]]
-  implicit val www = PicklerUnpickler.generate[SrcSinkType]
-
-  private def unpicklePrimitiveToString(pickle: QuinePickleWrapper)/*(implicit scheme: PickleScheme[String])*/: Try[String] = Try {
-    Try( pickle.thisPickle.unpickle[String] ).getOrElse(
-      Try( pickle.thisPickle.unpickle[Long] ).getOrElse(
-        Try( pickle.thisPickle.unpickle[Int] ).get //OrElse(
-//          Try( pickle.thisPickle.unpickle[Boolean] ).getOrElse(
-//            Try( pickle.thisPickle.unpickle[Float] ).getOrElse(
-//              Try( pickle.thisPickle.unpickle[Double] ).getOrElse(
-//                Try( pickle.thisPickle.unpickle[Char] ).getOrElse(
-//                  Try( pickle.thisPickle.unpickle[Short] ).getOrElse(
-//                    Try( pickle.thisPickle.unpickle[Byte] ).getOrElse(
-//                      Try( pickle.thisPickle.unpickle[Unit] ).getOrElse(
-//                        Try( pickle.thisPickle.unpickle[Null] ).get
-//                      )
-//                    )
-//                  )
-//                )
-//              )
-//            )
-//          )
-//        )
-      )
-    )
-  }.map(_.toString)
-
-  def unpickleToString(pickle: QuinePickleWrapper)/*(implicit scheme: PickleScheme[String])*/: String = {
-//    Try( pickle.thisPickle.unpickle[AbstractObject] ).getOrElse(
-    unpicklePrimitiveToString(pickle).getOrElse(
-      Try( pickle.thisPickle.unpickle[Option[Map[String, String]]] ).getOrElse(
-        Try( pickle.thisPickle.unpickle[Option[String]] ).getOrElse(
-          Try( pickle.thisPickle.unpickle[PrincipalType] ).getOrElse(
-            Try( pickle.thisPickle.unpickle[List[String]] ).getOrElse(
-              Try( pickle.thisPickle.unpickle[Option[Int]] ).getOrElse(
-                Try( pickle.thisPickle.unpickle[Option[Long]] ).getOrElse(
-                  Try( pickle.thisPickle.unpickle[FileObjectType] ).getOrElse(
-//                        Try( pickle.thisPickle.unpickle[CryptographicHash] ).getOrElse(
-//                          Try( pickle.thisPickle.unpickle[Option[Seq[CryptographicHash]]] ).getOrElse(
-                    Try( pickle.thisPickle.unpickle[EventType] ).getOrElse(
-                      Try( pickle.thisPickle.unpickle[Option[List[Value]]] ).getOrElse(
-                        Try( pickle.thisPickle.unpickle[SubjectType] ).getOrElse(
-                          Try( pickle.thisPickle.unpickle[Option[PrivilegeLevel]] ).getOrElse(
-//                                    Try( pickle.thisPickle.unpickle[Option[List[String]]] ).getOrElse(
-                            Try( pickle.thisPickle.unpickle[Option[UUID]] ).getOrElse(
-                              Try( pickle.thisPickle.unpickle[UUID] ).getOrElse(
-//                                        Try( pickle.thisPickle.unpickle[Option[TagOpCode]] ).getOrElse(
-//                                          Try( pickle.thisPickle.unpickle[Option[List[UUID]]] ).getOrElse(
-//                                            Try( pickle.thisPickle.unpickle[Option[IntegrityTag]] ).getOrElse(
-//                                              Try( pickle.thisPickle.unpickle[Option[ConfidentialityTag]] ).getOrElse(
-//                                                Try( pickle.thisPickle.unpickle[Option[Value]] ).getOrElse(
-                                Try( pickle.thisPickle.unpickle[SrcSinkType] ).getOrElse(
-                                  "{--unknown_serialized_type--}"
-                                )
-//                                                )
-//                                              )
-//                                            )
-//                                          )
-//                                        )
-                              )
-//                                    )
-                            )
-                          )
-                        )
-                      )
-//                          )
-//                        )
-                    )
-                  )
-                )
-              )
-            )
-          )
-        )
-      )
-    )
-//    )
-  }.toString
-}

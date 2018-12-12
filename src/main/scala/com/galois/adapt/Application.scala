@@ -394,7 +394,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 """
       )
       Runtime.getRuntime.halt(1)
-
+/*
     case "quine" =>
       println("Running provenance ingest demo with the Quine database.")
 
@@ -410,7 +410,6 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       replServer.start()   // ssh repl@localhost -p22222
 
       import com.rrwright.quine.language._
-      import CDM17Implicits._
       import shapeless._
       import shapeless.syntax.singleton._
 
@@ -526,7 +525,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       }).run()
 
 
-
+*/
     case "pre-e4-test" =>
       startWebServer()
       statusActor ! InitMsg

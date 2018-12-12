@@ -56,10 +56,10 @@ object ERRules {
     ) = {
       val newN = AdmNetFlowObject(Seq(CdmUUID(n.getUuid, provider)), n.localAddress, n.localPort, n.remoteAddress, n.remotePort, provider)
 
-      val newLP = n.localPort.map(AdmPort)
-      val newLA = n.localAddress.map(AdmAddress)
-      val newRP = n.remotePort.map(AdmPort)
-      val newRA = n.remoteAddress.map(AdmAddress)
+      val newLP = n.localPort.map(AdmPort.apply)
+      val newLA = n.localAddress.map(AdmAddress.apply)
+      val newRP = n.remotePort.map(AdmPort.apply)
+      val newRA = n.remoteAddress.map(AdmAddress.apply)
       (
         newN,
         newLA.map(la => (EdgeAdm2Adm(newN.uuid, "localAddress", la.uuid), la)),
