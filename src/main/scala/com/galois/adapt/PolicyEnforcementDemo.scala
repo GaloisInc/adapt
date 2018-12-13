@@ -1070,6 +1070,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
           val (id: ID, time: TimestampNanos) = toVisit.dequeue()
 
           val checkEnd = s"MATCH (n: AdmNetFlowObject) WHERE ID(n) = $id RETURN n.remoteAddress, n.remotePort"
+          println(checkEnd)
           futQuery(checkEnd).flatMap { netflows =>
             if (netflows.nonEmpty) {
 
@@ -1083,31 +1084,37 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
                 s"""MATCH (o1)<-[:predicateObject]-(e: AdmEvent)-[:subject]->(o2)
                    |WHERE (e.eventType = "EVENT_WRITE" OR e.eventType = "EVENT_SENDTO" OR e.eventType = "EVENT_SENDMSG") AND ID(o1) = $id AND e.earliestTimestampNanos <= $time
                    |RETURN ID(o2), e.latestTimestampNanos
-                   |""".stripMargin.replaceAll("\n","")
+                   |""".stripMargin
 
               val stepRead =
                 s"""MATCH (o1)<-[:subject]-(e: AdmEvent)-[:predicateObject]->(o2)
                    |WHERE (e.eventType = "EVENT_READ" OR e.eventType = "EVENT_RECV" OR e.eventType = "EVENT_RECVMSG") AND ID(o1) = $id AND e.earliestTimestampNanos <= $time
                    |RETURN ID(o2), e.latestTimestampNanos
-                   |""".stripMargin.replaceAll("\n","")
+                   |""".stripMargin
 
               val stepRename =
                 s"""MATCH (o1)<-[:predicateObject|predicateObject2]-(e: AdmEvent)-[:predicateObject|predicateObject2]->(o2)
                    |WHERE e.eventType = "EVENT_RENAME" AND ID(o1) = $id AND ID(o1) <> ID(o2) AND e.earliestTimestampNanos <= $time
                    |RETURN ID(o2), e.latestTimestampNanos
-                   |""".stripMargin.replaceAll("\n","")
+                   |""".stripMargin
 
               val stepParent =
                 s"""MATCH (o1)-[:parentSubject]->(o2)
                    |WHERE ID(o1) = $id
                    |RETURN ID(o2)
-                   |""".stripMargin.replaceAll("\n","")
+                   |""".stripMargin
 
               val stepOpen =
                 s"""MATCH (o1)<-[:predicateObject]-(e: AdmEvent)-[:subject]->(o2)
                    |WHERE (e.eventType = "EVENT_OPEN") AND ID(o1) = $id AND e.earliestTimestampNanos <= $time
                    |RETURN ID(o2), e.latestTimestampNanos
-                   |""".stripMargin.replaceAll("\n","")
+                   |""".stripMargin
+
+              println(s"stepWrite: $stepWrite")
+              println(s"stepRead: $stepRead")
+              println(s"stepRename: $stepRename")
+              println(s"stepParent: $stepParent")
+              println(s"stepOpen: $stepOpen")
 
               val foundFut: Future[List[(ID, TimestampNanos)]] = for {
                 writes <- futQuery(stepWrite)
@@ -1350,7 +1357,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     }
 
     def filesAffected(processNodeIds: List[Int]) = {
-      val (t1,t2) = timeInterval(timestampSeconds-10, 20) // [t-20,t+20]
+      val (t1,t2) = timeInterval(timestampSeconds-10, 20) // [t-10,t+10]
 
       val query =
         s"""g.V(${processNodeIds.mkString(",")}).in('subject').hasLabel('AdmEvent')
