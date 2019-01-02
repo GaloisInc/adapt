@@ -26,6 +26,7 @@ import scala.language.postfixOps
 import scala.util.{Failure, Random, Success, Try}
 import sys.process._
 import com.rrwright.quine.runtime._
+import com.rrwright.quine.language.JavaObjectSerializationScheme._
 
 import AdaptConfig._
 import com.galois.adapt.PpmFlowComponents.CompletedESO
@@ -390,7 +391,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 """
       )
       Runtime.getRuntime.halt(1)
-/*
+
     case "quine" =>
       println("Running provenance ingest demo with the Quine database.")
 
@@ -408,8 +409,6 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       import com.rrwright.quine.language._
       import shapeless._
       import shapeless.syntax.singleton._
-
-      val asdasd = implicitly[PickleScheme[String]]
 
       val graph = GraphService(
         system,
@@ -512,6 +511,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
           source
             .via(printCounter(host.hostName, statusActor, 0))
             .via(debug.debugBuffer(s"[${host.hostName}] 0 before ER"))
+            .via(erMap(host.hostName))
             .mapAsyncUnordered(parallelism)(cdm => quineRouter ? cdm)
             .recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace()}
             .runWith(Sink.ignore)
@@ -521,7 +521,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       }).run()
 
 
-*/
+
     case "pre-e4-test" =>
       startWebServer()
       statusActor ! InitMsg

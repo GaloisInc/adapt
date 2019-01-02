@@ -35,7 +35,7 @@ case class ProcessFileActivity(pid: Int, subject: <--[FileEvent]) extends NoCons
 class QuineDBActor(graphService: GraphService, idx: Int) extends DBQueryProxyActor {
 
   implicit val service = graphService
-  val graph: org.apache.tinkerpop.gremlin.structure.Graph = ???
+  lazy val graph: org.apache.tinkerpop.gremlin.structure.Graph = ???
 
 //  log.info(s"QuineDB actor init")
 
@@ -86,6 +86,9 @@ class QuineDBActor(graphService: GraphService, idx: Int) extends DBQueryProxyAct
 
   override def receive = {
 
+    case (s: ActorRef, Left(a: ADM)) =>          writeAdm(a).onComplete(_ => s ! Ack)
+    case (s: ActorRef, Right(e: EdgeAdm2Adm)) => writeAdmEdge(e).onComplete(_ => s ! Ack)
+
     case InitMsg => sender() ! Ack
 
     case Ready => sender() ! Ack
@@ -125,7 +128,7 @@ class QuineRouter(count: Int, graph: GraphService) extends Actor with ActorLoggi
       context watch r
       router = router.addRoutee(r)
     case x =>
-      router.route(x, sender())
+      router.route((sender(), x), sender())
   }
 }
 
