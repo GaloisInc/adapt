@@ -4,33 +4,16 @@ import java.util.UUID
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import akka.util.Timeout
-import com.galois.adapt.cdm17._
 import com.rrwright.quine.language.EdgeDirections.{-->, <--}
 import com.rrwright.quine.language._
-import com.rrwright.quine.language._
 import com.rrwright.quine.runtime.GraphService
-import spray.json.{JsArray, JsObject, JsString, JsValue}
 import scala.concurrent.{ExecutionContext, Future, Await}
 import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
 import shapeless._
 import shapeless.syntax.singleton._
 import com.rrwright.quine.language.JavaObjectSerializationScheme._
-// import scala.pickling.{PickleFormat, PicklerUnpickler}
 import com.galois.adapt.adm._
 import scala.util.{Try, Success, Failure}
-//import scala.pickling.shareNothing._
-//import scala.pickling.static._        // Avoid run-time reflection
-
-
-//case object ReadEventType extends NodeConstants( 'eventType ->> EVENT_READ )
-//case class FileReadingEvent(predicateObject: FileObject) extends DomainNode {
-//  val nodeConstants: AbstractNodeConstants = ReadEventType
-//}
-//case class ProcessReadsFile(pid: Int, subject: <--[FileReadingEvent]) extends NoConstantsDomainNode
-case class FileEvent(eventType: EventType, predicateObject: FileObject) extends NoConstantsDomainNode
-case class ProcessFileActivity(pid: Int, subject: <--[FileEvent]) extends NoConstantsDomainNode
-
 
 class QuineDBActor(graphService: GraphService, idx: Int) extends DBQueryProxyActor {
 
@@ -46,8 +29,6 @@ class QuineDBActor(graphService: GraphService, idx: Int) extends DBQueryProxyAct
     }
   }
 
-  import com.rrwright.quine.language._
-
   implicit val timeout = Timeout(21 seconds)
 
   def DBNodeableTx(cdms: Seq[DBNodeable[_]]): Try[Unit] = ??? 
@@ -62,19 +43,19 @@ class QuineDBActor(graphService: GraphService, idx: Int) extends DBQueryProxyAct
   ))
 
   def writeAdm(a: ADM): Future[Unit] = (a match {
-    case anAdm: AdmEvent => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmSubject => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmPrincipal => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmFileObject => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmNetFlowObject => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmPathNode => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmPort => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmAddress => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmSrcSinkObject => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmProvenanceTagNode => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmHost => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmSynthesized => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case _ => throw new Exception("Unexpected ADM")
+    case anAdm: AdmEvent              => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmSubject            => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmPrincipal          => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmFileObject         => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmNetFlowObject      => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmPathNode           => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmPort               => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmAddress            => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmSrcSinkObject      => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmProvenanceTagNode  => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmHost               => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmSynthesized        => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case _                            => throw new Exception("Unexpected ADM")
   }).flatMap {
     case Success(s) => Future.successful(s)
     case Failure(f) => Future.failed(f)
@@ -86,8 +67,8 @@ class QuineDBActor(graphService: GraphService, idx: Int) extends DBQueryProxyAct
 
   override def receive = {
 
-    case (s: ActorRef, Left(a: ADM)) =>          writeAdm(a).onComplete(_ => s ! Ack)
-    case (s: ActorRef, Right(e: EdgeAdm2Adm)) => writeAdmEdge(e).onComplete(_ => s ! Ack)
+    case WithSender(s: ActorRef, Left(a: ADM))          => writeAdm(a).ackOnComplete(s)
+    case WithSender(s: ActorRef, Right(e: EdgeAdm2Adm)) => writeAdmEdge(e).ackOnComplete(s)
 
     case InitMsg => sender() ! Ack
 
@@ -97,12 +78,12 @@ class QuineDBActor(graphService: GraphService, idx: Int) extends DBQueryProxyAct
       println(s"Data loading complete: $idx")
       sender() ! Ack
 
-
     case msg => log.warning(s"Unknown message: $msg")
 
   }
 }
 
+case class WithSender[A](sender: ActorRef, message: A)
 
 
 class QuineRouter(count: Int, graph: GraphService) extends Actor with ActorLogging {
@@ -118,8 +99,6 @@ class QuineRouter(count: Int, graph: GraphService) extends Actor with ActorLoggi
   var nextIdx: Int = count
 
   def receive = {
-    case w: CDM17 =>
-      router.route(w, sender())
     case msg @ Terminated(a) =>
       log.warning(s"Received $msg")
       router = router.removeRoutee(a)
@@ -127,8 +106,7 @@ class QuineRouter(count: Int, graph: GraphService) extends Actor with ActorLoggi
       nextIdx += 1
       context watch r
       router = router.addRoutee(r)
-    case x =>
-      router.route((sender(), x), sender())
+    case x => router.route(WithSender(sender(), x), sender())
   }
 }
 

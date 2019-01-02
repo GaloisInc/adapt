@@ -28,6 +28,9 @@ import sys.process._
 import com.rrwright.quine.runtime._
 import com.rrwright.quine.language.JavaObjectSerializationScheme._
 
+import shapeless._
+import shapeless.syntax.singleton._
+
 import AdaptConfig._
 import com.galois.adapt.PpmFlowComponents.CompletedESO
 
@@ -235,8 +238,6 @@ object Application extends App {
     actorList.foreach { ref => broadcast ~> Sink.actorRefWithAck[T](ref, InitMsg, Ack, CompleteMsg) }
     SinkShape(broadcast.in)
   })
-
-  var quineGraph: GraphService = _
   
   def startWebServer(): Http.ServerBinding = {
     println(s"Starting the web server at: http://${runtimeConfig.webinterface}:${runtimeConfig.port}")
@@ -395,22 +396,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
     case "quine" =>
       println("Running provenance ingest demo with the Quine database.")
 
-      import ammonite.sshd._
-      import org.apache.sshd.server.auth.password.AcceptAllPasswordAuthenticator
-      val replServer = new SshdRepl(
-        SshServerConfig(
-          address = "localhost",
-          port = 22222,
-          passwordAuthenticator = Some(AcceptAllPasswordAuthenticator.INSTANCE) // Some(pwdAuth) // or publicKeyAuthenticator
-        )
-      )
-      replServer.start()   // ssh repl@localhost -p22222
-
-      import com.rrwright.quine.language._
-      import shapeless._
-      import shapeless.syntax.singleton._
-
-      val graph = GraphService(
+      implicit val graph = GraphService(
         system,
         inMemorySoftNodeLimit = Some(1000),
         shardCount = 3,
@@ -418,81 +404,9 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         MapDBMultimap()
       )
 
-      quineGraph = graph
-
-//      import com.rrwright.quine.runtime.runtimePickleFormat
-//      import scala.pickling.Defaults._
-
-//      val branch = branchOf[com.galois.adapt.cdm17.Event]( 'eventType := cdm17.EVENT_READ )
-//      println(branch)
-//      branch.standingFind(
-//        id => println(s"FOUND ONE: $id")
-//      )(graph)
-      implicit val gg = graph
       implicit val timeout = Timeout(30.4 seconds)
-//      val branch = branchOf[ProcessFileActivity]()
-
-
-
-
-
-
-
-//      branch.standingFind(
-//        id => lookup[ProcessFileActivity](branch.identifyRoot(id))
-//          .map { results =>
-//          results collect { case result
-//            if result.subject.target.eventType == cdm17.EVENT_READ => println(result)
-//          }
-//        }
-//      )
-
-
-
-
-
-
-
-
-//            if (reads.nonEmpty) println(s"Process Reading a File:\n${reads.mkString("\n")}")
-//            else println(s"Events found: ${results.map(r => r.subject.target.eventType -> r.subject.target.id.get).groupBy(_._1).mapValues(_.size).mkString("\n")}")
-
-//      branchOf[com.galois.adapt.cdm17.Event]( 'eventType := EVENT_EXIT ).standingFind(
-//        id => {
-//          log.info(s"FOUND $id")
-//          graph.dumbOps.getHalfEdges(id, Some('predicateObject), Some(Outgoing)).flatMap{ predObjEdges =>
-//            Future.sequence(predObjEdges.map { he =>
-//              val objectId = he.other
-//              val branch = branchOf[com.galois.adapt.cdm17.Subject]().identifyRoot(objectId).refine('subjectUuid <-- branchOf[com.galois.adapt.cdm17.Event]())
-//              val now = System.currentTimeMillis
-//              graph.deleteFromBranch(branch)(Timeout(10 seconds)).map { x =>
-//                val size = x.foldLeft(0)((a, b) => a + b.allIds.size)
-//                if (size > 0) log.info(s"Deleted $size nodes from EVENT_EXIT 'subjectUuid after time: $now")
-////              if (size == 0) log.warning(s"Zero deleted from 'subjectUuid on EVENT_EXIT ${cdm.getUuid}")
-//              }
-//            })
-//          }
-//        }
-////          .onFailure {
-////          case Success(s) =>
-////          case Failure(err) => log.error(s"Failure when deleting by standing query: ${err.getMessage}")
-////        }
-//      )(graph)
-
 
       val parallelism = 32 // 16
-//        val quineActor = system.actorOf(Props(classOf[QuineDBActor], graph))
-//        Flow[CDM17].runWith(CDMSource(ta1).via(FlowComponents.printCounter("Quine", 1000)), Sink.actorRefWithAck(quineActor, Init, Ack, Complete, println))
-
-      // println(s"\n\nDemo ingest ${Try(config.getLong("adapt.ingest.loadlimit")).map(s => s"for the first $s items ").getOrElse("")}begun at time: ${System.currentTimeMillis}\n")
-
-  //    CDMSource.cdm17(ta1).map(_._2).concat(Source.single(CompleteMsg))
-  //      .via(FlowComponents.printCounter("Quine demo", statusActor, 100))
-  //      .buffer(10, OverflowStrategy.backpressure)
-  //      .mapAsyncUnordered(parallelism)(cdm => quineRouter ? cdm)
-  //      .recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace()}
-  //      .runWith(Sink.ignore)
-
         
       val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
       
@@ -519,7 +433,6 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 
         ClosedShape
       }).run()
-
 
 
     case "pre-e4-test" =>
