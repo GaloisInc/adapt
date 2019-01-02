@@ -234,9 +234,13 @@ object AdaptConfig extends Utils {
   val kafkaConsumerJavaConfig = com.typesafe.config.ConfigFactory.load().getConfig("akka.kafka.consumer")
 
 
-
-
-  private val adaptConfig: AdaptConfig = loadConfigOrThrow[AdaptConfig]("adapt")  // This is here only to disallow extra keys--to prevent typos.
+  // This is here only to disallow extra keys--to prevent typos.
+  private val adaptConfig: AdaptConfig = Try(loadConfigOrThrow[AdaptConfig]("adapt")) match {
+    case Success(c) => c
+    case Failure(f) =>
+      println(f.getMessage)
+      scala.sys.exit(1)
+  }
 
   var ingestConfig: IngestConfig = adaptConfig.ingest
   val runFlow: String = adaptConfig.runflow
