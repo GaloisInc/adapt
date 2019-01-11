@@ -1,5 +1,5 @@
 {"context specification":{
-     "query":"MATCH (c:AdmSubject)-->(p:AdmSubject)--> (n:AdmPathNode) RETURN  c.uuid as childUuid, n.path AS parentProcName",
+     "query":"MATCH (n:AdmSubject)-->(p:AdmSubject)--> (path:AdmPathNode) WHERE %s RETURN n.uuid as childUuid, path.path AS parentProcName",
      "endpoint":"cypher",
 "objects":"childUuid",
 "attributes":["parentProcName"]

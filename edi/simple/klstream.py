@@ -23,7 +23,7 @@ from ..util import utils
 
 
 class KLStream:
-	def __init__(self,attrs,Model=model.AVCOnlineModel):
+	def __init__(self,attrs, Model=model.AVCOnlineModel):
 		self.attrs = attrs
 		self.n = 0
 		self.k = 0
@@ -57,8 +57,9 @@ class KLStream:
 		return (totalcost,cl)
 
 
-def run(inputfile,outputfile,modelfile=None,
+def run(inputfile,outputfile, modelfile=None,
 		Model=lambda header: KLStream(header,Model=model.AVCOnlineModel)):
+
 	print(inputfile)
 	print(outputfile)
 
