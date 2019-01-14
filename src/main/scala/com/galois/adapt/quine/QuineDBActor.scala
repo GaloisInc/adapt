@@ -1,19 +1,17 @@
-package com.galois.adapt
+package com.galois.adapt.quine
 
-import java.util.UUID
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, Terminated}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import akka.util.Timeout
-import com.rrwright.quine.language.EdgeDirections.{-->, <--}
-import com.rrwright.quine.language._
-import com.rrwright.quine.runtime.GraphService
-import scala.concurrent.{ExecutionContext, Future, Await}
-import scala.concurrent.duration._
-import shapeless._
-import shapeless.syntax.singleton._
-import com.rrwright.quine.language.JavaObjectSerializationScheme._
 import com.galois.adapt.adm._
-import scala.util.{Try, Success, Failure}
+import com.galois.adapt.{Ack, CompleteMsg, DBNodeable, DBQueryProxyActor, InitMsg, Ready}
+import com.rrwright.quine.runtime.GraphService
+
+import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.util.{Failure, Success, Try}
+import com.rrwright.quine.language.DomainNodeSetSingleton
+import com.rrwright.quine.language.JavaObjectSerializationScheme._   // IntelliJ sometimes can't tell that this is used for implicits
 
 class QuineDBActor(graphService: GraphService, idx: Int) extends DBQueryProxyActor {
 
@@ -57,7 +55,7 @@ class QuineDBActor(graphService: GraphService, idx: Int) extends DBQueryProxyAct
     case anAdm: AdmSynthesized        => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
     case _                            => throw new Exception("Unexpected ADM")
   }).flatMap {
-    case Success(s) => Future.successful(s)
+    case Success(_) => Future.successful(())
     case Failure(f) => Future.failed(f)
   }
 
