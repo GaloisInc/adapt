@@ -192,7 +192,7 @@ object AdaptConfig extends Utils {
     def from(cur: ConfigCursor): Either[ConfigReaderFailures, IngestUnit] = for {
       typ <- cur.atPath("type").right.flatMap(_.asString)
       iu  <- typ.toLowerCase match {
-        case "file" =>
+        case "file" | "files" =>
           for {
             // prevent extra fields
             _ <- cur.asMap.right.flatMap { kvs =>
