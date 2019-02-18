@@ -31,7 +31,7 @@ import shapeless._
 import shapeless.syntax.singleton._
 import AdaptConfig._
 import com.galois.adapt.PpmFlowComponents.CompletedESO
-import com.galois.adapt.quine.QuineRouter
+import com.galois.adapt.quine.{AdmUuidProvider, QuineRouter}
 
 
 object Application extends App {
@@ -400,7 +400,8 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         inMemorySoftNodeLimit = Some(1000),
         shardCount = 3,
         uiPort = None /*Some(9090)*/ )(
-        MapDBMultimap()
+        MapDBMultimap(),
+        AdmUuidProvider
       )
 
       implicit val timeout = Timeout(30.4 seconds)

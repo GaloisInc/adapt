@@ -14,7 +14,7 @@ case class FileObject(
   baseObject: AbstractObject,
   fileObjectType: FileObjectType,
   fileDescriptor: Option[Int] = None,
-  localPrincipal: Option[-->[UUID]] = None,
+  localPrincipal: Option[UUID] = None,
   size: Option[Long] = None,
   peInfo: Option[String] = None,
   hashes: Option[Seq[CryptographicHash]] = None
@@ -35,7 +35,7 @@ case class FileObject(
     hashes.fold[List[(String,Any)]](List.empty)(v => List(("hashes", v.map(h => s"${h.cryptoType}:${h.hash}").mkString(", "))))  // TODO: Revisit how we should represent this in the DB
 
   def asDBEdges = List.concat(
-    localPrincipal.map(p => (CDM17.EdgeTypes.localPrincipal,p.target))
+    localPrincipal.map(p => (CDM17.EdgeTypes.localPrincipal,p))
   )
 
   def getUuid = uuid
@@ -65,7 +65,7 @@ case object FileObject extends CDM17Constructor[FileObject] {
       cdm.getBaseObject,
       cdm.getType,
       AvroOpt.int(cdm.getFileDescriptor),
-      AvroOpt.uuid(cdm.getLocalPrincipal).map(u => toOutgoingId(u)),
+      AvroOpt.uuid(cdm.getLocalPrincipal),
       AvroOpt.long(cdm.getSize),
       AvroOpt.str(cdm.getPeInfo),
       AvroOpt.listCryptographicHash(cdm.getHashes)

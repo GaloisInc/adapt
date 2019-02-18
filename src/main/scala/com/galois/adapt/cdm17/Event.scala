@@ -15,11 +15,11 @@ case class Event(
   sequence: Long = 0,
   eventType: EventType,
   threadId: Int,
-  subject: -->[UUID],
+  subject: UUID,
   timestampNanos: Long,
-  predicateObject: Option[-->[UUID]] = None,
+  predicateObject: Option[UUID] = None,
   predicateObjectPath: Option[String] = None,
-  predicateObject2: Option[-->[UUID]] = None,
+  predicateObject2: Option[UUID] = None,
   predicateObject2Path: Option[String] = None,
   name: Option[String] = None,
   parameters: Option[List[Value]] = None,
@@ -38,7 +38,7 @@ case class Event(
     ("sequence", sequence),
     ("eventType", eventType.toString),
     ("threadId", threadId),
-    ("subjectUuid", subject.target),
+    ("subjectUuid", subject),
     ("timestampNanos", timestampNanos)
   ) ++
     predicateObject.fold[List[(String,Any)]](List.empty)(v => List(("predicateObjectUuid", v))) ++
@@ -53,9 +53,9 @@ case class Event(
     DBOpt.fromKeyValMap(properties)  // Flattens out nested "properties"
 
   def asDBEdges = List.concat(
-    List((CDM17.EdgeTypes.subject,subject.target)),
-    predicateObject.map(p => (CDM17.EdgeTypes.predicateObject,p.target)),
-    predicateObject2.map(p => (CDM17.EdgeTypes.predicateObject2,p.target)),
+    List((CDM17.EdgeTypes.subject,subject)),
+    predicateObject.map(p => (CDM17.EdgeTypes.predicateObject,p)),
+    predicateObject2.map(p => (CDM17.EdgeTypes.predicateObject2,p)),
     foldedParameters.flatMap(value => value.tagsFolded.map(tag => (CDM17.EdgeTypes.parameterTagId, tag.tagId)))
   )
 
@@ -71,7 +71,7 @@ case class Event(
     "sequence" -> sequence,
     "eventType" -> eventType.toString,
     "threadId" -> threadId,
-    "subjectUuid" -> subject.target,
+    "subjectUuid" -> subject,
     "timestampNanos" -> timestampNanos,
     "predicateObjectUuid" -> predicateObject.getOrElse(""),
     "predicateObjectPath" -> predicateObjectPath.getOrElse(""),
@@ -100,11 +100,11 @@ case object Event extends CDM17Constructor[Event] {
       cdm.getSequence,
       cdm.getType,
       cdm.getThreadId,
-      toOutgoingId[UUID](cdm.getSubject),
+      cdm.getSubject,
       cdm.getTimestampNanos,
-      AvroOpt.uuid(cdm.getPredicateObject).map(toOutgoingId),
+      AvroOpt.uuid(cdm.getPredicateObject),
       AvroOpt.str(cdm.getPredicateObjectPath),
-      AvroOpt.uuid(cdm.getPredicateObject2).map(toOutgoingId),
+      AvroOpt.uuid(cdm.getPredicateObject2),
       AvroOpt.str(cdm.getPredicateObject2Path),
       AvroOpt.str(cdm.getName),
       AvroOpt.listValue(cdm.getParameters),

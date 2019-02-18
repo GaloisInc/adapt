@@ -6,14 +6,30 @@ import akka.util.Timeout
 import com.galois.adapt.adm._
 import com.galois.adapt.{Ack, CompleteMsg, DBNodeable, DBQueryProxyActor, InitMsg, Ready}
 import com.rrwright.quine.runtime.GraphService
+import java.util.UUID
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
-import com.rrwright.quine.language.DomainNodeSetSingleton
+import com.rrwright.quine.runtime.{QuineIdProvider, NameSpacedUuidProvider}
+import com.rrwright.quine.language.{QuineId, DomainNodeSetSingleton}
 import com.rrwright.quine.language.JavaObjectSerializationScheme._   // IntelliJ sometimes can't tell that this is used for implicits
 
-class QuineDBActor(graphService: GraphService, idx: Int) extends DBQueryProxyActor {
+object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
+  val underlying = NameSpacedUuidProvider("synthetic")
+  private implicit def toNamespacedId(a: AdmUUID): (String, UUID) = (a.namespace, a.uuid)
+  private implicit def fromNamespacedId(x: (String, UUID)): AdmUUID  = AdmUUID(x._2, x._1)
+
+  def newId() = underlying.newId()
+  def hashedCustomId(bytes: Array[Byte]) = underlying.hashedCustomId(bytes)
+  def customIdToString(typed: AdmUUID) = underlying.customIdToString(typed)
+  def customIdToBytes(typed: AdmUUID) = underlying.customIdToBytes(typed)
+  def customIdFromBytes(bytes: Array[Byte]) = underlying.customIdFromBytes(bytes).map(x => x)
+  def customIdFromString(str: String) = underlying.customIdFromString(str).map(x => x)
+  def whichShard(qid: QuineId, shardCount: Int): Int = underlying.whichShard(qid, shardCount)
+}
+
+class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQueryProxyActor {
 
   implicit val service = graphService
   lazy val graph: org.apache.tinkerpop.gremlin.structure.Graph = ???
@@ -41,25 +57,29 @@ class QuineDBActor(graphService: GraphService, idx: Int) extends DBQueryProxyAct
   ))
 
   def writeAdm(a: ADM): Future[Unit] = (a match {
-    case anAdm: AdmEvent              => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmSubject            => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmPrincipal          => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmFileObject         => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmNetFlowObject      => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmPathNode           => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmPort               => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmAddress            => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmSrcSinkObject      => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmProvenanceTagNode  => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmHost               => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
-    case anAdm: AdmSynthesized        => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid.uuid))
+    case anAdm: AdmEvent              => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
+    case anAdm: AdmSubject            => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
+    case anAdm: AdmPrincipal          => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
+    case anAdm: AdmFileObject         => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
+    case anAdm: AdmNetFlowObject      => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
+    case anAdm: AdmPathNode           => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
+    case anAdm: AdmPort               => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
+    case anAdm: AdmAddress            => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
+    case anAdm: AdmSrcSinkObject      => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
+    case anAdm: AdmProvenanceTagNode  => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
+    case anAdm: AdmHost               => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
+    case anAdm: AdmSynthesized        => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
     case _                            => throw new Exception("Unexpected ADM")
   }).flatMap {
     case Success(_) => Future.successful(())
     case Failure(f) => Future.failed(f)
   }
 
-  def writeAdmEdge(e: EdgeAdm2Adm): Future[Unit] = graphService.dumbOps.addEdge(e.src, e.tgt, e.label)
+  def writeAdmEdge(e: EdgeAdm2Adm): Future[Unit] = graphService.dumbOps.addEdge(
+    AdmUuidProvider.customIdToQid(e.src),
+    AdmUuidProvider.customIdToQid(e.tgt),
+    e.label
+  )
 
   def FutureTx[T](body: => T)(implicit ec: ExecutionContext): Future[T] = Future(body)
 
@@ -84,7 +104,7 @@ class QuineDBActor(graphService: GraphService, idx: Int) extends DBQueryProxyAct
 case class WithSender[A](sender: ActorRef, message: A)
 
 
-class QuineRouter(count: Int, graph: GraphService) extends Actor with ActorLogging {
+class QuineRouter(count: Int, graph: GraphService[AdmUUID]) extends Actor with ActorLogging {
   var router = {
     val routees = (0 until count) map { idx =>
       val r = context.actorOf(Props(classOf[QuineDBActor], graph, idx))
