@@ -21,13 +21,14 @@ parser.add_argument('--mode', '-m',
 					default='batch',
 					choices=['batch','stream'])
 parser.add_argument('--classes', '-k', help='number of classes',default=0)
-parser.add_argument('--iterations', '-n', help='number of iterations')
+parser.add_argument('--epsilon', '-e', help='improvement threshold',default=0.01)
 
 
 if __name__ == '__main__':
 	args = parser.parse_args()
 	if args.mode == 'batch':
-		klmeans.run(args.input, args.output, int(args.classes), int(args.iterations),
+		klmeans.run(args.input, args.output, int(args.classes),
+					epsilon=float(args.epsilon),
 					modelfile=args.cluster)
 	else:
 		klstream.run(args.input, args.output, modelfile=args.cluster)

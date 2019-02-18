@@ -24,7 +24,7 @@ def escape(attr):
 		return attr
 
 def convertDict2CSVFile(dictionary, filename):
-	attributes = sorted({escape(e) for val in dictionary.values() for e in val})
+	attributes = sorted({e for val in dictionary.values() for e in val})
 	with open(filename,'w') as f:
 		f.write(','.join(['Object_ID']+attributes)+'\n')
 		for obj,atts in dictionary.items():
@@ -55,15 +55,20 @@ def convertQueryRes2Dict(json,obj_name,att_names):
 	dict = collections.defaultdict(list)
 	if type(att_names)==list:
 		for e in json:
-			dict[e[obj_name]].extend([str(e[a]) for a in att_names])
+			dict[e[obj_name]].extend([escape(str(e[a])) for a in att_names])
 	else:
 		sys.exit('Expected list of attribute names in specification')
 	return dict
 
-def convert2InputCSV(spec_file,output_file,db):
+def convert2InputCSV(spec_file,output_file,db,provider):
 	spec = loadSpec(spec_file)
 	# extract the query from specification file and get the results
 	(query,obj_name,att_names,endpoint,timeout) = parseQuerySpec(spec)
+	# plug in the hole with provider name if available
+	if provider != None:
+		query = query % ('n.provider = "' + provider + '"')
+	else:
+		query = query % ('TRUE')
 	# run the query
 	query_res = db.getQuery(query,endpoint=endpoint,timeout=timeout)
 	# convert query to a dictionary grouping by object ids
