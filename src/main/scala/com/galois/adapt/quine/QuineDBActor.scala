@@ -8,12 +8,15 @@ import com.galois.adapt.{Ack, CompleteMsg, DBNodeable, DBQueryProxyActor, InitMs
 import com.rrwright.quine.runtime.GraphService
 import java.util.UUID
 
+import spray.json.{JsObject, JsString, JsValue, RootJsonFormat}
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
+import com.rrwright.quine.gremlin.{GremlinQueryRunner, TypeAnnotationFieldReader}
 import com.rrwright.quine.runtime.{QuineIdProvider, NameSpacedUuidProvider}
-import com.rrwright.quine.language.{QuineId, DomainNodeSetSingleton}
+import com.rrwright.quine.language.{QuineId, DomainNodeSetSingleton, PickleReader}
 import com.rrwright.quine.language.JavaObjectSerializationScheme._   // IntelliJ sometimes can't tell that this is used for implicits
+import com.galois.adapt.{NodeQuery, EdgeQuery,StringQuery}
 
 object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
   val underlying = NameSpacedUuidProvider("synthetic")
@@ -32,7 +35,24 @@ object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
 class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQueryProxyActor {
 
   implicit val service = graphService
+  implicit val timeout = Timeout(21 seconds)
   lazy val graph: org.apache.tinkerpop.gremlin.structure.Graph = ???
+
+  val gremlin = GremlinQueryRunner(
+    graph = graphService,
+    fieldReader = TypeAnnotationFieldReader(
+      fieldToTypeName = Map.empty,
+      defaultTypeNames = Seq("Boolean", "Long", "Int", "List[Int]", "List[Long]", "String"),
+      typeNameToPickleReader = Map(
+        "Boolean"    -> PickleReader[Boolean],   
+        "Long"       -> PickleReader[Long],
+        "Int"        -> PickleReader[Int],
+        "List[Long]" -> PickleReader[List[Long]],
+        "List[Int]"  -> PickleReader[List[Int]],
+        "String"     -> PickleReader[String]
+      )
+    )
+  )
 
 //  log.info(s"QuineDB actor init")
 
@@ -43,7 +63,6 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
     }
   }
 
-  implicit val timeout = Timeout(21 seconds)
 
   def DBNodeableTx(cdms: Seq[DBNodeable[_]]): Try[Unit] = ??? 
   
@@ -84,6 +103,25 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   def FutureTx[T](body: => T)(implicit ec: ExecutionContext): Future[T] = Future(body)
 
   override def receive = {
+
+   // Run a query that returns vertices
+    case NodeQuery(q, shouldParse) => ???
+    case EdgeQuery(q, shouldParse) => ???
+
+    // Run the query without specifying what the output type will be. This is the variant used by 'cmdline_query.py'
+    case StringQuery(q, shouldParse) =>
+//      log.info(s"Received string query: $q")
+      sender() ! FutureTx {
+        gremlin.queryExpecting[java.lang.Object](q).map { results =>
+//          log.info(s"Found: ${results.length} items")
+          if (shouldParse) {
+            DBQueryProxyActor.toJson(results.toList)
+          } else {
+            JsString(results.map(r => s""""${r.toString.replace("\\", "\\\\").replace("\"", "\\\"")}"""").mkString("[", ",", "]"))
+          }
+        }
+      }
+
 
     case WithSender(s: ActorRef, Left(a: ADM))          => writeAdm(a).ackOnComplete(s)
     case WithSender(s: ActorRef, Right(e: EdgeAdm2Adm)) => writeAdmEdge(e).ackOnComplete(s)
