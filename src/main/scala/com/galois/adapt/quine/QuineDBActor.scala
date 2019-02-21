@@ -4,19 +4,19 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import akka.util.Timeout
 import com.galois.adapt.adm._
-import com.galois.adapt.{Ack, CompleteMsg, DBNodeable, DBQueryProxyActor, InitMsg, Ready}
+import com.galois.adapt.{Ack, ApiJsonProtocol, CompleteMsg, DBNodeable, DBQueryProxyActor, EdgeQuery, InitMsg, NodeQuery, Ready, StringQuery}
 import com.rrwright.quine.runtime.GraphService
 import java.util.UUID
 
-import spray.json.{JsObject, JsString, JsValue, RootJsonFormat}
+import spray.json.{JsArray, JsNumber, JsObject, JsString, JsValue, RootJsonFormat}
+
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import com.rrwright.quine.gremlin.{GremlinQueryRunner, TypeAnnotationFieldReader}
-import com.rrwright.quine.runtime.{QuineIdProvider, NameSpacedUuidProvider}
-import com.rrwright.quine.language.{QuineId, DomainNodeSetSingleton, PickleReader}
-import com.rrwright.quine.language.JavaObjectSerializationScheme._   // IntelliJ sometimes can't tell that this is used for implicits
-import com.galois.adapt.{NodeQuery, EdgeQuery,StringQuery}
+import com.rrwright.quine.runtime.{NameSpacedUuidProvider, QuineIdProvider}
+import com.rrwright.quine.language.{DomainNodeSetSingleton, PickleReader, QuineId}
+import com.rrwright.quine.language.JavaObjectSerializationScheme._
 
 object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
   val underlying = NameSpacedUuidProvider("synthetic")
@@ -25,11 +25,10 @@ object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
 
   def newId() = underlying.newId()
   def hashedCustomId(bytes: Array[Byte]) = underlying.hashedCustomId(bytes)
-  def customIdToString(typed: AdmUUID) = underlying.customIdToString(typed)
+  def customIdToString(typed: AdmUUID) = typed.rendered
   def customIdToBytes(typed: AdmUUID) = underlying.customIdToBytes(typed)
   def customIdFromBytes(bytes: Array[Byte]) = underlying.customIdFromBytes(bytes).map(x => x)
-  def customIdFromString(str: String) = underlying.customIdFromString(str).map(x => x)
-  def whichShard(qid: QuineId, shardCount: Int): Int = underlying.whichShard(qid, shardCount)
+  def customIdFromString(str: String) = Try(AdmUUID.fromRendered(str))
 }
 
 class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQueryProxyActor {
@@ -51,7 +50,8 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         "List[Int]"  -> PickleReader[List[Int]],
         "String"     -> PickleReader[String]
       )
-    )
+    ),
+    labelKey = "type_of"
   )
 
 //  log.info(s"QuineDB actor init")
@@ -104,20 +104,49 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 
   override def receive = {
 
-   // Run a query that returns vertices
-    case NodeQuery(q, shouldParse) => ???
-    case EdgeQuery(q, shouldParse) => ???
-
     // Run the query without specifying what the output type will be. This is the variant used by 'cmdline_query.py'
-    case StringQuery(q, shouldParse) =>
-//      log.info(s"Received string query: $q")
-      sender() ! FutureTx {
-        gremlin.queryExpecting[java.lang.Object](q).map { results =>
-//          log.info(s"Found: ${results.length} items")
-          if (shouldParse) {
-            DBQueryProxyActor.toJson(results.toList)
-          } else {
-            JsString(results.map(r => s""""${r.toString.replace("\\", "\\\\").replace("\"", "\\\"")}"""").mkString("[", ",", "]"))
+    case WithSender(sndr, StringQuery(q, shouldParse)) =>
+      log.debug(s"Received string query: $q")
+      println(s"Received string query: $q")
+      sndr ! {
+        gremlin.queryEither(q).map { resultsEither =>
+          resultsEither.fold(qge => Failure(throw qge), Success(_)).map { results =>
+            if (shouldParse) {
+              ApiJsonProtocol.anyToJson(results.toList)
+            } else {
+              JsString(results.map(r => s""""${r.toString.replace("\\", "\\\\").replace("\"", "\\\"")}"""").mkString("[", ",", "]"))
+            }
+          }
+        }
+      }
+
+    // Run a query that returns vertices
+    case WithSender(sndr, NodeQuery(q, shouldParse)) =>
+      log.debug(s"Received node query: $q")
+      println(s"Received node query: $q")
+      sndr ! {
+        // The Gremlin adapter for quine doesn't store much information on nodes, so we have to
+        // actively go get that information
+        gremlin.queryEither(q + s""".as('vertex')
+                                   |.valueMap().as('valueMap').select('vertex')
+                                   |.id().as('id')
+                                   |.select('valueMap','id')""".stripMargin).map { verticesEither =>
+          verticesEither.fold(qge => Failure(throw qge), Success(_)).map { vertices =>
+            if (shouldParse) JsArray(vertices.map(ApiJsonProtocol.quineVertexToJson).toVector)
+            else vertices.toStream
+          }
+        }
+      }
+
+    // Run a query that returns edges
+    case WithSender(sndr, EdgeQuery(q, shouldParse)) =>
+      log.debug(s"Received new edge query: $q")
+      println(s"Received new edge query: $q")
+      sndr ! {
+        gremlin.queryEitherExpecting[com.rrwright.quine.gremlin.Edge](q).map { edgesEither =>
+          edgesEither.fold(qge => Failure(throw qge), Success(_)).map { edges =>
+            if (shouldParse) JsArray(edges.map(ApiJsonProtocol.quineEdgeToJson).toVector)
+            else edges.toList.toStream
           }
         }
       }

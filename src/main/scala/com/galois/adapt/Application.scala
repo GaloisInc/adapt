@@ -142,7 +142,7 @@ object Application extends App {
   if ( ! ppmBaseDirFile.exists()) ppmBaseDirFile.mkdir()
 
   // Start up the database
-  val dbActor: ActorRef = runFlow match {
+  var dbActor: ActorRef = runFlow match {
     case "accept" => system.actorOf(Props(classOf[TinkerGraphDBQueryProxy]))
     case "quine" => ActorRef.noSender
     case _ => system.actorOf(Props(classOf[Neo4jDBQueryProxy], statusActor))
@@ -395,11 +395,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
     case "quine" =>
       println("Running provenance ingest demo with the Quine database.")
 
-      implicit val graph = GraphService(
-        system,
-        inMemorySoftNodeLimit = Some(1000),
-        shardCount = 3,
-        uiPort = None /*Some(9090)*/ )(
+      implicit val graph = GraphService(system)(
         MapDBMultimap(),
         AdmUuidProvider
       )
@@ -407,9 +403,10 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       implicit val timeout = Timeout(30.4 seconds)
 
       val parallelism = 32 // 16
-        
+
       val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
-      
+      dbActor = quineRouter
+
       startWebServer()
       statusActor ! InitMsg
 
