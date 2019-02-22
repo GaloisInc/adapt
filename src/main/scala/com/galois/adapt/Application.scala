@@ -395,8 +395,9 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
     case "quine" =>
       println("Running provenance ingest demo with the Quine database.")
 
-      implicit val graph = GraphService(system)(
+      implicit val graph = GraphService(system, uiPort = None)(
         MapDBMultimap(),
+//        EmptyPersistor(),
         AdmUuidProvider
       )
 
