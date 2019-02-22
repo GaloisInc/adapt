@@ -17,7 +17,7 @@ import akka.NotUsed
 import akka.event.{Logging, LoggingAdapter}
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
-import com.galois.adapt.cdm19._
+import com.galois.adapt.cdm20._
 
 import scala.collection.mutable
 import scala.concurrent.duration._
@@ -173,7 +173,7 @@ object Application extends App {
     case _ => ErrorHandler.print
   }
 
-  val cdmSources: Map[HostName, (IngestHost, Source[(Namespace,CDM19), NotUsed])] = ingestConfig.hosts.map { host: IngestHost =>
+  val cdmSources: Map[HostName, (IngestHost, Source[(Namespace,CDM20), NotUsed])] = ingestConfig.hosts.map { host: IngestHost =>
     host.hostName -> (host, host.toCdmSource(errorHandler))
   }.toMap
 
@@ -251,9 +251,9 @@ object Application extends App {
 
       val sink = Sink.fromGraph(GraphDSL.create() { implicit b =>
         import GraphDSL.Implicits._
-        val broadcast = b.add(Broadcast[(String,CDM19)](1))
+        val broadcast = b.add(Broadcast[(String,CDM20)](1))
 
-        broadcast ~> DBQueryProxyActor.graphActorCdm19WriteSink(dbActor, CdmDone)(writeTimeout)
+        broadcast ~> DBQueryProxyActor.graphActorCdm20WriteSink(dbActor, CdmDone)(writeTimeout)
      //   broadcast ~> EntityResolution(uuidRemapper) ~> Neo4jFlowComponents.neo4jActorAdmWriteSink(dbActor, AdmDone)(writeTimeout)
         SinkShape(broadcast.in)
       })
@@ -294,13 +294,13 @@ object Application extends App {
             import GraphDSL.Implicits._
 
             val sources = cdmSources.values.toSeq
-            val merge = b.add(Merge[(Namespace,CDM19)](sources.size))
+            val merge = b.add(Merge[(Namespace,CDM20)](sources.size))
 
             for (((host, source), i) <- sources.zipWithIndex) {
               source.via(printCounter(host.hostName, statusActor, 0)) ~> merge.in(i)
             }
 
-            merge.out ~> DBQueryProxyActor.graphActorCdm19WriteSink(dbActor, completionMsg)(writeTimeout)
+            merge.out ~> DBQueryProxyActor.graphActorCdm20WriteSink(dbActor, completionMsg)(writeTimeout)
 
             ClosedShape
           }).run()
@@ -339,7 +339,7 @@ object Application extends App {
               broadcast.out(1) ~> erMap(host.hostName) ~> mergeAdm.in(i)
             }
 
-            mergeCdm.out                     ~> DBQueryProxyActor.graphActorCdm19WriteSink(dbActor, completionMsg)(writeTimeout)
+            mergeCdm.out                     ~> DBQueryProxyActor.graphActorCdm20WriteSink(dbActor, completionMsg)(writeTimeout)
             mergeAdm.out ~> betweenHostDedup ~> DBQueryProxyActor.graphActorAdmWriteSink(dbActor, completionMsg)
 
             ClosedShape
@@ -486,7 +486,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         import GraphDSL.Implicits._
 
         val hostSources = cdmSources.values.toSeq
-        val mergeCdm = b.add(Merge[CDM19](hostSources.size))
+        val mergeCdm = b.add(Merge[CDM20](hostSources.size))
 
         for (((host, source), i) <- hostSources.zipWithIndex) {
           source.map(_._2) ~> mergeCdm.in(i)
@@ -503,7 +503,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         import GraphDSL.Implicits._
 
         val sources = cdmSources.values.toSeq
-        val merge = b.add(Merge[(Namespace,CDM19)](sources.size))
+        val merge = b.add(Merge[(Namespace,CDM20)](sources.size))
         val sink = b.add(Sink.ignore)
 
         for (((host, source), i) <- sources.zipWithIndex) {
@@ -660,15 +660,15 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         .via(printCounter("UniqueUUIDs", statusActor, li.range.startInclusive))
         .statefulMapConcat[(UUID,Boolean)] { () =>
         import scala.collection.mutable.{Map => MutableMap}
-        val firstObservation = MutableMap.empty[UUID, CDM19]
+        val firstObservation = MutableMap.empty[UUID, CDM20]
         val ignoreUuid = new UUID(0L,0L);
         {
-          case (name, c: CDM19 with DBNodeable[_]) if c.getUuid == ignoreUuid => List()
-          case (name, c: CDM19 with DBNodeable[_]) if firstObservation.contains(c.getUuid) =>
+          case (name, c: CDM20 with DBNodeable[_]) if c.getUuid == ignoreUuid => List()
+          case (name, c: CDM20 with DBNodeable[_]) if firstObservation.contains(c.getUuid) =>
             val comparison = firstObservation(c.getUuid) == c
             if ( ! comparison) println(s"Match Failure on UUID: ${c.getUuid}\nOriginal: ${firstObservation(c.getUuid)}\nThis:     $c\n")
             List()
-          case (name, c: CDM19 with DBNodeable[_]) =>
+          case (name, c: CDM20 with DBNodeable[_]) =>
             firstObservation += (c.getUuid -> c)
             List()
           case _ => List.empty

@@ -6,7 +6,7 @@ import java.util.UUID
 package object adapt {
 
   trait CdmVersion
-  type CurrentCdm = cdm19.CDM19
+  type CurrentCdm = cdm20.CDM20
 
   /// Simple variant of [InstrumentationSource]
   sealed trait DataProvider
@@ -19,7 +19,7 @@ package object adapt {
   case object Marple extends DataProvider
 
   object DataProvider {
-    def fromInstrumentationSource(src: cdm19.InstrumentationSource): DataProvider = src.toString.split('_').last match {
+    def fromInstrumentationSource(src: cdm20.InstrumentationSource): DataProvider = src.toString.split('_').last match {
       case "CLEARSCOPE" => Clearscope
       case "TRACE" => Trace
       case "CADETS" => Cadets

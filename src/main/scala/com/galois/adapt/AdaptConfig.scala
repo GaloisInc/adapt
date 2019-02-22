@@ -8,7 +8,8 @@ import akka.stream.scaladsl.{Flow, Source}
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.cdm17.CDM17
 import com.galois.adapt.cdm18.CDM18
-import com.galois.adapt.cdm19.{CDM19, RawCDM19Type}
+import com.galois.adapt.cdm19.CDM19
+import com.galois.adapt.cdm20.{CDM20, RawCDM20Type}
 import org.apache.avro.specific.SpecificDatumReader
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import pureconfig.error.{ConfigReaderFailures, ConvertFailure, NoValidCoproductChoiceFound, UnknownKey}
@@ -55,8 +56,8 @@ object AdaptConfig extends Utils {
       hosts.head
     }
 
-    def toCdmSource(handler: ErrorHandler = ErrorHandler.print): Source[(Namespace,CDM19), NotUsed] = hosts
-      .foldLeft(Source.empty[(Namespace,CDM19)])((acc, h: IngestHost) => acc.merge(h.toCdmSource(handler)))
+    def toCdmSource(handler: ErrorHandler = ErrorHandler.print): Source[(Namespace,CDM20), NotUsed] = hosts
+      .foldLeft(Source.empty[(Namespace,CDM20)])((acc, h: IngestHost) => acc.merge(h.toCdmSource(handler)))
   }
 
   case class RuntimeConfig(
@@ -291,10 +292,10 @@ object AdaptConfig extends Utils {
       .toString
       .toLowerCase
 
-    def toCdmSource(handler: ErrorHandler = ErrorHandler.print): Source[(Namespace,CDM19), NotUsed] = parallel
-      .foldLeft(Source.empty[(Namespace,CDM19)])((acc, li: LinearIngest) => acc.merge(li.toCdmSource(handler, updateHost _)))
+    def toCdmSource(handler: ErrorHandler = ErrorHandler.print): Source[(Namespace,CDM20), NotUsed] = parallel
+      .foldLeft(Source.empty[(Namespace,CDM20)])((acc, li: LinearIngest) => acc.merge(li.toCdmSource(handler, updateHost _)))
       .take(loadlimit.getOrElse(Long.MaxValue))
-      .filter { case (_, cdm: CDM19) => filter.fold(true)(applyFilter(cdm, _)) }
+      .filter { case (_, cdm: CDM20) => filter.fold(true)(applyFilter(cdm, _)) }
 
     def updateHost(is: DataProvider): Unit = ta1 match {
       case None => ta1 = Some(is)
@@ -340,16 +341,16 @@ object AdaptConfig extends Utils {
     def toCdmSource(
         handler: ErrorHandler,
         check: DataProvider => Unit = { _ => }
-    ): Source[(Namespace,CDM19), NotUsed] = {
-      val croppedRange: Source[Lazy[(Try[CDM19], Namespace)], NotUsed] = range.applyToSourceMessage(
-        sequential.foldLeft(Source.empty[Lazy[(Try[CDM19], Namespace)]])((acc, iu) => acc.concat(iu.toCdmSourceTry(check)))
+    ): Source[(Namespace,CDM20), NotUsed] = {
+      val croppedRange: Source[Lazy[(Try[CDM20], Namespace)], NotUsed] = range.applyToSourceMessage(
+        sequential.foldLeft(Source.empty[Lazy[(Try[CDM20], Namespace)]])((acc, iu) => acc.concat(iu.toCdmSourceTry(check)))
       )
 
-      // Only now do we actually force the parsing of the CDM19 (ie. purge the `Lazy`)
+      // Only now do we actually force the parsing of the CDM20 (ie. purge the `Lazy`)
       croppedRange.statefulMapConcat { () =>
         var counter: Long = 0L
 
-        (cdmTry: Lazy[(Try[CDM19], Namespace)]) => {
+        (cdmTry: Lazy[(Try[CDM20], Namespace)]) => {
           counter += 1
           cdmTry.value match {
             case (Success(cdm), namespace) => List(namespace -> cdm)
@@ -365,7 +366,7 @@ object AdaptConfig extends Utils {
     val range: Range
 
     // The `Lazy` is so that we can skip past records without actually parsing them.
-    def toCdmSourceTry(check: DataProvider => Unit): Source[Lazy[(Try[CDM19], Namespace)], _]
+    def toCdmSourceTry(check: DataProvider => Unit): Source[Lazy[(Try[CDM20], Namespace)], _]
   }
 
   case class FileIngestUnit(
@@ -375,7 +376,7 @@ object AdaptConfig extends Utils {
   ) extends IngestUnit {
 
     // Falls back on old CDM parsers
-    override def toCdmSourceTry(check: DataProvider => Unit): Source[Lazy[(Try[CDM19], Namespace)], _] = range.applyToSource {
+    override def toCdmSourceTry(check: DataProvider => Unit): Source[Lazy[(Try[CDM20], Namespace)], _] = range.applyToSource {
 
       val pathsExpanded: List[FilePath] = if (paths.length == 1 && new File(paths.head).isDirectory) {
         new File(paths.head).listFiles().toList.collect {
@@ -386,17 +387,17 @@ object AdaptConfig extends Utils {
         paths.map(_.replaceFirst("^~", System.getProperty("user.home")))
       }
 
-      pathsExpanded.foldLeft(Source.empty[Lazy[(Try[CDM19], Namespace)]]) { case (acc, path) =>
-        readCdm19(path) orElse readCdm18(path) orElse readCdm17(path) match {
+      pathsExpanded.foldLeft(Source.empty[Lazy[(Try[CDM20], Namespace)]]) { case (acc, path) =>
+        readCdm20(path) orElse readCdm19(path) orElse readCdm18(path) orElse readCdm17(path) match {
           case Failure(_: FileNotFoundException) =>
             println(s"Failed to find a file at $path. Skipping it for now.")
             acc
 
           case Failure(_) =>
-            println(s"Failed to read file $path as CDM19, CDM18, or CDM17. Skipping it for now.")
+            println(s"Failed to read file $path as CDM20, CDM19, CDM18, or CDM17. Skipping it for now.")
             acc
 
-          case Success((is: DataProvider, source: Source[Lazy[Try[CDM19]], NotUsed])) =>
+          case Success((is: DataProvider, source: Source[Lazy[Try[CDM20]], NotUsed])) =>
             check(is)
             acc.concat(source.map(lazyTryCdm => lazyTryCdm.map(_ -> namespace)))
         }
@@ -416,36 +417,62 @@ object AdaptConfig extends Utils {
     import org.apache.kafka.common.serialization.ByteArrayDeserializer
 
     // Only tries the newest CDM version, also doesn't check that we were right with the provider
-    override def toCdmSourceTry(_check: DataProvider => Unit): Source[Lazy[(Try[CDM19], Namespace)], _] =
+    override def toCdmSourceTry(_check: DataProvider => Unit): Source[Lazy[(Try[CDM20], Namespace)], _] =
       range.applyToSource {
         Consumer
           .plainSource(
             ConsumerSettings(kafkaConsumerJavaConfig, new ByteArrayDeserializer, new ByteArrayDeserializer),
             Subscriptions.assignmentWithOffset(new TopicPartition(topicName, 0), offset = 0)
           )
-          .map(cr => Lazy { (KafkaTopicIngestUnit.kafkaCdm19Parser(cr), namespace) })
+          .map(cr => Lazy { (KafkaTopicIngestUnit.kafkaCdm20Parser(cr), namespace) })
       }
   }
   object KafkaTopicIngestUnit {
 
-    private val reader19 = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm19.TCCDMDatum])
+    private val reader20 = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm20.TCCDMDatum])
 
-    // Parse a `CDM18` from a kafka record
-    def kafkaCdm19Parser(msg: ConsumerRecord[Array[Byte], Array[Byte]]): Try[CDM19] = Try {
+    // Parse a `CDM20` from a kafka record
+    def kafkaCdm20Parser(msg: ConsumerRecord[Array[Byte], Array[Byte]]): Try[CDM20] = Try {
       import org.apache.avro.io.DecoderFactory
 
       val bais = new ByteArrayInputStream(msg.value()) // msg.record.value()
       val offset = msg.offset() // msg.record.offset()
       val decoder = DecoderFactory.get.binaryDecoder(bais, null)
-      val datum = reader19.read(null, decoder)
-      val cdm = new RawCDM19Type(datum.getDatum, Some(datum.getHostId))
-      CDM19.parse(cdm)
+      val datum = reader20.read(null, decoder)
+      val cdm = new RawCDM20Type(datum.getDatum, Some(datum.getHostId))
+      CDM20.parse(cdm)
     }.flatten
   }
 
   case class CouldNotConvert(cdm: AnyRef, targetCdm: String) extends Exception(s"Could not convert $cdm to $targetCdm")
 
-  // Try to make a CDM19 record from a CDM18 one
+  // Try to make a CDM20 record from a CDM19 one
+  def cdm19ascdm20(c: CDM19): Try[CDM20] = {
+    import com.galois.adapt.cdm20.Cdm19to20
+    import com.galois.adapt.{cdm19 => cdm19types}
+
+    c match {
+      case e: cdm19types.Event => Success(Cdm19to20.event(e))
+      case f: cdm19types.FileObject => Success(Cdm19to20.fileObject(f))
+      case m: cdm19types.MemoryObject => Success(Cdm19to20.memoryObject(m))
+      case n: cdm19types.NetFlowObject => Success(Cdm19to20.netFlowObject(n))
+      case p: cdm19types.Principal => Success(Cdm19to20.principal(p))
+      case p: cdm19types.ProvenanceTagNode => Success(Cdm19to20.provenanceTagNode(p))
+      case r: cdm19types.RegistryKeyObject => Success(Cdm19to20.registryKeyObject(r))
+      case s: cdm19types.SrcSinkObject => Success(Cdm19to20.srcSinkObject(s))
+      case s: cdm19types.Subject => Success(Cdm19to20.subject(s))
+      case t: cdm19types.TimeMarker => Success(Cdm19to20.timeMarker(t))
+      case u: cdm19types.UnitDependency => Success(Cdm19to20.unitDependency(u))
+      case u: cdm19types.IpcObject => Success(Cdm19to20.ipcObject(u))
+      case u: cdm19types.Host => Success(Cdm19to20.host(u))
+      case u: cdm19types.PacketSocketObject => Success(Cdm19to20.packetSocketObject(u))
+      case _ =>
+        println(s"couldn't find a way to convert $c")
+        Failure(throw CouldNotConvert(c, "CDM20"))
+    }
+  }
+
+  // Try to make a CDM20 record from a CDM18 one
   def cdm18ascdm19(c: CDM18, dummyHost: UUID): Try[CDM19] = {
     import com.galois.adapt.cdm19.Cdm18to19
     import com.galois.adapt.{cdm18 => cdm18types}
@@ -497,52 +524,82 @@ object AdaptConfig extends Utils {
 
   val dummyHost: UUID = new java.util.UUID(0L,1L)
 
-  def applyFilter(c: CDM19, f: Filterable => Boolean): Boolean = c match {
-    case c: cdm19.Event => f(Filterable.apply(c))
-    case c: cdm19.FileObject => f(Filterable.apply(c))
+  def applyFilter(c: CDM20, f: Filterable => Boolean): Boolean = c match {
+    case c: cdm20.Event => f(Filterable.apply(c))
+    case c: cdm20.FileObject => f(Filterable.apply(c))
     //      case (s, c: Host) => (s, Left(Filterable.apply(c)))
-    case c: cdm19.MemoryObject => f(Filterable.apply(c))
-    case c: cdm19.NetFlowObject => f(Filterable.apply(c))
-    case c: cdm19.PacketSocketObject => f(Filterable.apply(c))
-    case c: cdm19.Principal => f(Filterable.apply(c))
-    case c: cdm19.ProvenanceTagNode => f(Filterable.apply(c))
-    case c: cdm19.RegistryKeyObject => f(Filterable.apply(c))
-    case c: cdm19.SrcSinkObject => f(Filterable.apply(c))
-    case c: cdm19.Subject => f(Filterable.apply(c))
-    case c: cdm19.TagRunLengthTuple => f(Filterable.apply(c))
-    case c: cdm19.UnitDependency => f(Filterable.apply(c))
-    case c: cdm19.IpcObject => f(Filterable.apply(c))
+    case c: cdm20.MemoryObject => f(Filterable.apply(c))
+    case c: cdm20.NetFlowObject => f(Filterable.apply(c))
+    case c: cdm20.PacketSocketObject => f(Filterable.apply(c))
+    case c: cdm20.Principal => f(Filterable.apply(c))
+    case c: cdm20.ProvenanceTagNode => f(Filterable.apply(c))
+    case c: cdm20.RegistryKeyObject => f(Filterable.apply(c))
+    case c: cdm20.SrcSinkObject => f(Filterable.apply(c))
+    case c: cdm20.Subject => f(Filterable.apply(c))
+    case c: cdm20.TagRunLengthTuple => f(Filterable.apply(c))
+    case c: cdm20.UnitDependency => f(Filterable.apply(c))
+    case c: cdm20.IpcObject => f(Filterable.apply(c))
     case other => true
   }
 
-  // Read a CDM19 file in
-  def readCdm19(path: FilePath): Try[(DataProvider, Source[Lazy[Try[CDM19]], NotUsed])] =
-    CDM19.readData(path).map { case (is, iterator) => (
+  // Read a CDM20 file in
+  def readCdm20(path: FilePath): Try[(DataProvider, Source[Lazy[Try[CDM20]], NotUsed])] =
+    CDM20.readData(path).map { case (is, iterator) => (
       DataProvider.fromInstrumentationSource(is),
       Source.fromIterator(() => iterator)
     ) }
 
-  // Read a CDM18 file in and, if it works convert it to CDM19
-  def readCdm18(path: FilePath): Try[(DataProvider, Source[Lazy[Try[CDM19]], NotUsed])] = {
-    import com.galois.adapt.cdm19.Cdm18to19
+  // Read a CDM19 file in and, if it works convert it to CDM20
+  def readCdm19(path: FilePath): Try[(DataProvider, Source[Lazy[Try[CDM20]], NotUsed])] = {
+    import com.galois.adapt.cdm20.Cdm19to20
 
-    CDM18.readData(path).map { case (is, iterator) => (
-      DataProvider.fromInstrumentationSource(Cdm18to19.instrumentationSource(is)),
-      Source.fromIterator(() => iterator.map { cdm18LazyTry =>
-        cdm18LazyTry.map((cdm18Try: Try[CDM18]) => cdm18Try.flatMap(cdm18 => cdm18ascdm19(cdm18, dummyHost)))
+    CDM19.readData(path).map { case (is, iterator) => (
+      DataProvider.fromInstrumentationSource(Cdm19to20.instrumentationSource(is)),
+      Source.fromIterator(() => iterator.map { cdm19LazyTry =>
+        cdm19LazyTry.map((cdm19Try: Try[CDM19]) => for {
+            cdm19 <- cdm19Try
+            cdm20 <- cdm19ascdm20(cdm19)
+          } yield cdm20
+        )
       })
     ) }
   }
 
-  // Read a CDM17 file in and, if it works convert it to CDM18 then CDM19
-  def readCdm17(path: FilePath): Try[(DataProvider, Source[Lazy[Try[CDM19]], NotUsed])] = {
+  // Read a CDM18 file in and, if it works convert it to CDM19 then CDM20
+  def readCdm18(path: FilePath): Try[(DataProvider, Source[Lazy[Try[CDM20]], NotUsed])] = {
+    import com.galois.adapt.cdm19.Cdm18to19
+    import com.galois.adapt.cdm20.Cdm19to20
+
+
+    CDM18.readData(path).map { case (is, iterator) => (
+      DataProvider.fromInstrumentationSource(Cdm19to20.instrumentationSource(Cdm18to19.instrumentationSource(is))),
+      Source.fromIterator(() => iterator.map { cdm18LazyTry =>
+        cdm18LazyTry.map((cdm18Try: Try[CDM18]) => for {
+            cdm18 <- cdm18Try
+            cdm19 <- cdm18ascdm19(cdm18, dummyHost)
+            cdm20 <- cdm19ascdm20(cdm19)
+          } yield cdm20
+        )
+      })
+    ) }
+  }
+
+  // Read a CDM17 file in and, if it works convert it to CDM18, CDM19, then CDM20
+  def readCdm17(path: FilePath): Try[(DataProvider, Source[Lazy[Try[CDM20]], NotUsed])] = {
     import com.galois.adapt.cdm18.Cdm17to18
     import com.galois.adapt.cdm19.Cdm18to19
+    import com.galois.adapt.cdm20.Cdm19to20
 
     CDM17.readData(path).map { case (is, iterator) => (
-      DataProvider.fromInstrumentationSource(Cdm18to19.instrumentationSource(Cdm17to18.instrumentationSource(is))),
+      DataProvider.fromInstrumentationSource(Cdm19to20.instrumentationSource(Cdm18to19.instrumentationSource(Cdm17to18.instrumentationSource(is)))),
       Source.fromIterator(() => iterator.map { cdm17LazyTry =>
-        cdm17LazyTry.map((cdm17Try: Try[CDM17]) => cdm17Try.flatMap(cdm17 => cdm17ascdm18(cdm17, dummyHost).flatMap(cdm18 => cdm18ascdm19(cdm18, dummyHost))))
+        cdm17LazyTry.map((cdm17Try: Try[CDM17]) => for {
+            cdm17 <- cdm17Try
+            cdm18 <- cdm17ascdm18(cdm17, dummyHost)
+            cdm19 <- cdm18ascdm19(cdm18, dummyHost)
+            cdm20 <- cdm19ascdm20(cdm19)
+          } yield cdm20
+        )
       })
     ) }
   }

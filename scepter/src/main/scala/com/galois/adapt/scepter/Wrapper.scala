@@ -133,14 +133,14 @@ object Wrapper extends App {
       }
 
       // Run the tests
-      val loadFiles = opts.targets.zipWithIndex.map { case (t,i) => s"-Dadapt.ingest.hosts.0.parallelIngests.0.sequentialUnits.0.paths.$i=$t" }
+      val loadFiles = opts.targets.zipWithIndex.map { case (t,i) => s"-Dadapt.ingest.hosts.0.parallel.0.sequential.0.paths.$i=$t" }
       val cmd = s"""java -Xmx${opts.heapSize}
                    |     -Dadapt.runflow=accept
                    |     -Dadapt.test.web-ui=${opts.webUi}
                    |     -Dakka.loglevel=ERROR
-                   |     -Dadapt.ingest.hosts.0.hostName=host
-                   |     -Dadapt.ingest.hosts.0.parallelIngests.0.sequentialUnits.0.type=file
-                   |     -Dadapt.ingest.hosts.0.parallelIngests.0.sequentialUnits.0.namespace=\"\"
+                   |     -Dadapt.ingest.hosts.0.hostname=host
+                   |     -Dadapt.ingest.hosts.0.parallel.0.sequential.0.type=file
+                   |     -Dadapt.ingest.hosts.0.parallel.0.sequential.0.namespace=\"\"
                    |     ${loadFiles.mkString(" ")}
                    |     -jar $actualAdaptJarPath
                    |""".stripMargin
