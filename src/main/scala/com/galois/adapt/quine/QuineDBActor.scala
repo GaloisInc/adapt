@@ -19,7 +19,7 @@ import com.rrwright.quine.language.{DomainNodeSetSingleton, PickleReader, QuineI
 import com.rrwright.quine.language.JavaObjectSerializationScheme._
 
 object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
-  val underlying = NameSpacedUuidProvider("synthetic")
+  val underlying = NameSpacedUuidProvider(List("synthetic"),0)
   private implicit def toNamespacedId(a: AdmUUID): (String, UUID) = (a.namespace, a.uuid)
   private implicit def fromNamespacedId(x: (String, UUID)): AdmUUID  = AdmUUID(x._2, x._1)
 
@@ -76,18 +76,18 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   ))
 
   def writeAdm(a: ADM): Future[Unit] = (a match {
-    case anAdm: AdmEvent              => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
-    case anAdm: AdmSubject            => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
-    case anAdm: AdmPrincipal          => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
-    case anAdm: AdmFileObject         => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
-    case anAdm: AdmNetFlowObject      => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
-    case anAdm: AdmPathNode           => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
-    case anAdm: AdmPort               => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
-    case anAdm: AdmAddress            => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
-    case anAdm: AdmSrcSinkObject      => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
-    case anAdm: AdmProvenanceTagNode  => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
-    case anAdm: AdmHost               => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
-    case anAdm: AdmSynthesized        => DomainNodeSetSingleton(anAdm).create(Some(AdmUuidProvider.customIdToQid(anAdm.uuid)))
+    case anAdm: AdmEvent              => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
+    case anAdm: AdmSubject            => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
+    case anAdm: AdmPrincipal          => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
+    case anAdm: AdmFileObject         => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
+    case anAdm: AdmNetFlowObject      => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
+    case anAdm: AdmPathNode           => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
+    case anAdm: AdmPort               => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
+    case anAdm: AdmAddress            => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
+    case anAdm: AdmSrcSinkObject      => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
+    case anAdm: AdmProvenanceTagNode  => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
+    case anAdm: AdmHost               => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
+    case anAdm: AdmSynthesized        => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
     case _                            => throw new Exception("Unexpected ADM")
   }).flatMap {
     case Success(_) => Future.successful(())

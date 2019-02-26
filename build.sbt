@@ -78,6 +78,7 @@ lazy val adapt = (project in file(".")).settings(
 
   assemblyMergeStrategy in assembly := {
     case PathList("reference.conf") => MergeStrategy.concat
+    case PathList("application.conf") => MergeStrategy.concat  // keep Quine's application.conf too
 //    case PathList("META-INF", "services" /*, "org.neo4j.kernel.extension.KernelExtensionFactory"*/) => MergeStrategy.first
     case PathList("META-INF", xs @ _*) => xs.map(_.toLowerCase) match {
       case "services" :: rfqdn :: Nil => MergeStrategy.first
