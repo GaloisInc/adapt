@@ -32,7 +32,7 @@ import shapeless.syntax.singleton._
 import AdaptConfig._
 import com.galois.adapt.PpmFlowComponents.CompletedESO
 import com.galois.adapt.quine.{AdmUuidProvider, QuineRouter}
-
+import com.typesafe.config.{Config, ConfigFactory}
 
 object Application extends App {
   org.slf4j.LoggerFactory.getILoggerFactory  // This is here just to make SLF4j shut up and not log lots of error messages when instantiating the Kafka producer.
@@ -100,8 +100,22 @@ object Application extends App {
   }
   println(s"Information identifying this run:\n${summary.map(x => s"  ${x._1} ${x._2}").mkString("\n")}")
 
+  val actorSystemGraphService: (ActorSystem, Option[GraphService[AdmUUID]]) = runFlow match {
+    case "quine" =>
+      val clusterConfig = ConfigFactory.load().getConfig("cluster-config")
+      val graphService = GraphService.clustered(
+        config = clusterConfig,
+        persistor = as => MapDBMultimap()(as),
+        idProvider = AdmUuidProvider,
+        uiPort = None
+      )
+      (graphService.system, Some(graphService))
 
-  implicit val system = ActorSystem("production-actor-system")
+    case _ =>
+      (ActorSystem("production-actor-system"), None)
+  }
+
+  implicit val system = actorSystemGraphService._1 
   val log: LoggingAdapter = Logging.getLogger(system, this)
 
   // All large maps should be store in `MapProxy`
@@ -395,11 +409,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
     case "quine" =>
       println("Running provenance ingest demo with the Quine database.")
 
-      implicit val graph = GraphService(system, uiPort = None)(
-        MapDBMultimap(),
-//        EmptyPersistor(),
-        AdmUuidProvider
-      )
+      implicit val graph: GraphService[AdmUUID] = actorSystemGraphService._2.get
 
       implicit val timeout = Timeout(30.4 seconds)
 
