@@ -424,6 +424,12 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       // Write out debug states
       val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
 
+      val clusterStartupDeadline: Deadline = 60.seconds.fromNow
+      while ( ! graph.clusterIsReady) {
+        if (clusterStartupDeadline.isOverdue()) throw new RuntimeException(s"Timeout expired while waiting for cluster hosts to become active.")
+        Thread.sleep(1000)
+      }
+
       RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
         import GraphDSL.Implicits._
 
@@ -451,7 +457,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         import GraphDSL.Implicits._
         val hostSources = cdmSources.values.toSeq
         for (((host, source), i) <- hostSources.zipWithIndex) {
-          source.via(printCounter(host.hostName, statusActor, 0)) ~> Sink.ignore
+          source.via(printCounter(host.hostName, statusActor)) ~> Sink.ignore
         }
         ClosedShape
       }).run()
@@ -473,7 +479,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 
         for (((host, source), i) <- hostSources.zipWithIndex) {
           val broadcast = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
-          (source.via(printCounter(host.hostName, statusActor, 0)) via debug.debugBuffer(s"[${host.hostName}] 0 before ER")) ~>
+          (source.via(printCounter(host.hostName, statusActor)) via debug.debugBuffer(s"[${host.hostName}] 0 before ER")) ~>
             (erMap(host.hostName) via debug.debugBuffer(s"[${host.hostName}] 1 after ER")) ~>
             broadcast.in
 
