@@ -1,6 +1,6 @@
 val scalaV = "2.11.12"   // "2.12.2"  // Scala 2.12 requires JVM 1.8.0_111 or newer.
-val akkaV = "2.5.17"
-val akkaHttpV = "10.1.5"
+val akkaV = "2.5.21"
+val akkaHttpV = "10.1.7"
 val neoV = "3.3.3"
 
 //resolvers += Resolver.jcenterRepo  // for akka persistence in memory
@@ -26,6 +26,7 @@ lazy val adapt = (project in file(".")).settings(
     "org.apache.avro" % "avro" % "1.8.2",
     "com.typesafe.scala-logging" %% "scala-logging" % "3.7.2",
     "com.typesafe.akka" %% "akka-actor" % akkaV,
+    "com.typesafe.akka" %% "akka-cluster" % akkaV,
     "com.typesafe.akka" %% "akka-http" % akkaHttpV,
     "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV,
     "com.typesafe.akka" %% "akka-stream" % akkaV,
