@@ -12,7 +12,6 @@ import org.apache.avro.util.Utf8
 
 import scala.util.Try
 import scala.collection.JavaConverters._
-import org.neo4j.graphdb.RelationshipType
 import shapeless.Lazy
 
 package object cdm17 {
@@ -26,10 +25,6 @@ package object cdm17 {
       type EdgeTypes = Value
       val localPrincipal,
       subject, predicateObject, predicateObject2, parameterTagId, flowObject, prevTagId, parentSubject, dependentUnit, unit, tag, tagId = Value
-
-      implicit def conv(rt: EdgeTypes) = new RelationshipType() {
-        def name = rt.toString
-      }
     }
 
     def readData(filePath: String, limit: Option[Int] = None): Try[(InstrumentationSource, Iterator[Lazy[Try[CDM17]]])] = {

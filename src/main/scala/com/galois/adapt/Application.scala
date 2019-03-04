@@ -159,7 +159,7 @@ object Application extends App {
   var dbActor: ActorRef = runFlow match {
     case "accept" => system.actorOf(Props(classOf[TinkerGraphDBQueryProxy]))
     case "quine" => ActorRef.noSender
-    case _ => system.actorOf(Props(classOf[Neo4jDBQueryProxy], statusActor))
+    case _ => ???
   }
   val dbStartUpTimeout = Timeout(600 seconds)  // Don't make this implicit.
 //  println(s"Waiting for DB indices to become active: $dbStartUpTimeout")

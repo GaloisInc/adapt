@@ -39,11 +39,6 @@ lazy val adapt = (project in file(".")).settings(
     "org.scala-lang.modules" %% "scala-parser-combinators" % "1.1.1",
     "org.mapdb" % "mapdb" % "3.0.7",
     "com.github.alexandrnikitin" %% "bloom-filter" % "0.10.1",
-    "org.neo4j" % "neo4j-community" % neoV,
-    "org.neo4j" % "neo4j-cypher" % neoV,
-    "org.neo4j" % "neo4j-tinkerpop-api" % "0.1",
-    "org.neo4j" % "neo4j-tinkerpop-api-impl" % "0.7-3.2.3" exclude("org.neo4j", "neo4j-enterprise"),
-    "org.apache.tinkerpop" % "neo4j-gremlin" % neoV,
     "org.apache.tinkerpop" % "tinkergraph-gremlin" % neoV,
 
 //  , "com.bbn" % "tc-avro" % "1.0-SNAPSHOT"
@@ -51,7 +46,7 @@ lazy val adapt = (project in file(".")).settings(
     "com.univocity" % "univocity-parsers" % "2.6.1",
     "com.github.felfert" % "cidrutils" % "1.1",  // For testing IP address ranges in the policy enforcement demo.
 
-    "com.lihaoyi" % "ammonite-sshd" % "1.1.2" cross CrossVersion.full
+    "com.lihaoyi" % "ammonite-sshd" % "1.6.3" cross CrossVersion.full
   ),
 
   offline := true,
@@ -80,10 +75,8 @@ lazy val adapt = (project in file(".")).settings(
   assemblyMergeStrategy in assembly := {
     case PathList("reference.conf") => MergeStrategy.concat
     case PathList("application.conf") => MergeStrategy.concat  // keep Quine's application.conf too
-//    case PathList("META-INF", "services" /*, "org.neo4j.kernel.extension.KernelExtensionFactory"*/) => MergeStrategy.first
     case PathList("META-INF", xs @ _*) => xs.map(_.toLowerCase) match {
       case "services" :: rfqdn :: Nil => MergeStrategy.first
-      case list if list.exists(_.contains("neo4j")) => MergeStrategy.first
       case _ => MergeStrategy.discard
     }
     case x => MergeStrategy.first

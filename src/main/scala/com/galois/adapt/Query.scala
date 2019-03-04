@@ -4,7 +4,6 @@ package com.galois.adapt
 import java.util
 import java.util.function.BiPredicate
 
-import org.apache.tinkerpop.gremlin.neo4j.process.traversal.LabelP
 import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex, Property => GremlinProperty, T => Token}
 import org.apache.tinkerpop.gremlin.process.traversal.{P, Path, Traverser}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal
@@ -153,9 +152,6 @@ object Query {
   def run[T](query: String, graph: Graph, namespaces: mutable.Set[String]): Try[Stream[T]] =
     Query(query, namespaces).flatMap(_.run(graph)).flatMap(t => Try(t.asInstanceOf[Stream[T]]))
 
-  // Is this Neo4j or not
-  val isNeo4j: Boolean = runFlow != "accept"
-
   // Attempt to parse a traversal from a string
   def apply(input: String, namespaces: mutable.Set[String]): Try[Query[_]] = {
 
@@ -263,14 +259,13 @@ object Query {
         | ".has(" ~ ("'uuid'"|"\"uuid\"") ~ "," ~ lit ~ ")" ^^ {
             case _~_~_~Raw(u: String)~_ if u.length == 36 => {
               val nsPred: QueryValue[P[String]] = RawWithinPred(RawArr(Raw(u) :: namespaces.toList.map(ns => Raw(ns + "_" + u))))
-              (t: Tr) => HasPredicate(if (isNeo4j) { HasLabel(t, Raw("Node")) } else { t }, Raw("uuid"), nsPred)
+              (t: Tr) => HasPredicate(t, Raw("uuid"), nsPred)
             }
-            case _~_~_~v~_ => (t: Tr) => HasValue(if (isNeo4j) { HasLabel(t, Raw("Node")) } else { t }, Raw("uuid"), v)
+            case _~_~_~v~_ => (t: Tr) => HasValue(t, Raw("uuid"), v)
           }
         | ".has(" ~ str ~ "," ~ lit ~ ")"  ^^ { case _~k~_~v~_  => HasValue(_: Tr, k, v) }
         | ".has(" ~ str ~ "," ~ trav ~ ")" ^^ { case _~k~_~t~_  => HasTraversal(_: Tr, k, t) }
         | ".has(" ~ ("'uuid'"|"\"uuid\"") ~ "," ~ pred ~ ")" ^^ {
-            case _~_~_~p~_ if isNeo4j => (t: Tr) => HasPredicate(HasLabel(t, Raw("Node")), Raw("uuid"), p)
             case _~_~_~p~_ => (t: Tr) => HasPredicate(t, Raw("uuid"), p)
           }
         | ".has(" ~ str ~ "," ~ pred ~ ")" ^^ { case _~l~_~p~_  => HasPredicate(_: Tr, l, p) }
@@ -525,7 +520,7 @@ object QueryLanguage {
   }
   case class HasLabel[S,T](traversal: Traversal[S,T], label: QueryValue[String]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =
-      traversal.buildTraversal(graph,context).has(Token.label, LabelP.of(label.eval(context)))
+      traversal.buildTraversal(graph,context).hasLabel(label.eval(context))
   }
   case class HasId[S,T](traversal: Traversal[S,T], id: QueryValue[java.lang.Long]) extends Traversal[S,T] {
     override def buildTraversal(graph: Graph, context: Map[String,QueryValue[_]]) =

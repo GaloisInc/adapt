@@ -1,5 +1,6 @@
 package com.galois.adapt
 
+/*
 import java.io._
 import java.util.UUID
 
@@ -335,4 +336,4 @@ class Neo4jDBQueryProxy(statusActor: ActorRef) extends DBQueryProxyActor {
 
   }: PartialFunction[Any,Unit]) orElse super.receive
 }
-
+*/
