@@ -27,6 +27,7 @@ import scala.util.{Failure, Random, Success, Try}
 import sys.process._
 import com.rrwright.quine.runtime._
 import com.rrwright.quine.language.JavaObjectSerializationScheme._
+// import com.rrwright.quine.language.BoopickleScheme._
 import shapeless._
 import shapeless.syntax.singleton._
 import AdaptConfig._

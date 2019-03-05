@@ -33,6 +33,7 @@ lazy val adapt = (project in file(".")).settings(
 
 
     "com.rrwright" %% "quine" % "0.1-SNAPSHOT",
+    "com.rrwright" %% "quine-boopickle" % "0.1-SNAPSHOT",
     "com.rrwright" %% "quine-gremlin" % "0.1-SNAPSHOT",
 
     "com.typesafe.akka" %% "akka-stream-kafka" % "0.22",

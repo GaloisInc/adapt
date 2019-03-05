@@ -16,6 +16,7 @@ import scala.util.{Failure, Success, Try}
 import com.rrwright.quine.gremlin.{GremlinQueryRunner, TypeAnnotationFieldReader}
 import com.rrwright.quine.runtime.{NameSpacedUuidProvider, QuineIdProvider}
 import com.rrwright.quine.language.{DomainNodeSetSingleton, PickleReader, QuineId}
+// import com.rrwright.quine.language.BoopickleScheme._
 import com.rrwright.quine.language.JavaObjectSerializationScheme._
 
 object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
@@ -40,15 +41,25 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   val gremlin = GremlinQueryRunner(
     graph = graphService,
     fieldReader = TypeAnnotationFieldReader(
-      fieldToTypeName = Map.empty,
+      fieldToTypeName = Map(
+        "type_of" -> "String",
+        "hostName" -> "String",
+        "provider" -> "String",
+        "fileObjectType" -> "FileObjectType",
+        "originalCdmUuids" -> "Seq[CdmUUID]",
+        "size" -> "Option[Long]"
+      ),
       defaultTypeNames = Seq("Boolean", "Long", "Int", "List[Int]", "List[Long]", "String"),
       typeNameToPickleReader = Map(
-        "Boolean"    -> PickleReader[Boolean],   
-        "Long"       -> PickleReader[Long],
-        "Int"        -> PickleReader[Int],
-        "List[Long]" -> PickleReader[List[Long]],
-        "List[Int]"  -> PickleReader[List[Int]],
-        "String"     -> PickleReader[String]
+        "Boolean"         -> PickleReader[Boolean],   
+        "Long"            -> PickleReader[Long],
+        "Int"             -> PickleReader[Int],
+        "List[Long]"      -> PickleReader[List[Long]],
+        "List[Int]"       -> PickleReader[List[Int]],
+        "String"          -> PickleReader[String],
+        "FileObjectType"  -> PickleReader[com.galois.adapt.cdm19.FileObjectType],
+        "Seq[CdmUUID]"    -> PickleReader[List[CdmUUID]],
+        "Option[Long]"    -> PickleReader[Option[Long]]
       )
     ),
     labelKey = "type_of"

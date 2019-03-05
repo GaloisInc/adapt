@@ -165,6 +165,7 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
       case x if Option(x).isEmpty => JsNull
 
       // Numbers
+      case n: Byte => JsNumber(n)
       case n: Int => JsNumber(n)
       case n: Long => JsNumber(n)
       case n: Double => JsNumber(n)
@@ -174,9 +175,14 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
       // Strings
       case s: String => JsString(s)
 
+      // Booleans
+      case b: Boolean => JsBoolean(b)
+      case b: java.lang.Boolean => JsBoolean(b)
+
       // Lists
       case l: java.util.List[_] => anyToJson(l.toList)
       case l: List[_] => JsArray(l map anyToJson)
+      case a: Array[_] => anyToJson(a.toList)
 
       // Maps
       case m: java.util.Map[_,_] => anyToJson(m.toMap)
