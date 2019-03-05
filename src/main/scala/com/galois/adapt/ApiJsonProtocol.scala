@@ -163,6 +163,10 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
     any match {
       // Null value
       case x if Option(x).isEmpty => JsNull
+      
+      // Option
+      case None => JsNull
+      case Some(x) => anyToJson(x)
 
       // Numbers
       case n: Byte => JsNumber(n)

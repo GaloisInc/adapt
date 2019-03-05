@@ -46,8 +46,11 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         "hostName" -> "String",
         "provider" -> "String",
         "fileObjectType" -> "FileObjectType",
+        "eventType" -> "EventType",
         "originalCdmUuids" -> "Seq[CdmUUID]",
-        "size" -> "Option[Long]"
+        "size" -> "Option[Long]",
+        "inputType" -> "Option[String]",
+        "deviceType" -> "Option[String]"
       ),
       defaultTypeNames = Seq("Boolean", "Long", "Int", "List[Int]", "List[Long]", "String"),
       typeNameToPickleReader = Map(
@@ -58,8 +61,10 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         "List[Int]"       -> PickleReader[List[Int]],
         "String"          -> PickleReader[String],
         "FileObjectType"  -> PickleReader[com.galois.adapt.cdm19.FileObjectType],
+        "EventType"       -> PickleReader[com.galois.adapt.cdm19.EventType],
         "Seq[CdmUUID]"    -> PickleReader[List[CdmUUID]],
-        "Option[Long]"    -> PickleReader[Option[Long]]
+        "Option[Long]"    -> PickleReader[Option[Long]],
+        "Option[String]"  -> PickleReader[Option[String]]
       )
     ),
     labelKey = "type_of"
