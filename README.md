@@ -13,6 +13,12 @@ Then, you just run
 
 Once the system has started, you can open up the interactive UI at <http://localhost:8080/> or start querying the REST api directly.
 
+You may run into a `java.lang.StackOverflowError` during compilation. If that happens, just increase
+the stack size. You can do this either by adding `export SBT_OPTS=-Xss4m` to your `.bashrc`, or by
+manually overriding `SBT_OPTS` on every `sbt` invocation.
+
+    $ SBT_OPTS=-Xss4m sbt run
+
 ### Command Line Options
 SBT will allow you to choose the maximum ram to allocate (default is 1 GB).
 Specify how much RAM to use with the `-mem` flag followed by a number in megabytes. e.g.: `sbt -mem 6000 run`
