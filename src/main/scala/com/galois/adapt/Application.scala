@@ -32,7 +32,6 @@ import shapeless._
 import shapeless.syntax.singleton._
 import AdaptConfig._
 import com.galois.adapt.PpmFlowComponents.CompletedESO
-import com.galois.adapt.quine.{AdmUuidProvider, QuineRouter}
 import com.typesafe.config.{Config, ConfigFactory}
 
 object Application extends App {
@@ -103,11 +102,31 @@ object Application extends App {
 
   val actorSystemGraphService: (ActorSystem, Option[GraphService[AdmUUID]]) = runFlow match {
     case "quine" =>
-      val clusterConfig = ConfigFactory.load().getConfig("cluster-config")
+      val hostConfigSrcs: List[String] = quineConfig.hosts
+        .zipWithIndex  
+        .map { case (QuineHost(ip, _), idx) => 
+          s"""|  {
+              |    hostname = $ip
+              |    port = 2551
+              |    first-shard = ${idx * quineConfig.shardsperhost}
+              |    last-shard = ${(idx + 1) * quineConfig.shardsperhost - 1}
+              |  }
+              |""".stripMargin
+        }
+    
+      val clusterConfigSrc =
+        s"""|name = "adapt-cluster"
+            |hostname = "${quineConfig.thishost}"
+            |port = 2551
+            |host-shard-ranges = ${hostConfigSrcs.mkString("[\n",",","]\n")}
+            |""".stripMargin
+
       val graphService = GraphService.clustered(
-        config = clusterConfig,
+        config = ConfigFactory.parseString(clusterConfigSrc),
         persistor = as => MapDBMultimap()(as),
         idProvider = AdmUuidProvider,
+        inMemorySoftNodeLimit = Some(100000),
+        inMemoryHardNodeLimit = Some(200000),
         uiPort = None
       )
       (graphService.system, Some(graphService))
@@ -414,7 +433,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 
       implicit val timeout = Timeout(30.4 seconds)
 
-      val parallelism = 32 // 16
+      val parallelism = quineConfig.quineactorparallelism
 
       val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
       dbActor = quineRouter

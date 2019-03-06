@@ -1,10 +1,9 @@
-package com.galois.adapt.quine
+package com.galois.adapt
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import akka.util.Timeout
 import com.galois.adapt.adm._
-import com.galois.adapt.{Ack, ApiJsonProtocol, CompleteMsg, DBNodeable, DBQueryProxyActor, EdgeQuery, InitMsg, NodeQuery, Ready, StringQuery}
 import com.rrwright.quine.runtime.GraphService
 import java.util.UUID
 
@@ -24,12 +23,23 @@ object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
   private implicit def toNamespacedId(a: AdmUUID): (String, UUID) = (a.namespace, a.uuid)
   private implicit def fromNamespacedId(x: (String, UUID)): AdmUUID  = AdmUUID(x._2, x._1)
 
+  // Given a namespace, get the host index
+  private val namespaceIdx: Map[String, HostIdx] = AdaptConfig.quineConfig.hosts
+    .zipWithIndex
+    .flatMap { case (AdaptConfig.QuineHost(_, namespaces), hostIdx) => namespaces.map(_ -> hostIdx) }
+    .toMap
+
   def newId() = underlying.newId()
   def hashedCustomId(bytes: Array[Byte]) = underlying.hashedCustomId(bytes)
   def customIdToString(typed: AdmUUID) = typed.rendered
   def customIdToBytes(typed: AdmUUID) = underlying.customIdToBytes(typed)
   def customIdFromBytes(bytes: Array[Byte]) = underlying.customIdFromBytes(bytes).map(x => x)
   def customIdFromString(str: String) = Try(AdmUUID.fromRendered(str))
+
+  def qidDistribution(admUuid: AdmUUID): (HostIdx, LocalShardIdx) = {
+    val h = admUuid.hashCode
+    namespaceIdx.getOrElse(admUuid.namespace, h) -> h
+  }
 }
 
 class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQueryProxyActor {

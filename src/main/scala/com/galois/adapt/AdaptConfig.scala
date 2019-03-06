@@ -35,6 +35,7 @@ object AdaptConfig extends Utils {
     ingest: IngestConfig,
     runtime: RuntimeConfig,
     env: EnvironmentConfig,
+    quine: QuineConfig,
     adm: AdmConfig,
     ppm: PpmConfig,
     test: TestConfig,
@@ -78,6 +79,18 @@ object AdaptConfig extends Utils {
     keystorepath: String,
     keypass: String,
     sslkey: String
+  )
+
+  type Ip = String
+  case class QuineConfig(
+    quineactorparallelism: Int,
+    shardsperhost: Int,
+    thishost: Ip,
+    hosts: List[QuineHost]
+  )
+  case class QuineHost(
+    ip: Ip,
+    namespaces: List[String]
   )
 
   case class AdmConfig(
@@ -242,6 +255,7 @@ object AdaptConfig extends Utils {
   val runFlow: String = adaptConfig.runflow
   val runtimeConfig: RuntimeConfig = adaptConfig.runtime
   val envConfig: EnvironmentConfig = adaptConfig.env
+  val quineConfig: QuineConfig = adaptConfig.quine
   val admConfig: AdmConfig = adaptConfig.adm
   val ppmConfig: PpmConfig = adaptConfig.ppm
   val testWebUi: TestConfig = adaptConfig.test

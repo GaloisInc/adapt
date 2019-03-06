@@ -257,8 +257,6 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   )
 
   def quineEdgeToJson(e: com.rrwright.quine.gremlin.Edge): JsValue = {
-    import com.galois.adapt.quine.AdmUuidProvider
-
     val fromId: AdmUUID = AdmUuidProvider.customIdFromBytes(e.fromId.array).get
     val toId: AdmUUID = AdmUuidProvider.customIdFromBytes(e.toId.array).get
 
