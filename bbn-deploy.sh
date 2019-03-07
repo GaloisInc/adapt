@@ -48,7 +48,7 @@ fi
 if [ "YES" = "$KILLALL" ]; then
   echo -n "Running 'killall java' on the BBN machines..."
   for NODENUM in {1..3}; do
-    ssh $BBN_AUTH gw.tc.bbn.com "ssh $NODENUM 'killall java; true'"        &> $OUTSTUFF
+    ssh $BBN_AUTH gw.tc.bbn.com "ssh $NODENUM 'killall java; rm $DELETEME; true'" &> $OUTSTUFF
   done
   echo " Done."
 fi
