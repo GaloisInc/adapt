@@ -36,9 +36,17 @@ object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
   def customIdFromBytes(bytes: Array[Byte]) = underlying.customIdFromBytes(bytes).map(x => x)
   def customIdFromString(str: String) = Try(AdmUUID.fromRendered(str))
 
-  def qidDistribution(admUuid: AdmUUID): (HostIdx, LocalShardIdx) = {
-    val h = admUuid.hashCode
-    namespaceIdx.getOrElse(admUuid.namespace, h) -> h
+  override def qidDistribution(qid: QuineId): (HostIdx, LocalShardIdx) = {
+    customIdFromQid(qid) match {
+      case Success(admUuid) =>
+        val h = Math.abs(admUuid.hashCode)
+        namespaceIdx.getOrElse(admUuid.namespace, h) -> h
+
+      case Failure(_) =>
+        import java.nio.ByteBuffer
+        val randomIdx = Math.abs(ByteBuffer.wrap(hashToLength(qid.array, 4)).getInt())
+        randomIdx -> randomIdx
+    }
   }
 }
 
