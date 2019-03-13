@@ -15,8 +15,8 @@ import scala.util.{Failure, Success, Try}
 import com.rrwright.quine.gremlin.{GremlinQueryRunner, TypeAnnotationFieldReader}
 import com.rrwright.quine.runtime.{NameSpacedUuidProvider, QuineIdProvider}
 import com.rrwright.quine.language.{DomainNodeSetSingleton, PickleReader, QuineId}
-// import com.rrwright.quine.language.BoopickleScheme._
-import com.rrwright.quine.language.JavaObjectSerializationScheme._
+import com.rrwright.quine.language.BoopickleScheme._
+//import com.rrwright.quine.language.JavaObjectSerializationScheme._
 
 object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
   val underlying = NameSpacedUuidProvider(List("synthetic"),0)
