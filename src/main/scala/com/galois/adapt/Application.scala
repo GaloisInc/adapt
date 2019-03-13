@@ -125,6 +125,7 @@ object Application extends App {
         config = ConfigFactory.parseString(clusterConfigSrc),
         persistor = as => MapDBMultimap()(as),
         idProvider = AdmUuidProvider,
+        index = EmptyIndex,
         inMemorySoftNodeLimit = Some(100000),
         inMemoryHardNodeLimit = Some(200000),
         uiPort = None
