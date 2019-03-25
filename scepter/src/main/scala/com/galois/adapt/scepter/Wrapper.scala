@@ -136,6 +136,7 @@ object Wrapper extends App {
       val loadFiles = opts.targets.zipWithIndex.map { case (t,i) => s"-Dadapt.ingest.hosts.0.parallel.0.sequential.0.paths.$i=$t" }
       val cmd = s"""java -Xmx${opts.heapSize}
                    |     -Dadapt.runflow=accept
+                   |     -Dadapt.skipshutdown=true
                    |     -Dadapt.test.web-ui=${opts.webUi}
                    |     -Dakka.loglevel=ERROR
                    |     -Dadapt.ingest.hosts.0.hostname=host

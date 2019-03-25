@@ -25,6 +25,9 @@ object AdaptConfig extends Utils {
   type KakfaTopicName = String
   type FilePath = String
 
+  // A horrible hack to work around hanging behaviour around `system.terminate()`
+  type SkipActorSystemShutdown = Boolean
+
   sealed trait DataModelProduction
   case object ProduceAdm extends DataModelProduction
   case object ProduceCdm extends DataModelProduction
@@ -39,7 +42,8 @@ object AdaptConfig extends Utils {
     adm: AdmConfig,
     ppm: PpmConfig,
     test: TestConfig,
-    alarms: AlarmsConfig
+    alarms: AlarmsConfig,
+    skipshutdown: SkipActorSystemShutdown = false
   )
 
   case class IngestConfig(
@@ -251,7 +255,7 @@ object AdaptConfig extends Utils {
   val ppmConfig: PpmConfig = adaptConfig.ppm
   val testWebUi: TestConfig = adaptConfig.test
   val alarmConfig: AlarmsConfig = adaptConfig.alarms
-
+  val skipshutdown: SkipActorSystemShutdown = adaptConfig.skipshutdown
 
   trait ErrorHandler {
     def handleError(offset: Long, error: Throwable): Unit

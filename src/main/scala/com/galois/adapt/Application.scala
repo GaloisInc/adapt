@@ -118,6 +118,8 @@ object Application extends App {
 //    new File(this.getClass.getClassLoader.getResource("bin/iforest.exe").getPath).setExecutable(true)
 //    new File(config.getString("adapt.runtime.iforestpath")).setExecutable(true)
 
+  var someTestFailed: Boolean = false
+
   val quitOnError = runtimeConfig.quitonerror
   val streamErrorStrategy: Supervision.Decider = {
     case e: Throwable =>
@@ -696,9 +698,8 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       Runtime.getRuntime.halt(1)
   }
 
-
   Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
-    override def run(): Unit = {
+    override def run(): Unit = if  (!AdaptConfig.skipshutdown) {
       val patienceLevel = 48 hours
       implicit val timeout = Timeout(patienceLevel)
 
