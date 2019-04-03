@@ -26,8 +26,9 @@ import scala.language.postfixOps
 import scala.util.{Failure, Random, Success, Try}
 import sys.process._
 import com.rrwright.quine.runtime._
-import com.rrwright.quine.language.JavaObjectSerializationScheme._
-// import com.rrwright.quine.language.BoopickleScheme._
+import com.rrwright.quine.language._
+//import com.rrwright.quine.language.JavaObjectSerializationScheme._
+ import com.rrwright.quine.language.BoopickleScheme._
 import shapeless._
 import shapeless.syntax.singleton._
 import AdaptConfig._
@@ -123,7 +124,7 @@ object Application extends App {
 
       val graphService = GraphService.clustered(
         config = ConfigFactory.parseString(clusterConfigSrc),
-        persistor = as => MapDBMultimap()(as),
+        persistor = as => LMDBSnapshotPersistor()(as), // EmptyPersistor()(as),
         idProvider = AdmUuidProvider,
         inMemorySoftNodeLimit = Some(100000),
         inMemoryHardNodeLimit = Some(200000),
@@ -427,13 +428,27 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       Runtime.getRuntime.halt(1)
 
     case "quine" =>
-      println("Running provenance ingest demo with the Quine database.")
+      println("Running Quine ingest.")
 
       implicit val graph: GraphService[AdmUUID] = actorSystemGraphService._2.get
 
       implicit val timeout = Timeout(30.4 seconds)
 
       val parallelism = quineConfig.quineactorparallelism
+
+      val sqid = StandingQueryId("standing-find_ESO-accumulator")
+      val standingFetchActor = system.actorOf(
+        Props(
+          classOf[StandingFetchActor[ESOInstance]],
+          implicitly[Queryable[ESOInstance]],
+          (l: List[ESOInstance]) => if (l.nonEmpty) {
+//            println(s"RESULT: ${l.head}")
+          }
+        ), sqid.name
+      )
+      graph.currentGraph.standingQueryActors = graph.currentGraph.standingQueryActors + (sqid -> standingFetchActor)
+      println(branchOf[ESOInstance]())
+
 
       val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
       dbActor = quineRouter
@@ -442,7 +457,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       statusActor ! InitMsg
 
       // Write out debug states
-      val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
+//      val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
 
       val clusterStartupDeadline: Deadline = 60.seconds.fromNow
       while ( ! graph.clusterIsReady) {
@@ -458,7 +473,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         for (((host, source), i) <- hostSources.zipWithIndex) {
           source
             .via(printCounter(host.hostName, statusActor, 0))
-            .via(debug.debugBuffer(s"[${host.hostName}] 0 before ER"))
+//            .via(debug.debugBuffer(s"[${host.hostName}] 0 before ER"))
             .via(erMap(host.hostName))
             .mapAsyncUnordered(parallelism)(cdm => quineRouter ? cdm)
             .recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace()}

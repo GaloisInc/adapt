@@ -236,7 +236,7 @@ object UuidRemapper {
 
     def expireKey(cdmUuid: CdmUUID, cause: String, expireInto: ListBuffer[UuidRemapperInfo]): Unit = {
       for (edges <- blockedEdges.get(cdmUuid)) {
-        val synthesizedAdm = AdmSynthesized(Seq(cdmUuid))
+        val synthesizedAdm = AdmSynthesized(Set(cdmUuid))
 
         println(s"Expired ${synthesizedAdm.uuid} ($cause)")
 
@@ -409,13 +409,12 @@ object UuidRemapper {
 
     def expireKey(cdmUuid: CdmUUID, cause: String, expireInto: ListBuffer[Either[ADM, EdgeAdm2Adm]]): Unit = {
       for ((edges, originalCdmUuids) <- blockedEdges.get(cdmUuid).toList) {
-        val originalCdms = originalCdmUuids.toList
-        val synthesizedAdm = AdmSynthesized(originalCdms)
+        val synthesizedAdm = AdmSynthesized(originalCdmUuids)
 
         println(s"Expired ${synthesizedAdm.uuid} ($cause)")
 
         expireInto += Left(synthesizedAdm)
-        for (originalCdm <- originalCdms) {
+        for (originalCdm <- originalCdmUuids) {
           expireInto ++= putCdm2Adm(cdmUuid, synthesizedAdm.uuid)
         }
       }
@@ -490,7 +489,7 @@ object UuidRemapper {
 
           List.empty
 
-        case Some(adm) => dependent.flatMap(e => addEdge(e.applyRemap(Seq(keyCdm), adm)))
+        case Some(adm) => dependent.flatMap(e => addEdge(e.applyRemap(Set(keyCdm), adm)))
       }
     }
 

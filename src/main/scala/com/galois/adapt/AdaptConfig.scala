@@ -273,16 +273,17 @@ object AdaptConfig extends Utils {
   }
 
   case class IngestHost(
-      var ta1: Option[DataProvider] = None,
-        /* who is producing this data. We need this because we need to know who is producing
-         * data before data actually arrives. That means we can only assert the provider after
-         * the fact.
-         */
+    var ta1: Option[DataProvider] = None,
+      /* who is producing this data. We need this because we need to know who is producing
+       * data before data actually arrives. That means we can only assert the provider after
+       * the fact.
+       */
 
-      hostName: HostName,
-      parallel: List[LinearIngest],
+    hostName: HostName,
+    parallel: List[LinearIngest],
 
-      loadlimit: Option[Long] = None
+    startatoffset: Option[Long] = None,
+    loadlimit: Option[Long] = None
   ) {
     var filterAst: Option[Filter] = None
     private var filter: Option[Filterable => Boolean] = filterAst.map(FilterCdm.compile)
@@ -301,10 +302,12 @@ object AdaptConfig extends Utils {
       .toString
       .toLowerCase
 
-    def toCdmSource(handler: ErrorHandler = ErrorHandler.print): Source[(Namespace,CDM19), NotUsed] = parallel
-      .foldLeft(Source.empty[(Namespace,CDM19)])((acc, li: LinearIngest) => acc.merge(li.toCdmSource(handler, updateHost _)))
-      .take(loadlimit.getOrElse(Long.MaxValue))
-      .filter { case (_, cdm: CDM19) => filter.fold(true)(applyFilter(cdm, _)) }
+    def toCdmSource(handler: ErrorHandler = ErrorHandler.print): Source[(Namespace,CDM19), NotUsed] = {
+      val linearized = parallel.foldLeft(Source.empty[(Namespace,CDM19)])((acc, li: LinearIngest) => acc.merge(li.toCdmSource(handler, updateHost _)))
+      val offsetApplied = startatoffset.fold(linearized){offset => println(s"Starting at offset: $offset"); linearized.drop(offset)}
+      val limitApplied = loadlimit.fold(offsetApplied){limit => offsetApplied.take(limit)} //.take(loadlimit.getOrElse(Long.MaxValue))
+      limitApplied.filter { case (_, cdm: CDM19) => filter.fold(true)(applyFilter(cdm, _)) }
+    }
 
     def updateHost(is: DataProvider): Unit = ta1 match {
       case None => ta1 = Some(is)

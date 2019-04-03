@@ -23,7 +23,7 @@ object ERRules {
       ProvenanceTagNodeEdges.PrevTagID,
       ProvenanceTagNodeEdges.TagIdEdges
     ) = {
-      val newPtn = AdmProvenanceTagNode(Seq(CdmUUID(p.getUuid, provider)), p.programPoint, hostName, provider)
+      val newPtn = AdmProvenanceTagNode(Set(CdmUUID(p.getUuid, provider)), p.programPoint, hostName, provider)
       (
         newPtn,
         p.flowObject.map(flow => EdgeAdm2Cdm(newPtn.uuid, "flowObject", CdmUUID(flow, provider))),
@@ -35,11 +35,11 @@ object ERRules {
 
   // Resolve a 'Principal'
   def resolvePrincipal(provider: String, p: Principal, hostName: HostName): AdmPrincipal
-    = AdmPrincipal(Seq(CdmUUID(p.getUuid, provider)), p.userId, p.groupIds, p.principalType, p.username, hostName, provider)
+    = AdmPrincipal(Set(CdmUUID(p.getUuid, provider)), p.userId, p.groupIds, p.principalType, p.username, hostName, provider)
 
   // Resolve a 'SrcSinkObject'
   def resolveSrcSink(provider: String, s: SrcSinkObject, hostName: HostName): AdmSrcSinkObject
-    = AdmSrcSinkObject(Seq(CdmUUID(s.getUuid, provider)), s.srcSinkType, hostName, provider)
+    = AdmSrcSinkObject(Set(CdmUUID(s.getUuid, provider)), s.srcSinkType, hostName, provider)
 
   // Resolve a 'NetFlowObject'
   object NetflowObjectEdges {
@@ -54,7 +54,7 @@ object ERRules {
       NetflowObjectEdges.PortEdgeNode,
       NetflowObjectEdges.PortEdgeNode
     ) = {
-      val newN = AdmNetFlowObject(Seq(CdmUUID(n.getUuid, provider)), n.localAddress, n.localPort, n.remoteAddress, n.remotePort, provider)
+      val newN = AdmNetFlowObject(Set(CdmUUID(n.getUuid, provider)), n.localAddress, n.localPort, n.remoteAddress, n.remotePort, provider)
 
       val newLP = n.localPort.map(AdmPort.apply)
       val newLA = n.localAddress.map(AdmAddress.apply)
@@ -83,7 +83,7 @@ object ERRules {
     FileObjectEdges.LocalPrincipalEdge,
     FileObjectEdges.FilePathEdgeNode
   ) = {
-    val newFo = AdmFileObject(Seq(CdmUUID(f.getUuid, provider)), f.fileObjectType, f.size, hostName, provider)
+    val newFo = AdmFileObject(Set(CdmUUID(f.getUuid, provider)), f.fileObjectType, f.size, hostName, provider)
     val pathOpt1: Option[AdmPathNode] = f.peInfo.flatMap(p => AdmPathNode.normalized(p, provider, isWindows))
     val pathOpt2: Option[AdmPathNode] = f.baseObject.properties.flatMap(_.get("filename")).flatMap(p => AdmPathNode.normalized(p, provider, isWindows))
     val pathOpt3: Option[AdmPathNode] = f.baseObject.properties.flatMap(_.get("path")).flatMap(p => AdmPathNode.normalized(p, provider, isWindows))
@@ -105,7 +105,7 @@ object ERRules {
       AdmFileObject,
       RegistryKeyObjectEdges.FilePathEdgeNode
     ) = {
-      val newFo = AdmFileObject(Seq(CdmUUID(r.getUuid, provider)), FILE_OBJECT_FILE, None, hostName, provider)
+      val newFo = AdmFileObject(Set(CdmUUID(r.getUuid, provider)), FILE_OBJECT_FILE, None, hostName, provider)
       (
         newFo,
         AdmPathNode.normalized(r.key, provider, isWindows).map(pathNode =>
@@ -118,10 +118,10 @@ object ERRules {
   //
   // TODO: sourceUUID, sinkUUID
   def resolveUnnamedPipeObject(provider: String, u: IpcObject, hostName: HostName): AdmFileObject
-    = AdmFileObject(Seq(CdmUUID(u.getUuid, provider)), FILE_OBJECT_NAMED_PIPE, None, hostName, provider)
+    = AdmFileObject(Set(CdmUUID(u.getUuid, provider)), FILE_OBJECT_NAMED_PIPE, None, hostName, provider)
 
   def resolveMemoryObject(provider: String, m: MemoryObject, hostName: HostName): AdmSrcSinkObject
-    = AdmSrcSinkObject(Seq(CdmUUID(m.uuid, provider)), MEMORY_SRCSINK, hostName, provider)
+    = AdmSrcSinkObject(Set(CdmUUID(m.uuid, provider)), MEMORY_SRCSINK, hostName, provider)
 
   // Resolve an 'Event'
   object EventEdges {
@@ -147,7 +147,7 @@ object ERRules {
       EventEdges.ExecPathEdgeNode
     ) = {
       val newEvent = AdmEvent(
-        originalCdmUuids = Seq(CdmUUID(e.getUuid, provider)),
+        originalCdmUuids = Set(CdmUUID(e.getUuid, provider)),
         eventType = e.eventType,
         earliestTimestampNanos = e.timestampNanos,
         latestTimestampNanos = e.timestampNanos,
@@ -189,7 +189,7 @@ object ERRules {
   // Resolve a 'Host'
   def resolveHost(provider: String, h: Host): AdmHost =
     AdmHost(
-      Seq(CdmUUID(h.uuid,provider)),
+      Set(CdmUUID(h.uuid,provider)),
       h.hostName,
       h.hostIdentifiers,
       h.osDetails,
@@ -226,7 +226,7 @@ object ERRules {
         UuidRemapper.CdmMerge(CdmUUID(s.getUuid, provider), CdmUUID(s.parentSubject.get, provider))
       ))
     } else {
-      val newSubj = AdmSubject(Seq(CdmUUID(s.getUuid, provider)), Set(s.subjectType), s.cid, s.startTimestampNanos.getOrElse(0), hostName, provider)
+      val newSubj = AdmSubject(Set(CdmUUID(s.getUuid, provider)), Set(s.subjectType), s.cid, s.startTimestampNanos.getOrElse(0), hostName, provider)
 
       Left((
         newSubj,
@@ -246,7 +246,7 @@ object ERRules {
         Left(e2.copy(
           earliestTimestampNanos = Math.min(e1.timestampNanos, e2.earliestTimestampNanos),
           latestTimestampNanos = Math.min(e1.timestampNanos, e2.latestTimestampNanos),
-          originalCdmUuids = CdmUUID(e1.getUuid, provider) +: e2.originalCdmUuids
+          originalCdmUuids = e2.originalCdmUuids + CdmUUID(e1.getUuid, provider)
         ))
       } else {
         Right((e1, e2))
