@@ -10,11 +10,12 @@ import java.io.{BufferedWriter, File, FileWriter, PrintWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
-import java.util.function.Consumer
+
 import akka.pattern.ask
 import akka.util.Timeout
 import com.galois.adapt
 import com.typesafe.scalalogging.LazyLogging
+
 import scala.collection.JavaConverters._
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
@@ -25,6 +26,8 @@ import AdaptConfig._
 import Application.hostNameForAllHosts
 import spray.json._
 import ApiJsonProtocol._
+import com.rrwright.quine.runtime.GraphService
+
 import scala.annotation.tailrec
 
 //type AnAlarm = (List[String], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
@@ -51,7 +54,7 @@ object NoveltyDetection {
   val execDeleteTypes = Set[EventType](EVENT_EXECUTE, EVENT_UNLINK)
   val march1Nanos = 1519862400000000L
 
-  case class NamespacedUuidDetails(extendedUuid: NamespacedUuid, name: Option[String] = None, pid: Option[Int] = None)
+  case class NamespacedUuidDetails(extendedUuid: NamespacedUuid, name: Option[String] = None, pid: Option[Int] = None) // Make this work with Quine UUIDs
 }
 
 case object AlarmExclusions {
@@ -72,14 +75,15 @@ case class PpmDefinition[DataShape](
   name: String,
   incomingFilter: Filter[DataShape],
   discriminators: List[Discriminator[DataShape]],
-  uuidCollector: DataShape => Set[NamespacedUuidDetails],
-  timestampExtractor: DataShape => Long,
+  uuidCollector: DataShape => Set[NamespacedUuidDetails], // Fix this to work with Quine IDs
+  timestampExtractor: DataShape => Set[Long], // Collect more timestamps, make a set
   shouldApplyThreshold: Boolean,
   alarmFilter: PpmNodeActorAlarmDetected => Boolean = AlarmExclusions.filter
 )(
   context: ActorContext,
   alarmActor: ActorRef,
-  hostName: HostName
+  hostName: HostName,
+  graphService: GraphService[AdmUUID]
 ) extends LazyLogging {
 
   val basePath: String = ppmConfig.basedir + name + "-" + hostName
@@ -95,7 +99,7 @@ case class PpmDefinition[DataShape](
           .orElse {println(s"FAILED to load data for tree: $name  on host: $hostName"); None}
       else None
 
-  val tree = context.actorOf(Props(classOf[PpmNodeActor], name, alarmActor, startingState), name = name)
+  val treeRootQid = AdmUuidProvider.ppmTreeRootNodeId(hostName,name)//context.actorOf(Props(classOf[PpmNodeActor], name, alarmActor, startingState), name = name)
 
   var alarms: Map[List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])] =
     if (ppmConfig.shouldloadalarms)
@@ -173,7 +177,8 @@ case class PpmDefinition[DataShape](
   }
 
   def observe(observation: DataShape): Unit = if (incomingFilter(observation)) {
-    tree ! PpmNodeActorBeginObservation(name, PpmTree.prepareObservation[DataShape](observation, discriminators), uuidCollector(observation), timestampExtractor(observation), alarmFilter)
+    implicit val timeout = Timeout(6.1 seconds)
+    graphService.observe(treeRootQid, name, PpmTree.prepareObservation[DataShape](observation, discriminators), Set()/*uuidCollector(observation)*/, timestampExtractor(observation), alarmActor)
   }
 
   //process name and pid/uuid
@@ -215,141 +220,17 @@ case class PpmDefinition[DataShape](
     }
   }
 
-  def getAllCounts: Future[ Map[List[ExtractedValue], Int] ] = {
-    implicit val timeout = Timeout(595 seconds)
-    (tree ? PpmNodeActorGetAllCounts(List.empty)).mapTo[Future[PpmNodeActorGetAllCountsResult]].flatMap(identity).map(_.results)
-  }
-
   val saveEveryAndNoMoreThan = 0L //ppmConfig.saveintervalseconds.getOrElse(0L) * 1000  // convert seconds to milliseconds
   val lastSaveCompleteMillis = new AtomicLong(0L)
   val isCurrentlySaving = new AtomicBoolean(false)
 
-  def getRepr(implicit timeout: Timeout): Future[TreeRepr] = (tree ? PpmNodeActorBeginGetTreeRepr(name)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{ _.repr }
-
-  def saveStateAsync(): Future[Unit] = {
-    val now = System.currentTimeMillis
-    val expectedSaveCostMillis = 1000  // Allow repeated saving in subsequent attempts if total save time took no longer than this time.
-    if ( ! isCurrentlySaving.get() && lastSaveCompleteMillis.get() + saveEveryAndNoMoreThan - expectedSaveCostMillis <= now ) {
-      isCurrentlySaving.set(true)
-
-      implicit val timeout = Timeout(593 seconds)
-      val treeWriteF = if (ppmConfig.shouldsaveppmtrees) {
-        (tree ? PpmNodeActorBeginGetTreeRepr(name)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map { reprResult =>
-          if (ppmConfig.shouldsaveppmtrees) reprResult.repr.writeToFile(outputFilePath)
-        }
-      } else Future.successful( () )
-
-      if (ppmConfig.shouldsavealarms) {
-        val content = alarms.toList.toJson.prettyPrint
-        val outputFile = new File(outputAlarmFilePath)
-        if ( ! outputFile.exists) outputFile.createNewFile()
-        Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
-      }
-
-      if (this.isInstanceOf[PartialPpm[_]] && ppmConfig.shouldsaveppmpartialobservationaccumulators)
-        this.asInstanceOf[PartialPpm[_]].saveStateSync(hostName)
-
-      treeWriteF.transform(
-        _ => {
-          lastSaveCompleteMillis.set(System.currentTimeMillis)
-          isCurrentlySaving.set(false)
-        },
-        e => {
-          println(s"Error writing to file for $name tree: ${e.getMessage}")
-          isCurrentlySaving.set(false)
-          e
-        }
-      )
-    } else Future.successful(())
-  }
+  def getRepr(implicit timeout: Timeout): Future[TreeRepr] = graphService.treeRepr(treeRootQid,name,List()).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{ _.repr }
 
   def prettyString: Future[String] = {
     implicit val timeout = Timeout(593 seconds)
-    (tree ? PpmNodeActorBeginGetTreeRepr(name)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map(_.repr.toString)
+    graphService.treeRepr(treeRootQid,name,List()).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map(_.repr.toString)
   }
 }
-
-trait PartialPpm[JoinType] { myself: PpmDefinition[DataShape] =>
-  type PartialShape = DataShape
-
-  val discriminators: List[Discriminator[PartialShape]]
-
-  require(discriminators.length == 2, "PartialPpm trees must have a discriminator length of exactly two; the first extracting from the observation written into the partialMap, and the second extracting from the observation that completes the match. NOTE: they can be reordered (mixed) by overriding the `arrangeExtracted` function.")
-
-  implicit val partialMapJson: RootJsonFormat[(JoinType, (List[ExtractedValue],Set[NamespacedUuidDetails]))] =
-    implicitly[RootJsonFormat[(JoinType, (List[ExtractedValue], Set[NamespacedUuidDetails]))]]
-
-  val partialMap: mutable.Map[JoinType, (List[ExtractedValue],Set[NamespacedUuidDetails])] = (inputFilePath, ppmConfig.shouldloadppmpartialobservationaccumulators) match {
-    case (fp, true) =>
-      val loadPath = fp + ".partialMap"
-      Try {
-        val toReturn = mutable.Map.empty[JoinType,(List[ExtractedValue],Set[NamespacedUuidDetails])]
-        Files.lines(Paths.get(loadPath)).forEach(new Consumer[String]{
-          override def accept(line: String): Unit = {
-            val (k, (v1,v2)) = line.parseJson.convertTo[(JoinType, (List[ExtractedValue],Set[NamespacedUuidDetails]))]
-            toReturn.put(k,(v1,v2))
-          }
-        })
-
-        println(s"Read in from disk $name at $loadPath: ${toReturn.size}")
-        toReturn
-      } match {
-        case Success(m) => m
-        case Failure(e) =>
-          println(s"Failed to read from disk $name at $loadPath (${e.toString})")
-          mutable.Map.empty
-      }
-    case _ => mutable.Map.empty
-  }
-
-  def saveStateSync(hostName: HostName): Unit = {
-    outputFilePath.foreach { savePath =>
-      Try {
-        val outputFile = new File(savePath + ".partialMap")
-        if (!outputFile.exists) outputFile.createNewFile()
-
-        val writer = new BufferedWriter(new FileWriter(outputFile))
-        for (pair <- this.partialMap) {
-          writer.write(pair.toJson.compactPrint + "\n")
-        }
-        writer.close()
-
-      } getOrElse {
-        println(s"Failed to save partial map to disk $name at $savePath.partialMap: ${partialMap.size}")
-      }
-    }
-  }
-
-  def getJoinCondition(observation: PartialShape): Option[JoinType]
-  def arrangeExtracted(extracted: List[ExtractedValue]): List[ExtractedValue] = extracted
-
-  // The first filter defines whether an observation will be saved in the "partialMap" cache (after matching nothing on the joinCondition).
-  // The second filter defines whether we have a successful match from the "partialMap" cache given the join condition.
-  val partialFilters: (PartialShape => Boolean, PartialShape => Boolean)
-
-  override def observe(observation: PartialShape): Unit = if (incomingFilter(observation)) {
-    getJoinCondition(observation).foreach { joinValue =>
-      partialMap.get(joinValue) match {
-        case None =>
-          if (partialFilters._1(observation)) {
-            val extractedList = discriminators(0)(observation)
-            if (extractedList.nonEmpty) partialMap(joinValue) = extractedList -> myself.uuidCollector(observation)
-          }
-        case Some((firstExtracted,uuidDetailSet)) =>
-          if (partialFilters._2(observation)) {
-            val newlyExtracted = discriminators(1)(observation)
-            if (newlyExtracted.nonEmpty) {
-              tree ! PpmNodeActorBeginObservation(name, arrangeExtracted(firstExtracted ++ newlyExtracted), uuidDetailSet ++ uuidCollector(observation), observation._1.latestTimestampNanos, myself.alarmFilter)
-            }
-          }
-      }
-    }
-  }
-}
-
-
-
-
 
 
 case object PpmTree {
@@ -363,12 +244,9 @@ case class PpmNodeActorObservation(treeName: String, extractedValues: List[Extra
 case class PpmNodeActorBeginGetTreeRepr(treeName: String, startingKey: List[ExtractedValue] = Nil)
 case class PpmNodeActorGetTreeRepr(yourDepth: Int, key: String, siblingPopulation: Int, parentCount: Int, parentGlobalProb: Float)
 case class PpmNodeActorGetTreeReprResult(repr: TreeRepr)
-case class PpmNodeActorGetAllCounts(accumulatedKey: List[ExtractedValue])
-case class PpmNodeActorGetAllCountsResult(results: Map[List[ExtractedValue], Int])
 case object PpmNodeActorGetTopLevelCount
 case class PpmNodeActorGetTopLevelCountResult(count: Int)
 case class PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long)
-case class PpmNodeActorManyAlarmsDetected(alarms: Set[PpmNodeActorAlarmDetected])
 
 class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState: Option[TreeRepr]) extends Actor with ActorLogging {
   var counter = 0
@@ -573,24 +451,13 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
       sender() ! futureResult
 
 
-    case PpmNodeActorGetAllCounts(accumulatedKey: List[ExtractedValue]) =>
-      implicit val timeout = Timeout(597 seconds)
-      val qNodeCountTuple = accumulatedKey ++ List(thisKey, "_?_") -> childrenPopulation
-      val childNodeCountTuple = accumulatedKey ++ List(thisKey) -> counter
-      val countTuples = Map(qNodeCountTuple, childNodeCountTuple)
-      val futureResult = Future.sequence(
-        children.values.map(child => (child ? PpmNodeActorGetAllCounts(accumulatedKey :+ thisKey)).mapTo[Future[PpmNodeActorGetAllCountsResult]].flatMap(identity))
-      ).map(x => x.foldLeft(Map.empty[List[ExtractedValue], Int])((a,b) => a ++ b.results) ++ countTuples)
-      sender() ! futureResult.map(r => PpmNodeActorGetAllCountsResult(r))
-
-
     case msg => log.error(s"Received unknown message: $msg")
 
   }
 }
 
 
-class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends Actor with ActorLogging { thisActor =>
+class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphService: GraphService[AdmUUID]) extends Actor with ActorLogging { thisActor =>
 
   val (pathDelimiterRegexPattern, pathDelimiterChar) = if (isWindows) ("""\\""", """\""") else ("""/""" ,   "/")
   val sudoOrPowershellComparison: String => Boolean = if (isWindows) {
@@ -600,117 +467,6 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
   }
 
   import NoveltyDetection._
-
-  lazy val cdmSanityTrees = List(
-    PpmDefinition[CurrentCdm]("CDM-Event",
-      d => d.isInstanceOf[cdm18.Event],
-      List(
-        d => List(d.asInstanceOf[cdm18.Event].eventType.toString),
-        d => List({
-          val e = d.asInstanceOf[cdm18.Event]
-          e match {
-            case cdm18.Event(_,_,_,_,_,subUuid,timestampNanos, po1, pop1, po2, pop2, name,_,_,_,programPoint,_) =>
-              val tests = List(subUuid.isDefined, timestampNanos > march1Nanos, po1.isDefined, pop1.isDefined, po2.isDefined, pop2.isDefined, name.isDefined, programPoint.isDefined)
-              tests.mkString(",")
-          }
-        })
-      ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Event].uuid, source))),
-      _.asInstanceOf[cdm18.Event].timestampNanos,
-      shouldApplyThreshold = false
-    )(thisActor.context, context.self, hostName),
-
-    PpmDefinition[CurrentCdm]("CDM-Subject",
-      d => d.isInstanceOf[cdm18.Subject],
-      List(
-        d => List(d.asInstanceOf[cdm18.Subject].subjectType.toString),
-        d => List({
-          val e = d.asInstanceOf[cdm18.Subject]
-          e match {
-            case cdm18.Subject(_, _, _, _, startTimestampNanos, parentSubject, _, unitId, _, _, cmdLine, privilegeLevel, importedLibraries, exportedLibraries, _) =>
-              val tests = List(startTimestampNanos > march1Nanos, parentSubject.isDefined, unitId.isDefined, cmdLine.isDefined, privilegeLevel.isDefined, importedLibraries.isDefined, exportedLibraries.isDefined)
-              tests.mkString(",")
-          }
-        })
-      ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.Subject].uuid, source))),
-      _ => 0L,
-      shouldApplyThreshold = false
-    )(thisActor.context, context.self, hostName),
-
-    PpmDefinition[CurrentCdm]("CDM-Netflow",
-      d => d.isInstanceOf[cdm18.NetFlowObject],
-      List(
-        d => List({
-          val e = d.asInstanceOf[cdm18.NetFlowObject]
-          e match {
-            case cdm18.NetFlowObject(_, _, localAddress, localPort, remoteAddress, remotePort, ipProtocol, fileDescriptor) =>
-              val tests = List(localAddress != "", localPort != -1, remoteAddress != "", remotePort != -1, ipProtocol.isDefined, fileDescriptor.isDefined)
-              tests.mkString(",")
-          }
-        })
-      ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.NetFlowObject].uuid, source))),
-      _ => 0L,
-      shouldApplyThreshold = false
-    )(thisActor.context, context.self, hostName)
-    ,
-    PpmDefinition[CurrentCdm]("CDM-FileObject",
-      d => d.isInstanceOf[cdm18.FileObject],
-      List(
-        d => List(d.asInstanceOf[cdm18.FileObject].fileObjectType.toString),
-        d => List({
-          val e = d.asInstanceOf[cdm18.FileObject]
-          e match {
-            case cdm18.FileObject(_, _, _, fileDescriptor, localPrincipal, size, peInfo, hashes) =>
-              val tests = List(fileDescriptor.isDefined, localPrincipal.isDefined, size.isDefined, peInfo.isDefined, hashes.isDefined)
-              tests.mkString(",")
-          }
-        })
-      ),
-      d => Set(NamespacedUuidDetails(CdmUUID(d.asInstanceOf[cdm18.FileObject].uuid, source))),
-      _ => 0L,
-      shouldApplyThreshold = false
-    )(thisActor.context, context.self, hostName)
-  ).par
-
-
-  lazy val iforestTrees = List(
-    PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestProcessEventType",
-      d => d._3.nonEmpty,
-      List(
-        d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
-        d => List(d._1.eventType.toString)
-      ),
-      d => Set(NamespacedUuidDetails(d._2.uuid)),
-      _._1.latestTimestampNanos,
-      shouldApplyThreshold = false,
-      _ => false
-    )(thisActor.context, context.self, hostName),
-
-    PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestCommonAlarms",
-      d => d._3.nonEmpty,
-      List(
-        d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
-        d => List(d._1.eventType.toString)
-      ),
-      d => Set(NamespacedUuidDetails(d._2.uuid)),
-      _._1.latestTimestampNanos,
-      shouldApplyThreshold = false
-    )(thisActor.context, context.self, hostName),
-
-    PpmDefinition[(Event,AdmSubject,Set[AdmPathNode])]("iForestUncommonAlarms",
-      d => d._3.nonEmpty,
-      List(
-        d => List(d._3.map(_.path).toList.sorted.mkString("-"),d._2.uuid.uuid.toString),
-        d => List(d._1.eventType.toString)
-      ),
-      d => Set(NamespacedUuidDetails(d._2.uuid)),
-      _._1.latestTimestampNanos,
-      shouldApplyThreshold = false
-    )(thisActor.context, context.self, hostName)
-  ).par
-
 
   lazy val esoTrees = List(
     PpmDefinition[DataShape]( "ProcessFileTouches",
@@ -724,9 +480,9 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
                NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos,
+      d => Set(d._1.latestTimestampNanos),
       shouldApplyThreshold = true
-    )(thisActor.context, context.self, hostName),
+    )(thisActor.context, context.self, hostName, graphService),
 
     PpmDefinition[DataShape]( "FilesTouchedByProcesses",
       d => readAndWriteTypes.contains(d._1.eventType),
@@ -739,9 +495,9 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos,
+      d => Set(d._1.latestTimestampNanos),
       shouldApplyThreshold = true
-    )(thisActor.context, context.self, hostName),
+    )(thisActor.context, context.self, hostName, graphService),
 
     PpmDefinition[DataShape]( "FilesExecutedByProcesses",
       d => d._1.eventType == EVENT_EXECUTE,
@@ -754,9 +510,9 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos,
+      d => Set(d._1.latestTimestampNanos),
       shouldApplyThreshold = false
-    )(thisActor.context, context.self, hostName),
+    )(thisActor.context, context.self, hostName, graphService),
 
     PpmDefinition[DataShape]( "ProcessesWithNetworkActivity",
       d => d._3._1.isInstanceOf[AdmNetFlowObject],
@@ -772,9 +528,9 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress.getOrElse("no_address_from_CDM")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos,
+      d => Set(d._1.latestTimestampNanos),
       shouldApplyThreshold = true
-    )(thisActor.context, context.self, hostName),
+    )(thisActor.context, context.self, hostName, graphService),
 
     PpmDefinition[DataShape]( "ProcessDirectoryReadWriteTouches",
       d => d._3._1.isInstanceOf[AdmFileObject] && d._3._2.isDefined && readAndWriteTypes.contains(d._1.eventType),
@@ -790,9 +546,9 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos,
+      d => Set(d._1.latestTimestampNanos),
       shouldApplyThreshold = true
-    )(thisActor.context, context.self, hostName),
+    )(thisActor.context, context.self, hostName, graphService),
 
     PpmDefinition[DataShape]( "ProcessesChangingPrincipal",
       d => d._1.eventType == EVENT_CHANGE_PRINCIPAL,
@@ -805,9 +561,9 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos,
+      d => Set(d._1.latestTimestampNanos),
       shouldApplyThreshold = false
-    )(thisActor.context, context.self, hostName),
+    )(thisActor.context, context.self, hostName, graphService),
 
     PpmDefinition[DataShape]( "SudoIsAsSudoDoes",
       d => d._2._2.exists(p => sudoOrPowershellComparison(p.path)),
@@ -820,9 +576,9 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + " : " + d._3._1.getClass.getSimpleName))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos,
+      d => Set(d._1.latestTimestampNanos),
       shouldApplyThreshold = true
-    )(thisActor.context, context.self, hostName),
+    )(thisActor.context, context.self, hostName, graphService),
 
     PpmDefinition[DataShape]( "ParentChildProcesses",
       d => d._1.eventType == PSEUDO_EVENT_PARENT_SUBJECT && d._2._2.isDefined && d._3._2.isDefined,
@@ -838,9 +594,9 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         })) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos,
+      d => Set(d._1.latestTimestampNanos),
       shouldApplyThreshold = false
-    )(thisActor.context, context.self, hostName),
+    )(thisActor.context, context.self, hostName, graphService),
 
     PpmDefinition[DataShape]("SummarizedProcessActivity",
       d => d._2._1.subjectTypes.contains(SUBJECT_PROCESS), // is a process
@@ -864,182 +620,155 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         NamespacedUuidDetails(d._3._1.uuid,d._3._2.map(_.path))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos,
+      d => Set(d._1.latestTimestampNanos),
       shouldApplyThreshold = false,
       alarmFilter = _ => false
-    )(thisActor.context, context.self, hostName)
+    )(thisActor.context, context.self, hostName, graphService)
+  ).par
 
-//    PpmDefinition[DataShape]("SummarizedProcessActivityTiming",
-//      d => d._2._1.subjectTypes.contains(SUBJECT_PROCESS), // is a process
-//      List(d => List(                         // 1.) Process name
-//        d._2._2.map(_.path).getOrElse("{{{unnamed_process}}}"), //es_should_have_been_filtered_out"),
-//        d._2._1.cid.toString,                 // 2.) PID, to disambiguate process instances. (collisions are assumed to be ignorably unlikely)
-//        d._1.earliestTimestampNanos.toString, // 3.) timestamp
-//        d._1.eventType.toString               // 4.) Event type
-//        ), _._3 match {                       // 5.) identifier(s) for the object, based on its type
-//          case (adm: AdmFileObject, pathOpt) => pathOpt.map(_.path.split(pathDelimiterRegexPattern, -1).toList match {
-//            case "" :: remainder => pathDelimiterChar :: remainder
-//            case x => x
-//          }).getOrElse(List(s"${adm.fileObjectType}:${adm.uuid.rendered}"))
-//          case (adm: AdmSubject, pathOpt) => List(pathOpt.map(_.path).getOrElse(s"{${adm.subjectTypes.toList.map(_.toString).sorted.mkString(",")}}:${adm.cid}"))
-//          case (adm: AdmSrcSinkObject, _) => List(s"${adm.srcSinkType}:${adm.uuid.rendered}")
-//          case (adm: AdmNetFlowObject, _) => List(s"${adm.remoteAddress}:${adm.remotePort}")
-//          case (adm, pathOpt) => List(s"UnhandledType:$adm:$pathOpt")
-//        }
+
+//  lazy val seoesTrees = List(
+//    new PpmDefinition[DataShape]("FileExecuteDelete",
+//      d => d._3._1.isInstanceOf[AdmFileObject],
+//      List(
+//        d => List(
+//          d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered), // File name or UUID
+//          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Executing process name or UUID
+//        ),
+//        d => List(
+//          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Deleting process name or UUID
+//        )
 //      ),
 //      d => Set(NamespacedUuidDetails(d._1.uuid),
-//        NamespacedUuidDetails(d._2._1.uuid,d._2._2.map(_.path), Some(d._2._1.cid.toString)),
-//        NamespacedUuidDetails(d._3._1.uuid,d._3._2.map(_.path))) ++ // TODO: Need to get child process PID (cid) from here
+//        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
+//        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
 //        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
 //        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-//      _._1.latestTimestampNanos
-//    )(thisActor.context, context.self)
-
-  ).par
-
-
-  lazy val seoesTrees = List(
-    new PpmDefinition[DataShape]("FileExecuteDelete",
-      d => d._3._1.isInstanceOf[AdmFileObject],
-      List(
-        d => List(
-          d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered), // File name or UUID
-          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Executing process name or UUID
-        ),
-        d => List(
-          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Deleting process name or UUID
-        )
-      ),
-      d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
-        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
-        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
-        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos,
-      shouldApplyThreshold = false
-    )(thisActor.context, context.self, hostName) with PartialPpm[String] {
-
-      def getJoinCondition(observation: DataShape) =
-        observation._3._2.map(_.path).orElse(Some(observation._3._1.uuid.rendered))  // File name or UUID
-
-      val partialFilters = (
-        (d: DataShape) => d._1.eventType == EVENT_EXECUTE,
-        (d: DataShape) => d._1.eventType == EVENT_UNLINK
-      )
-    },
-
-    new PpmDefinition[DataShape]("FilesWrittenThenExecuted",
-      d => d._3._1.isInstanceOf[AdmFileObject],
-      List(
-        d => List(
-          d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered), // File name or UUID
-          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Writing process name or UUID
-        ),
-        d => List(
-          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Executing process name or UUID
-        )
-      ),
-      d => Set(NamespacedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
-        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
-        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
-        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos,
-      shouldApplyThreshold = false
-    )(thisActor.context, context.self, hostName) with PartialPpm[String] {
-
-      def getJoinCondition(observation: DataShape) =
-        observation._3._2.map(_.path).orElse(Some(observation._3._1.uuid.rendered))  // File name or UUID
-
-      val partialFilters = (
-        (d: DataShape) => writeTypes.contains(d._1.eventType),
-        (d: DataShape) => d._1.eventType == EVENT_EXECUTE
-      )
-    },
-
-    new PpmDefinition[DataShape]("CommunicationPathThroughObject",
-      d => readAndWriteTypes.contains(d._1.eventType) ||
-        (d._3._1.isInstanceOf[AdmSrcSinkObject] && d._3._1.asInstanceOf[AdmSrcSinkObject].srcSinkType == MEMORY_SRCSINK),  // Any kind of event to a memory object.
-      List(
-        d => List(
-          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Writing subject name or UUID
-        ),
-        d => List(
-          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered), // Reading subject name or UUID
-          d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
-            d._3._1 match {
-              case o: AdmSrcSinkObject => s" : ${o.srcSinkType}"
-              case o: AdmFileObject => s" : ${o.fileObjectType}"
-              case o: AdmNetFlowObject => s"  NetFlow: ${o.remoteAddress}:${o.remotePort}"
-              case _ => ""
-            }
-          )
-        )
-      ),
-      d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
-        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
-          d._3._1 match {
-            case o: AdmSrcSinkObject => s" : ${o.srcSinkType}"
-            case o: AdmFileObject => s" : ${o.fileObjectType}"
-            case o: AdmNetFlowObject => s"  NetFlow: ${o.remoteAddress}:${o.remotePort}"
-            case _ => ""
-          }
-          )))) ++
-        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
-        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos,
-      shouldApplyThreshold = true
-    )(thisActor.context, context.self, hostName) with PartialPpm[AdmUUID] {
-
-      def getJoinCondition(observation: DataShape) = Some(observation._3._1.uuid)   // Object UUID
-
-      val partialFilters = (
-        (d: DataShape) => writeTypes.contains(d._1.eventType) ||
-          (d._3._1.isInstanceOf[AdmSrcSinkObject] && d._3._1.asInstanceOf[AdmSrcSinkObject].srcSinkType == MEMORY_SRCSINK),     // Any kind of event to a memory object.
-        (d: DataShape) => (readTypes.contains(d._1.eventType) ||
-          (d._3._1.isInstanceOf[AdmSrcSinkObject] && d._3._1.asInstanceOf[AdmSrcSinkObject].srcSinkType == MEMORY_SRCSINK)) &&  // Any kind of event to a memory object.
-          (partialMap.contains(getJoinCondition(d).get) && d._2._2.exists(_.path != partialMap(getJoinCondition(d).get)._1.head))  // subject names are distinct
-      )
-    }
-  ).par
+//      d => Set(d._1.latestTimestampNanos),
+//      shouldApplyThreshold = false
+//    )(thisActor.context, context.self, hostName, graphService) with PartialPpm[String] {
+//
+//      def getJoinCondition(observation: DataShape) =
+//        observation._3._2.map(_.path).orElse(Some(observation._3._1.uuid.rendered))  // File name or UUID
+//
+//      val partialFilters = (
+//        (d: DataShape) => d._1.eventType == EVENT_EXECUTE,
+//        (d: DataShape) => d._1.eventType == EVENT_UNLINK
+//      )
+//    },
+//
+//    new PpmDefinition[DataShape]("FilesWrittenThenExecuted",
+//      d => d._3._1.isInstanceOf[AdmFileObject],
+//      List(
+//        d => List(
+//          d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered), // File name or UUID
+//          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Writing process name or UUID
+//        ),
+//        d => List(
+//          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Executing process name or UUID
+//        )
+//      ),
+//      d => Set(NamespacedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
+//        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
+//        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
+//        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+//        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
+//      d => Set(d._1.latestTimestampNanos),
+//      shouldApplyThreshold = false
+//    )(thisActor.context, context.self, hostName, graphService) with PartialPpm[String] {
+//
+//      def getJoinCondition(observation: DataShape) =
+//        observation._3._2.map(_.path).orElse(Some(observation._3._1.uuid.rendered))  // File name or UUID
+//
+//      val partialFilters = (
+//        (d: DataShape) => writeTypes.contains(d._1.eventType),
+//        (d: DataShape) => d._1.eventType == EVENT_EXECUTE
+//      )
+//    },
+//
+//    new PpmDefinition[DataShape]("CommunicationPathThroughObject",
+//      d => readAndWriteTypes.contains(d._1.eventType) ||
+//        (d._3._1.isInstanceOf[AdmSrcSinkObject] && d._3._1.asInstanceOf[AdmSrcSinkObject].srcSinkType == MEMORY_SRCSINK),  // Any kind of event to a memory object.
+//      List(
+//        d => List(
+//          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Writing subject name or UUID
+//        ),
+//        d => List(
+//          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered), // Reading subject name or UUID
+//          d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
+//            d._3._1 match {
+//              case o: AdmSrcSinkObject => s" : ${o.srcSinkType}"
+//              case o: AdmFileObject => s" : ${o.fileObjectType}"
+//              case o: AdmNetFlowObject => s"  NetFlow: ${o.remoteAddress}:${o.remotePort}"
+//              case _ => ""
+//            }
+//          )
+//        )
+//      ),
+//      d => Set(NamespacedUuidDetails(d._1.uuid),
+//        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
+//        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
+//          d._3._1 match {
+//            case o: AdmSrcSinkObject => s" : ${o.srcSinkType}"
+//            case o: AdmFileObject => s" : ${o.fileObjectType}"
+//            case o: AdmNetFlowObject => s"  NetFlow: ${o.remoteAddress}:${o.remotePort}"
+//            case _ => ""
+//          }
+//          )))) ++
+//        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+//        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
+//      d => Set(d._1.latestTimestampNanos),
+//      shouldApplyThreshold = true
+//    )(thisActor.context, context.self, hostName, graphService) with PartialPpm[AdmUUID] {
+//
+//      def getJoinCondition(observation: DataShape) = Some(observation._3._1.uuid)   // Object UUID
+//
+//      val partialFilters = (
+//        (d: DataShape) => writeTypes.contains(d._1.eventType) ||
+//          (d._3._1.isInstanceOf[AdmSrcSinkObject] && d._3._1.asInstanceOf[AdmSrcSinkObject].srcSinkType == MEMORY_SRCSINK),     // Any kind of event to a memory object.
+//        (d: DataShape) => (readTypes.contains(d._1.eventType) ||
+//          (d._3._1.isInstanceOf[AdmSrcSinkObject] && d._3._1.asInstanceOf[AdmSrcSinkObject].srcSinkType == MEMORY_SRCSINK)) &&  // Any kind of event to a memory object.
+//          (partialMap.contains(getJoinCondition(d).get) && d._2._2.exists(_.path != partialMap(getJoinCondition(d).get)._1.head))  // subject names are distinct
+//      )
+//    }
+//  ).par
 
 
-  lazy val oeseoTrees = List(
-    new PpmDefinition[DataShape]("ProcessWritesFileSoonAfterNetflowRead",
-      d => readAndWriteTypes.contains(d._1.eventType),
-      List(
-        d => {
-          val nf = d._3._1.asInstanceOf[AdmNetFlowObject]
-          List(s"${nf.remoteAddress}:${nf.remotePort}")
-        },
-        d => List(
-          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered),
-          d._3._2.map(_.path) match {
-            case Some("") | None => d._3._1.uuid.rendered
-            case Some(s) => s
-          }
-        )
-      ),
-      d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
-        NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path).getOrElse("AdmNetFlow")))) ++
-        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
-        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      _._1.latestTimestampNanos,
-      shouldApplyThreshold = true
-    )(thisActor.context, context.self, hostName) with PartialPpm[AdmUUID] {
-
-      def getJoinCondition(observation: DataShape) = observation._2._2.map(_.uuid)   // TODO: shouldn't this include some time range comparison here?????????????????????????????????????????????????????????????????
-
-      override def arrangeExtracted(extracted: List[ExtractedValue]) = extracted.tail :+ extracted.head
-
-      val partialFilters = (
-        (eso: DataShape) => eso._3._1.isInstanceOf[AdmNetFlowObject] && readTypes.contains(eso._1.eventType),
-        (eso: DataShape) => eso._3._1.isInstanceOf[AdmFileObject] && writeTypes.contains(eso._1.eventType)
-      )
-    }
-  ).par
+//  lazy val oeseoTrees = List(
+//    new PpmDefinition[DataShape]("ProcessWritesFileSoonAfterNetflowRead",
+//      d => readAndWriteTypes.contains(d._1.eventType),
+//      List(
+//        d => {
+//          val nf = d._3._1.asInstanceOf[AdmNetFlowObject]
+//          List(s"${nf.remoteAddress}:${nf.remotePort}")
+//        },
+//        d => List(
+//          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered),
+//          d._3._2.map(_.path) match {
+//            case Some("") | None => d._3._1.uuid.rendered
+//            case Some(s) => s
+//          }
+//        )
+//      ),
+//      d => Set(NamespacedUuidDetails(d._1.uuid),
+//        NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
+//        NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path).getOrElse("AdmNetFlow")))) ++
+//        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+//        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
+//      d => Set(d._1.latestTimestampNanos),
+//      shouldApplyThreshold = true
+//    )(thisActor.context, context.self, hostName, graphService) with PartialPpm[AdmUUID] {
+//
+//      def getJoinCondition(observation: DataShape) = observation._2._2.map(_.uuid)   // TODO: shouldn't this include some time range comparison here?????????????????????????????????????????????????????????????????
+//
+//      override def arrangeExtracted(extracted: List[ExtractedValue]) = extracted.tail :+ extracted.head
+//
+//      val partialFilters = (
+//        (eso: DataShape) => eso._3._1.isInstanceOf[AdmNetFlowObject] && readTypes.contains(eso._1.eventType),
+//        (eso: DataShape) => eso._3._1.isInstanceOf[AdmFileObject] && writeTypes.contains(eso._1.eventType)
+//      )
+//    }
+//  ).par
 
 
   sealed trait SendingOrReceiving { def invert: SendingOrReceiving = this match { case Sending => Receiving; case Receiving => Sending } }
@@ -1054,153 +783,117 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
     def invert = CrossHostNetObs(sendRec.invert, remoteAddress, remotePort, localAddress, localPort)
   }
 
-  lazy val crossHostTrees = List(
-
-    new PpmDefinition[DataShape]("CrossHostProcessCommunication",
-      d => netFlowTypes.contains(d._1.eventType) && (d._3._1 match {
-        case AdmNetFlowObject(_,Some(_),Some(_),Some(_),Some(_),_) => true   // Ignore raw sockets. ...and other sockets.
-        case _ => false
-      }),
-      List(
-        d => List(
-          d._2._2.map(_.path).getOrElse("<<unknown_process>>")), // Sending process name
-        d => List(
-          d._2._2.map(_.path).getOrElse("<<unknown_process>>"),          // Receiving process name
-          d._3._1.asInstanceOf[AdmNetFlowObject].localPort.get.toString  // Receiving port number
-        )
-      ),
-      d => Set(
-        NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid, d._2._2.map(_.path), Some(d._2._1.cid)),
-        NamespacedUuidDetails(d._3._1.uuid, d._3._2.map(_.path))
-      ) ++ d._2._2.map(n => NamespacedUuidDetails(n.uuid, Some(n.path), None)).toSet,
-//        ++ d._3._2.map(n => NamespacedUuidDetails(n.uuid, Some(n.path), None)).toSet,  // Don't need/will never be a path node from a netflow.
-      _._1.latestTimestampNanos,
-      shouldApplyThreshold = false
-    )(thisActor.context, context.self, hostName) with PartialPpm[CrossHostNetObs] {
-
-//      implicit def partialMapJson: RootJsonFormat[(Set[String], (List[ExtractedValue], Set[NamespacedUuidDetails]))] = ???
-
-      val netFlowReadTypes = writeTypes.+(EVENT_CONNECT)
-      val netFlowWriteTypes = readTypes.+(EVENT_ACCEPT)
-
-      val partialFilters = (
-        (eso: PartialShape) => netFlowReadTypes.contains(eso._1.eventType),
-        (eso: PartialShape) => netFlowWriteTypes.contains(eso._1.eventType)
-      )
-
-      def getJoinCondition(observation: DataShape): Option[CrossHostNetObs] = Try {
-        val nf = observation._3._1.asInstanceOf[AdmNetFlowObject]
-        CrossHostNetObs(
-          observation match {
-            case t if partialFilters._1(t) => Sending
-            case t if partialFilters._2(t) => Receiving
-            case _ => ???
-          },
-          nf.localAddress.get,
-          nf.localPort.get,
-          nf.remoteAddress.get,
-          nf.remotePort.get
-        )
-      }.toOption
-
-      var partialMap2 = Map.empty[HostName, mutable.Map[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]]]
-
-      override def observe(observation: PartialShape): Unit = if (incomingFilter(observation)) {
-        getJoinCondition(observation) match {
-          case None => log.error(s"Something unexpected passed the filter for CrossHostProcessCommunication: $observation")
-          case Some(joinValue) =>
-
-            val existingThisHost = partialMap2.getOrElse(observation._1.hostName, mutable.Map.empty[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]])
-            if ( ! partialMap2.contains(observation._2._1.hostName)) partialMap2 = partialMap2 + (observation._2._1.hostName -> existingThisHost)
-            val existingOtherHosts = (partialMap2 - observation._1.hostName).values
-              .foldLeft[Map[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]]](Map.empty)(_ ++ _)
-
-            val previousSameDirObservations = existingThisHost.getOrElse(joinValue, Map.empty[List[ExtractedValue], Set[NamespacedUuidDetails]])
-            val observedIds = uuidCollector(observation)
-
-            val sendRecOpt = joinValue.sendRec match {
-              case Sending =>
-                val theseDiscs = discriminators(0)(observation)
-                val theseIds = previousSameDirObservations.get(theseDiscs).fold(observedIds) { previousIds => observedIds ++ previousIds }
-                val thisSendObs = Map(theseDiscs -> theseIds)
-                val allSendObs = previousSameDirObservations ++ thisSendObs
-                existingThisHost(joinValue) = allSendObs  // Update mutable Map in place
-                existingOtherHosts.get(joinValue.invert).map(thisSendObs -> _)
-              case Receiving =>
-                val theseDiscs = discriminators(1)(observation)
-                val theseIds = previousSameDirObservations.get(theseDiscs).fold(observedIds) { previousIds => observedIds ++ previousIds }
-                val thisRecObs = Map(theseDiscs -> theseIds)
-                val allRecObs = previousSameDirObservations ++ thisRecObs
-                existingThisHost(joinValue) = allRecObs  // Update mutable Map in place
-                existingOtherHosts.get(joinValue.invert).map(_ -> thisRecObs)
-            }
-
-            sendRecOpt.foreach { obs =>
-              val combinedObs = for {
-                o1 <- obs._1
-                o2 <- obs._2
-              } yield {
-                o1._1 ++ o2._1 -> (o1._2 ++ o2._2)
-              }
-              combinedObs.foreach { case (extracted, ids) =>
-                tree ! PpmNodeActorBeginObservation(
-                  name,
-                  arrangeExtracted(extracted), // Updated first, because Sending discriminators is first.
-                  ids,
-                  observation._1.latestTimestampNanos,
-                  alarmFilter
-                )
-              }
-            }
-        }
-      }
-    }
-  ).par
-
+// /* lazy val crossHostTrees = List(
+//
+//    new PpmDefinition[DataShape]("CrossHostProcessCommunication",
+//      d => netFlowTypes.contains(d._1.eventType) && (d._3._1 match {
+//        case AdmNetFlowObject(_,Some(_),Some(_),Some(_),Some(_),_) => true   // Ignore raw sockets. ...and other sockets.
+//        case _ => false
+//      }),
+//      List(
+//        d => List(
+//          d._2._2.map(_.path).getOrElse("<<unknown_process>>")), // Sending process name
+//        d => List(
+//          d._2._2.map(_.path).getOrElse("<<unknown_process>>"),          // Receiving process name
+//          d._3._1.asInstanceOf[AdmNetFlowObject].localPort.get.toString  // Receiving port number
+//        )
+//      ),
+//      d => Set(
+//        NamespacedUuidDetails(d._1.uuid),
+//        NamespacedUuidDetails(d._2._1.uuid, d._2._2.map(_.path), Some(d._2._1.cid)),
+//        NamespacedUuidDetails(d._3._1.uuid, d._3._2.map(_.path))
+//      ) ++ d._2._2.map(n => NamespacedUuidDetails(n.uuid, Some(n.path), None)).toSet,
+////        ++ d._3._2.map(n => NamespacedUuidDetails(n.uuid, Some(n.path), None)).toSet,  // Don't need/will never be a path node from a netflow.
+//      d => Set(d._1.latestTimestampNanos),
+//      shouldApplyThreshold = false
+//    )(thisActor.context, context.self, hostName, graphService) with PartialPpm[CrossHostNetObs] {
+//
+////      implicit def partialMapJson: RootJsonFormat[(Set[String], (List[ExtractedValue], Set[NamespacedUuidDetails]))] = ???
+//
+//      val netFlowReadTypes = writeTypes.+(EVENT_CONNECT)
+//      val netFlowWriteTypes = readTypes.+(EVENT_ACCEPT)
+//
+//      val partialFilters = (
+//        (eso: PartialShape) => netFlowReadTypes.contains(eso._1.eventType),
+//        (eso: PartialShape) => netFlowWriteTypes.contains(eso._1.eventType)
+//      )
+//
+//      def getJoinCondition(observation: DataShape): Option[CrossHostNetObs] = Try {
+//        val nf = observation._3._1.asInstanceOf[AdmNetFlowObject]
+//        CrossHostNetObs(
+//          observation match {
+//            case t if partialFilters._1(t) => Sending
+//            case t if partialFilters._2(t) => Receiving
+//            case _ => ???
+//          },
+//          nf.localAddress.get,
+//          nf.localPort.get,
+//          nf.remoteAddress.get,
+//          nf.remotePort.get
+//        )
+//      }.toOption
+//
+//      var partialMap2 = Map.empty[HostName, mutable.Map[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]]]
+//
+//      override def observe(observation: PartialShape): Unit = if (incomingFilter(observation)) {
+//        getJoinCondition(observation) match {
+//          case None => log.error(s"Something unexpected passed the filter for CrossHostProcessCommunication: $observation")
+//          case Some(joinValue) =>
+//
+//            val existingThisHost = partialMap2.getOrElse(observation._1.hostName, mutable.Map.empty[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]])
+//            if ( ! partialMap2.contains(observation._2._1.hostName)) partialMap2 = partialMap2 + (observation._2._1.hostName -> existingThisHost)
+//            val existingOtherHosts = (partialMap2 - observation._1.hostName).values
+//              .foldLeft[Map[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]]](Map.empty)(_ ++ _)
+//
+//            val previousSameDirObservations = existingThisHost.getOrElse(joinValue, Map.empty[List[ExtractedValue], Set[NamespacedUuidDetails]])
+//            val observedIds = uuidCollector(observation)
+//
+//            val sendRecOpt = joinValue.sendRec match {
+//              case Sending =>
+//                val theseDiscs = discriminators(0)(observation)
+//                val theseIds = previousSameDirObservations.get(theseDiscs).fold(observedIds) { previousIds => observedIds ++ previousIds }
+//                val thisSendObs = Map(theseDiscs -> theseIds)
+//                val allSendObs = previousSameDirObservations ++ thisSendObs
+//                existingThisHost(joinValue) = allSendObs  // Update mutable Map in place
+//                existingOtherHosts.get(joinValue.invert).map(thisSendObs -> _)
+//              case Receiving =>
+//                val theseDiscs = discriminators(1)(observation)
+//                val theseIds = previousSameDirObservations.get(theseDiscs).fold(observedIds) { previousIds => observedIds ++ previousIds }
+//                val thisRecObs = Map(theseDiscs -> theseIds)
+//                val allRecObs = previousSameDirObservations ++ thisRecObs
+//                existingThisHost(joinValue) = allRecObs  // Update mutable Map in place
+//                existingOtherHosts.get(joinValue.invert).map(_ -> thisRecObs)
+//            }
+//
+//            sendRecOpt.foreach { obs =>
+//              val combinedObs = for {
+//                o1 <- obs._1
+//                o2 <- obs._2
+//              } yield {
+//                o1._1 ++ o2._1 -> (o1._2 ++ o2._2)
+//              }
+//              combinedObs.foreach { case (extracted, ids) =>
+//                tree ! PpmNodeActorBeginObservation(
+//                  name,
+//                  arrangeExtracted(extracted), // Updated first, because Sending discriminators is first.
+//                  ids,
+//                  observation._1.latestTimestampNanos,
+//                  alarmFilter
+//                )
+//              }
+//            }
+//        }
+//      }
+//    }
+//  ).par
+//*/
 
 
   lazy val admPpmTrees =
-    if (hostName == hostNameForAllHosts) crossHostTrees
-    else esoTrees ++ seoesTrees ++ oeseoTrees
+    if (hostName == hostNameForAllHosts) Nil // crossHostTrees
+    else esoTrees // ++ seoesTrees ++ oeseoTrees
 
-  lazy val iforestTreesToUse = if (ppmConfig.iforestenabled && hostName != hostNameForAllHosts) iforestTrees else Nil
-
-  val ppmList =
-    if (hostName == hostNameForAllHosts) admPpmTrees
-    else cdmSanityTrees ++ admPpmTrees ++ iforestTreesToUse
-
-
-
-  def saveTrees(): Future[Unit] = {
-    if (ppmConfig.iforestenabled) saveIforestModel()
-    ppmList.toList.foldLeft(Future.successful(()))((acc, ppmTree) => acc.flatMap(_ => ppmTree.saveStateAsync()))
-  }
-
-  def saveIforestModel(): Unit = {
-    val iForestTree = iforestTrees.find(_.name == "iForestProcessEventType")
-    val iforestTrainingSaveFile = ppmConfig.iforesttrainingsavefile
-    iForestTree match {
-      case Some(tree) => tree.getAllCounts.map( counts =>
-        EventTypeModels.EventTypeData.writeToFile(counts, EventTypeModels.modelDirIForest + iforestTrainingSaveFile)
-      ).onFailure{ case e => log.warning(s"Could not getAllCounts for iForestTree, with error: $e")}
-      case None => println("ProcessEventType tree for iForest is not defined.")
-    }
-  }
-
-
-//  println(s"Setting shutdown hook to save PPM trees for $hostName, shouldsave: ${ppmConfig.shouldsave}")
-////  override def postStop(): Unit = {
-//    context.system.registerOnTermination{
-//      println(s"Post stop: $didReceiveComplete && ${ppmConfig.shouldsave}")
-//      if ( ! didReceiveComplete && ppmConfig.shouldsave) {
-//        didReceiveComplete = true
-//        val ppmSaveFutures = ppmList.map(_.saveStateAsync())
-//        if (iforestEnabled) saveIforestModel()
-//        Await.ready(Future.sequence(ppmSaveFutures.seq), 603 seconds)
-//      }
-//  //    super.postStop()
-//    }
+  val ppmList = admPpmTrees
 
   def ppm(name: String): Option[PpmDefinition[_]] = ppmList.find(_.name == name)
 
@@ -1217,23 +910,6 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
         tree.recordAlarm(alarmOpt)
         tree.insertIntoLocalProbAccumulator(alarmOpt)
       }
-
-    case PpmNodeActorManyAlarmsDetected(setOfAlarms) =>
-      setOfAlarms.headOption.flatMap(a =>
-        ppm(a.treeName)
-      ).fold(
-        log.warning(s"Could not find tree named: ${setOfAlarms.headOption.map(_.treeName)} to record many Alarms from: $sender")
-      )( tree => setOfAlarms.foreach{ case PpmNodeActorAlarmDetected(treeName, alarmData, collectedUuids, dataTimestamp) =>
-          val alarmOpt = Some((alarmData, collectedUuids, dataTimestamp))
-          tree.recordAlarm(alarmOpt)
-          tree.insertIntoLocalProbAccumulator(alarmOpt)
-      })
-
-    case ListPpmTrees =>
-      implicit val timeout = Timeout(591 seconds)
-      sender() ! Future.sequence(
-        ppmList.map(t => (t.tree ? PpmNodeActorGetTopLevelCount).mapTo[PpmNodeActorGetTopLevelCountResult].map(c => t.name -> c.count)).seq
-      ).map(s => PpmTreeNames(s.toMap))
 
     case msg @ (e: Event, s: AdmSubject, subPathNodes: Set[_], o: ADM, objPathNodes: Set[_]) =>
 
@@ -1259,28 +935,9 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
           Future.successful(())
       }
 
-      if (ppmConfig.iforestenabled) {
-        Try(
-          (e, s, subPathNodes.asInstanceOf[Set[AdmPathNode]])
-        ) match {
-          case Success(t) => iforestTrees.find(_.name == "iForestProcessEventType").foreach(p => p.observe(t))
-          case Failure(err) => log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
-        }
-      }
-
       Try(
         Await.result(f, 15 seconds)
       ).failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
-
-
-//      sender() ! Ack
-
-
-    case (_, cdm: CurrentCdm) =>
-      cdmSanityTrees.foreach( ppm =>
-        ppm.observe(cdm)
-      )
-      sender() ! Ack
 
 
     case PpmTreeAlarmQuery(treeName, queryPath, namespace, startAtTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
@@ -1297,41 +954,26 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean) extends
       }
       sender() ! PpmTreeAlarmResult(resultOpt)
 
-    case PpmTreeCountQuery(treeName) =>
-      sender() ! ppm(treeName).map(tree => tree.getAllCounts.map(r => PpmTreeCountResult(Some(r)))).getOrElse(Future.successful(PpmTreeCountResult(None)))
-
     case SetPpmRatings(treeName, keys, rating, namespace) =>
       sender() ! ppm(treeName).map(tree => keys.map(key => tree.setAlarmRating(key, rating match {case 0 => None; case x => Some(x)}, namespace)))
 
     case msg @ PpmNodeActorBeginGetTreeRepr(treeName, startingKey) =>
       implicit val timeout = Timeout(30 seconds)
       val reprFut = ppm(treeName)
-        .map(d => (d.tree ? msg).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity))
+        .map(d => graphService.treeRepr(d.treeRootQid,treeName,startingKey).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity))
         .getOrElse(Future.failed(new NoSuchElementException(s"No tree found with name $treeName")))
       sender() ! reprFut
 
     case InitMsg =>
       if ( ! didReceiveInit) {
         didReceiveInit = true
-        if (ppmConfig.iforestenabled)   // TODO: If using iForest again in the future, come back and refactor this to use the right host name!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-          Future {
-            Application.ppmManagerActors.keys.foreach(hostName => EventTypeModels.evaluateModels(context.system, hostName))
-          }.recoverWith{ case e => e.printStackTrace(); throw e }
       }
       sender() ! Ack
-
-    case SaveTrees(shouldConfirm) =>
-      val s = sender()
-      val saveTreesF = saveTrees()
-      if (shouldConfirm) saveTreesF.onComplete(_ => s ! Ack )
 
     case CompleteMsg =>
       if ( ! didReceiveComplete) {
         println(s"PPM Manager with hostName: $hostName is completing the stream.")
         didReceiveComplete = true
-        val saveTreesF = saveTrees()
-        if (ppmConfig.iforestenabled) saveIforestModel()
-        Await.ready(saveTreesF, 48 hours)
       }
 
     case x =>
@@ -1354,8 +996,6 @@ case class PpmTreeAlarmResult(results: Option[List[(Long, Long, Alarm, Set[Names
 }
 case class SetPpmRatings(treeName: String, key: List[List[String]], rating: Int, namespace: String)
 
-case class PpmTreeCountQuery(treeName: String)
-case class PpmTreeCountResult(results: Option[Map[List[ExtractedValue], Int]])
 case class SaveTrees(shouldConfirm: Boolean = false)
 
 
