@@ -1,6 +1,6 @@
 package com.galois.adapt
 
-import com.galois.adapt.cdm19.CDM19
+import com.galois.adapt.cdm20.CDM20
 import spray.json.{JsObject, JsString, JsValue, RootJsonFormat}
 import spray.json.DefaultJsonProtocol._
 
@@ -92,13 +92,13 @@ object FilterCdm {
 
 // This is the unit of thing we are filtering over - basically just something that has properties and edges
 trait Filterable {
-  def underlying: CDM19
+  def underlying: CDM20
   def label: String
   def properties: Map[String, Any]
   def edges: Map[String, java.util.UUID]
 }
 object Filterable {
-  def apply(node: CDM19 with DBWritable with DBNodeable[AnyRef]): Filterable = new Filterable {
+  def apply(node: CDM20 with DBWritable with DBNodeable[AnyRef]): Filterable = new Filterable {
     override val underlying = node
     override lazy val label = node.getClass.getSimpleName
     override lazy val properties = node.asDBKeyValues.toMap

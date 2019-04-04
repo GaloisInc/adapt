@@ -9,6 +9,8 @@ class Scores:
 
     def __init__(self, reader, reverse=True):
         self.header = next(reader)[1:]
+        #for row in reader:
+        #    print(row[0] +","+ str(row[1]))
         self.data = [(row[0], float(row[1]))
                      for row in reader]
         self.data = sorted(self.data,

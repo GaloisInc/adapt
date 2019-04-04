@@ -237,12 +237,6 @@ case object PpmTree {
   def prepareObservation[DataShape](data: DataShape, ds: List[Discriminator[DataShape]]): List[ExtractedValue] = ds.flatMap(_.apply(data))
 }
 
-
-
-case class PpmNodeActorBeginObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long, alarmFilter: PpmNodeActorAlarmDetected => Boolean)
-case class PpmNodeActorObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long, siblingPopulation: Int, parentCount: Int, parentLocalProb: Float, acc: Alarm, alarmFilter: PpmNodeActorAlarmDetected => Boolean, newLeafProb: Option[(Float,Int)], depth: Int)
-case class PpmNodeActorBeginGetTreeRepr(treeName: String, startingKey: List[ExtractedValue] = Nil)
-case class PpmNodeActorGetTreeRepr(yourDepth: Int, key: String, siblingPopulation: Int, parentCount: Int, parentGlobalProb: Float)
 case class PpmNodeActorGetTreeReprResult(repr: TreeRepr)
 case object PpmNodeActorGetTopLevelCount
 case class PpmNodeActorGetTopLevelCountResult(count: Int)
@@ -278,178 +272,9 @@ class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState:
   def globalProbOfThisObs(parentGlobalProb: Float, parentCount: Int): Float =
     (counter.toFloat / parentCount.toFloat) * parentGlobalProb
 
-  /* Alternate methods of calculating local probability of a standard node and a question mark node.
-  (Based on the email Anthony Williams sent on September 14, 2018)
-
-  1. Simple Good-Turing
-    def qSimpleGoodTuringLP(qNodeVal: Int, parentCount: Int): Float = {
-      // qNodeVal is the number of sibling nodes with a count of 1
-      if (parentCount == 0) 1F
-      else qNodeVal.toFloat / parentCount.toFloat
-    }
-
-    def simpleGoodTuringLP(parentCount: Int): Float = localProbOfThisObs(parentCount)
-
-  2. Additive Smoothing
-    def qAdditiveSmoothingLP(siblingCount: Int, parentCount: Int): Float = {
-      1F / (parentCount.toFloat + siblingCount + 1) // +1 to count ?-node
-    }
-
-    def additiveSmoothingLP(siblingCount: Int, parentCount: Int): Float = {
-      (counter.toFloat + 1) / (parentCount.toFloat + siblingCount + 1)
-      }
-
-  3. Cleary and Witten's Method A
-    def qClearyWittenMethodALP(parentCount: Int): Float = {
-      1F / (parentCount.toFloat + 1)
-    }
-
-    def clearyWittenMethodALP(parentCount: Int): Float = {
-      (counter.toFloat) / (parentCount.toFloat + 1)
-      }
-
-  4. Cleary and Witten's Method B
-    def qClearyWittenMethodBLP(siblingCount: Int, parentCount: Int): Float = {
-      if (parentCount == 0) 1F
-      else siblingCount.toFloat / parentCount.toFloat
-    }
-
-    def clearyWittenMethodBLP(siblingCount: Int, parentCount: Int): Float = {
-      if (parentCount == 0) 1F
-      else (counter.toFloat - 1) / parentCount.toFloat
-      }
-
-  5. Cleary and Witten's Method C
-    def qClearyWittenMethodCLP(siblingCount: Int, parentCount: Int): Float = {
-      siblingCount.toFloat / (siblingCount.toFloat + parentCount.toFloat + 1)
-    }
-
-    def clearyWittenMethodCLP(siblingCount: Int, parentCount: Int): Float = {
-      counter.toFloat / (siblingCount.toFloat + parentCount.toFloat + 1)
-      }
-
-  6. GoodTuringInspired
-    def qGoodTuringInspiredLP(siblingCount: Int, parentCount: Int): Float = {
-      if (parentCount == 0) 1F
-      else siblingCount.toFloat / parentCount.toFloat
-    }
-
-    def goodTuringInspiredLP(parentCount: Int): Float = {
-      if (parentCount == 0) 1F
-      else counter.toFloat / parentCount.toFloat
-      }
- */
-
   def receive = {
 
     case PpmNodeActorGetTopLevelCount => sender() ! PpmNodeActorGetTopLevelCountResult(counter)
-
-    case PpmNodeActorBeginObservation(treeName: String, extractedValues: List[ExtractedValue], collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long, alarmFilter) =>
-      extractedValues match {
-        case Nil => log.warning(s"Tried to start an observation in tree: $treeName with an empty extractedValues.")
-        case extracted :: remainder =>
-          /*
-          If the first extracted value is new to this tree (at this level)
-          then an alarm will be recorded. The local probability of the question
-          mark node (at this level) will be used as the local probability of the
-          leaf node in the alarm.
-           */
-          val newLeafProb =
-            if (children.contains(extracted)) None
-            else Some(qLocalProbOfThisObs(childrenPopulation, counter) -> 1)
-          val childNode = children.getOrElse(extracted, {
-            val newChild = newSymbolNode(extracted)
-            children = children + (extracted -> newChild)
-            newChild
-          })
-          counter += 1
-          childNode ! PpmNodeActorObservation(treeName, remainder, collectedUuids, dataTimestamp, childrenPopulation, counter, 1F, List.empty, alarmFilter, newLeafProb, 1 )
-      }
-
-
-    case PpmNodeActorObservation(treeName, remainingExtractedValues, collectedUuids, dataTimestamp, siblingPopulation, parentCount, parentGlobalProb, alarmAcc: Alarm, alarmFilter, passNewLeafProb, depth) =>
-      counter += 1
-      val thisLocalProb = localProbOfThisObs(parentCount)
-      val thisQLocalProb = qLocalProbOfThisObs(siblingPopulation, parentCount)
-      val thisGlobalProb = globalProbOfThisObs(parentGlobalProb, parentCount)
-      val thisAlarmComponent = PpmTreeNodeAlarm(thisKey, thisLocalProb, thisGlobalProb, counter, siblingPopulation, parentCount, depth)
-      remainingExtractedValues match {
-        case Nil if counter == 1 =>
-          val alarmLocalProb = if (passNewLeafProb.isDefined && parentCount == 1) passNewLeafProb.get else thisQLocalProb -> depth // We use the newLeafProb if the parent node is new.
-          val leafAlarmComponent = PpmTreeNodeAlarm(thisKey, alarmLocalProb._1, thisGlobalProb, counter, siblingPopulation, parentCount, alarmLocalProb._2)
-          val alarm = PpmNodeActorAlarmDetected(treeName, alarmAcc :+ leafAlarmComponent, collectedUuids, dataTimestamp)  // Sound an alarm if the end is novel.
-          if (alarmFilter(alarm)) alarmActor ! alarm
-        case Nil =>
-        case extracted :: remainder =>
-          /*
-          If passNewLeafProb is defined, we pass it on;
-          if it's not defined and the newly extracted value has not been seen before
-          (i.e., it is not contained in `children`), we capture the local probability of the ?-node
-          (and tree depth) and pass it to the leaf (eventually) through newly defined nodes in the tree.
-           */
-          val newLeafProb =  if (passNewLeafProb.isDefined) passNewLeafProb else {
-            if (children.contains(extracted)) None
-            else Some(qLocalProbOfThisObs(childrenPopulation + 1, counter) -> (depth + 1))
-          }
-          val childNode = children.getOrElse(extracted, {
-            val newChild = newSymbolNode(extracted)
-            children = children + (extracted -> newChild)
-            newChild
-          })
-          childNode ! PpmNodeActorObservation(treeName, remainder, collectedUuids, dataTimestamp, childrenPopulation, counter, thisGlobalProb, alarmAcc :+ thisAlarmComponent, alarmFilter, newLeafProb, depth + 1)
-      }
-
-
-    case PpmNodeActorBeginGetTreeRepr(treeName: String, startingKey) =>
-      implicit val timeout = Timeout(599 seconds)
-      val qNodeRepr = if (children.isEmpty)
-        Set.empty[TreeRepr]
-      else {
-        val prob = if (counter == 0) 1 else childrenPopulation.toFloat / counter.toFloat   // TODO: This should reference another probability calculation instead of being hardcoded as a one-off!!!!!!!
-        Set(TreeRepr(1, "_?_", prob, prob, childrenPopulation, Set.empty))
-      }
-      val futureResult: Future[PpmNodeActorGetTreeReprResult] = startingKey match {
-        case Nil =>
-          val futureRepr = Future.sequence(
-            children.map { case (k,v) =>
-              (v ? PpmNodeActorGetTreeRepr(1, k, childrenPopulation, counter, 1F)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
-            }
-          ).map { resolvedChildren =>
-            PpmNodeActorGetTreeReprResult(TreeRepr(0, treeName, 1F, 1F, counter, resolvedChildren.map(_.repr).toSet ++ qNodeRepr))
-          }
-          futureRepr
-        case childKey :: remainder =>
-          children.get(childKey) match {
-            case Some(childRef) => (childRef ? PpmNodeActorBeginGetTreeRepr(childKey, remainder)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
-            case None =>
-//              Future.failed(new IndexOutOfBoundsException(s"No child element for key $childKey"))
-              Future.successful(PpmNodeActorGetTreeReprResult(TreeRepr.empty))
-          }
-      }
-
-      sender() ! futureResult
-
-
-    case PpmNodeActorGetTreeRepr(yourDepth: Int, key: String, siblingPopulation: Int, parentCount: Int, parentGlobalProb: Float) =>
-      implicit val timeout = Timeout(599 seconds)
-      val thisLocalProb = counter.toFloat / parentCount.toFloat
-      val thisGlobalProb = thisLocalProb * parentGlobalProb
-      val childPop = childrenPopulation
-      val qNodeRepr = if (children.isEmpty)
-        Set.empty[TreeRepr]
-      else {
-        val prob = if (counter == 0) 1 else childPop.toFloat / counter.toFloat
-        Set(TreeRepr(yourDepth + 1, "_?_", prob, prob * thisGlobalProb, childPop, Set.empty))
-      }
-      val futureResult = Future.sequence(
-        children.map { case (k,v) =>
-          (v ? PpmNodeActorGetTreeRepr(yourDepth + 1, k, childPop, counter, thisGlobalProb)).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
-        }
-      ).map { resolvedChildren =>
-        PpmNodeActorGetTreeReprResult(TreeRepr(yourDepth, key, thisLocalProb, thisLocalProb * parentGlobalProb, counter, resolvedChildren.map(_.repr).toSet ++ qNodeRepr))
-      }
-      sender() ! futureResult
-
 
     case msg => log.error(s"Received unknown message: $msg")
 
@@ -1071,7 +896,7 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
 
   def readableString: String = simpleStrings(-1).drop(1).mkString("\n")
   def simpleStrings(passedDepth: Int = 0): List[String] =
-    s"${(0 until (4 * passedDepth)).map(_ => " ").mkString("") + (if (children.isEmpty) s"- ${count} count${if (count>=2)"s"} of:" else "with:")} $key" ::
+    s"${(0 until (4 * passedDepth)).map(_ => " ").mkString("") + (if (children.isEmpty) s"- ${count} count${if (count == 1) "" else "s"} of:" else "with:")} $key" ::
       children.toList.sortBy(r => 1F - r.localProb).flatMap(_.simpleStrings(passedDepth + 1))
 
   def toFlat: List[(Int, ExtractedValue, Float, Float, Int)] = (depth, key, localProb, globalProb, count) :: children.toList.flatMap(_.toFlat)

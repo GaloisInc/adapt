@@ -1,5 +1,5 @@
 {"context specification":{
-     "query":"MATCH (e:AdmEvent)-->(f:AdmFileObject) RETURN DISTINCT e.eventType AS type, f.uuid AS uuid",
+     "query":"MATCH (e:AdmEvent)-->(n:AdmFileObject) WHERE %s RETURN DISTINCT e.eventType AS type, n.uuid AS uuid",
      "endpoint":"cypher",
 "objects":"uuid",
 "attributes":["type"]
