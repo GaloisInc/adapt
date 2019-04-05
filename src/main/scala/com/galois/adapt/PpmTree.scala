@@ -26,12 +26,14 @@ import AdaptConfig._
 import Application.hostNameForAllHosts
 import spray.json._
 import ApiJsonProtocol._
+import com.rrwright.quine.language.QuineId
 import com.rrwright.quine.runtime.GraphService
+import com.rrwright.quine.runtime.Novelty
 
 import scala.annotation.tailrec
 
 //type AnAlarm = (List[String], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
-case class AnAlarm (key:List[String], details:(Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
+case class AnAlarm(key:List[String], details:(Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
 
 object NoveltyDetection {
   type Event = AdmEvent
@@ -54,7 +56,7 @@ object NoveltyDetection {
   val execDeleteTypes = Set[EventType](EVENT_EXECUTE, EVENT_UNLINK)
   val march1Nanos = 1519862400000000L
 
-  case class NamespacedUuidDetails(extendedUuid: NamespacedUuid, name: Option[String] = None, pid: Option[Int] = None) // Make this work with Quine UUIDs
+  case class NamespacedUuidDetails(extendedUuid: AdmUUID, name: Option[String] = None, pid: Option[Int] = None)
 }
 
 case object AlarmExclusions {
@@ -66,8 +68,8 @@ case object AlarmExclusions {
   val trace = Set()
   val general = Set("<no_subject_path_node>")
   val allExclusions = cadets ++ clearscope ++ fivedirections ++ marple ++ theia ++ trace ++ general
-  def filter(alarm: PpmNodeActorAlarmDetected): Boolean = // true == allow an alarm to be reported.
-    ! alarm.alarmData.exists(level => allExclusions.contains(level.key))
+  def filter(novelty: Novelty[Set[NamespacedUuidDetails]]): Boolean = // true == allow an alarm to be reported.
+    ! novelty.probabilityData.exists(level => allExclusions.contains(level._1))
 }
 
 
@@ -75,10 +77,10 @@ case class PpmDefinition[DataShape](
   name: String,
   incomingFilter: Filter[DataShape],
   discriminators: List[Discriminator[DataShape]],
-  uuidCollector: DataShape => Set[NamespacedUuidDetails], // Fix this to work with Quine IDs
-  timestampExtractor: DataShape => Set[Long], // Collect more timestamps, make a set
+  uuidCollector: DataShape => Set[NamespacedUuidDetails],
+  timestampExtractor: DataShape => Set[Long],
   shouldApplyThreshold: Boolean,
-  alarmFilter: PpmNodeActorAlarmDetected => Boolean = AlarmExclusions.filter
+  noveltyFilter: Novelty[Set[NamespacedUuidDetails]] => Boolean = AlarmExclusions.filter
 )(
   context: ActorContext,
   alarmActor: ActorRef,
@@ -88,30 +90,22 @@ case class PpmDefinition[DataShape](
 
   val basePath: String = ppmConfig.basedir + name + "-" + hostName
 
-  val inputFilePath  = basePath + ppmConfig.loadfilesuffix + ".csv"
-  val outputFilePath = basePath + ppmConfig.savefilesuffix + ".csv"
   val inputAlarmFilePath  = basePath + ppmConfig.loadfilesuffix + "_alarm.json"
   val outputAlarmFilePath = basePath + ppmConfig.savefilesuffix + "_alarm.json"
 
-  val startingState =
-      if (ppmConfig.shouldloadppmtrees)
-        TreeRepr.readFromFile(inputFilePath).map { t => println(s"Reading tree $name on host: $hostName in from file: $inputFilePath"); t }
-          .orElse {println(s"FAILED to load data for tree: $name  on host: $hostName"); None}
-      else None
-
   val treeRootQid = AdmUuidProvider.ppmTreeRootNodeId(hostName,name)//context.actorOf(Props(classOf[PpmNodeActor], name, alarmActor, startingState), name = name)
 
-  var alarms: Map[List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])] =
+  var alarms: Map[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])] =
     if (ppmConfig.shouldloadalarms)
       Try {
         val content = new String(Files.readAllBytes(new File(inputAlarmFilePath).toPath), StandardCharsets.UTF_8)
-        content.parseJson.convertTo[List[(List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].toMap
+        content.parseJson.convertTo[List[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].toMap
       } match {
         case Success(alarm) => alarm
         case Failure(e) =>
           println(s"FAILED to load alarms for tree: $name  on host: $hostName. Starting with empty tree state.")
           e.printStackTrace()
-          Map.empty[List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])]
+          Map.empty[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])]
       }
     else Map.empty
 
@@ -120,7 +114,7 @@ case class PpmDefinition[DataShape](
       val noveltyLPs =
         Try {
           val content = new String(Files.readAllBytes(new File(inputAlarmFilePath).toPath), StandardCharsets.UTF_8)
-          content.parseJson.convertTo[List[(List[ExtractedValue], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].map(_._2._3.last.localProb).groupBy(identity).mapValues(_.size)
+          content.parseJson.convertTo[List[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].map(_._2._3.last.localProb).groupBy(identity).mapValues(_.size)
         } match {
           case Success(lps) => lps
           case Failure(e) =>
@@ -136,7 +130,7 @@ case class PpmDefinition[DataShape](
 
   var localProbThreshold: Float = 1
 
-  def insertIntoLocalProbAccumulator(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Long)]): Unit = alarmOpt.foreach {
+  def insertIntoLocalProbAccumulator(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Set[Long])]): Unit = alarmOpt.foreach {
     case (alarm, _, _) =>
       alarm.lastOption.foreach { alarmNode =>
         val lp = alarmNode.localProb
@@ -178,7 +172,7 @@ case class PpmDefinition[DataShape](
 
   def observe(observation: DataShape): Unit = if (incomingFilter(observation)) {
     implicit val timeout = Timeout(6.1 seconds)
-    graphService.observe(treeRootQid, name, PpmTree.prepareObservation[DataShape](observation, discriminators), Set()/*uuidCollector(observation)*/, timestampExtractor(observation), alarmActor)
+    graphService.observe(treeRootQid, name, PpmTree.prepareObservation[DataShape](observation, discriminators), uuidCollector(observation), timestampExtractor(observation), alarmActor)
   }
 
   //process name and pid/uuid
@@ -190,16 +184,14 @@ case class PpmDefinition[DataShape](
     }
   }
 
-  def recordAlarm(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Long)]): Unit = alarmOpt.foreach {
-    case (alarm, setNamespacedUuidDetails, timestamp) =>
-    //(Key, localProbability, globalProbability, count, siblingPop, parentCount, depthOfLocalProbabilityCalculation)
-    //case class AnAlarm (key:List[String], alarm:(Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
+  def recordAlarm(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Set[Long])]): Unit = alarmOpt.foreach {
+    case (alarm, setNamespacedUuidDetails, timestamps) =>
 
     val key: List[ExtractedValue] = alarm.map(_.key)
     if (alarms contains key) adapt.Application.statusActor ! IncrementAlarmDuplicateCount
     else {
 
-      val alarmDetails = (timestamp, System.currentTimeMillis, alarm, setNamespacedUuidDetails, Map.empty[String,Int])
+      val alarmDetails = (timestamps, System.currentTimeMillis, alarm, setNamespacedUuidDetails, Map.empty[String,Int])
       val newAlarm = AnAlarm(key,alarmDetails)
       alarms = alarms + AnAlarm.unapply(newAlarm).get
 
@@ -224,11 +216,11 @@ case class PpmDefinition[DataShape](
   val lastSaveCompleteMillis = new AtomicLong(0L)
   val isCurrentlySaving = new AtomicBoolean(false)
 
-  def getRepr(implicit timeout: Timeout): Future[TreeRepr] = graphService.treeRepr(treeRootQid,name,List()).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{ _.repr }
+  def getRepr(implicit timeout: Timeout): Future[TreeRepr] = graphService.getTreeRepr(treeRootQid,name,List()).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{ _.repr }
 
   def prettyString: Future[String] = {
     implicit val timeout = Timeout(593 seconds)
-    graphService.treeRepr(treeRootQid,name,List()).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map(_.repr.toString)
+    graphService.getTreeRepr(treeRootQid,name,List()).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map(_.repr.toString)
   }
 }
 
@@ -238,49 +230,9 @@ case object PpmTree {
 }
 
 case class PpmNodeActorGetTreeReprResult(repr: TreeRepr)
+case class PpmNodeActorBeginGetTreeRepr(treeName: String, startingKey: List[ExtractedValue] = Nil)
 case object PpmNodeActorGetTopLevelCount
-case class PpmNodeActorGetTopLevelCountResult(count: Int)
-case class PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long)
-
-class PpmNodeActor(thisKey: ExtractedValue, alarmActor: ActorRef, startingState: Option[TreeRepr]) extends Actor with ActorLogging {
-  var counter = 0
-
-  var children: Map[ExtractedValue, ActorRef] = startingState.fold {
-    Map.empty[ExtractedValue, ActorRef]
-  } { thisTreeState =>
-    counter = thisTreeState.count
-    thisTreeState.children.filter { c =>
-      c.key != "_?_"
-    }.map { c =>
-      c.key -> newSymbolNode(c.key, Some(c))
-    }.toMap   // + ("_?_" -> new QNode(children)) // Ensure a ? node is always present, even if it isn't in the loaded data.
-  }
-
-  def childrenPopulation: Int = children.size  // + 1   // `+ 1` for the Q node
-
-  def newSymbolNode(newNodeKey: ExtractedValue, startingState: Option[TreeRepr] = None): ActorRef =
-    context.actorOf(Props(classOf[PpmNodeActor], newNodeKey, alarmActor, startingState))
-
-  def localProbOfThisObs(parentCount: Int): Float =
-    if (parentCount == 0) 1F
-    else counter.toFloat / parentCount.toFloat
-
-  def qLocalProbOfThisObs(siblingPopulation: Int, parentCount: Int): Float =
-    if (parentCount == 0) 1F
-    else siblingPopulation.toFloat / (siblingPopulation.toFloat + parentCount.toFloat)
-
-  def globalProbOfThisObs(parentGlobalProb: Float, parentCount: Int): Float =
-    (counter.toFloat / parentCount.toFloat) * parentGlobalProb
-
-  def receive = {
-
-    case PpmNodeActorGetTopLevelCount => sender() ! PpmNodeActorGetTopLevelCountResult(counter)
-
-    case msg => log.error(s"Received unknown message: $msg")
-
-  }
-}
-
+case class PpmNodeActorGetTopLevelCountResult(count: Int) // We can just query the graph for properties on root node for this
 
 class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphService: GraphService[AdmUUID]) extends Actor with ActorLogging { thisActor =>
 
@@ -301,8 +253,8 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-               NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid)),
-               NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
+               NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid)),
+               NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       d => Set(d._1.latestTimestampNanos),
@@ -316,8 +268,8 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid)),
-        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
+        NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid)),
+        NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       d => Set(d._1.latestTimestampNanos),
@@ -331,8 +283,8 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid)),
-        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
+        NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid)),
+        NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       d => Set(d._1.latestTimestampNanos),
@@ -349,8 +301,8 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         }
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid)),
-        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress.getOrElse("no_address_from_CDM")))) ++
+        NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid)),
+        NamespacedUuidDetails(d._3._1.uuid, Some(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress.getOrElse("no_address_from_CDM")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       d => Set(d._1.latestTimestampNanos),
@@ -367,8 +319,8 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         }}.getOrElse(List("<no_file_path_node>")).dropRight(1)
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
-        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
+        NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
+        NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       d => Set(d._1.latestTimestampNanos),
@@ -381,9 +333,9 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         d => List(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),  // Process name or UUID
         d => List(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}"))
       ),
-      d => Set(NamespacedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
-        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}")))) ++
+      d => Set(NamespacedUuidDetails(d._1.uuid, Some(d._1.eventType.toString)),
+        NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
+        NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       d => Set(d._1.latestTimestampNanos),
@@ -396,9 +348,9 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         d => List(d._1.eventType.toString),
         d => List(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + " : " + d._3._1.getClass.getSimpleName)
       ),
-      d => Set(NamespacedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
+      d => Set(NamespacedUuidDetails(d._1.uuid, Some(d._1.eventType.toString)),
         NamespacedUuidDetails(d._2._1.uuid),
-        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + " : " + d._3._1.getClass.getSimpleName))) ++
+        NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + " : " + d._3._1.getClass.getSimpleName))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       d => Set(d._1.latestTimestampNanos),
@@ -412,11 +364,11 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         d._2._2.map(_.path).getOrElse("<no_path>")   // Child process second
       )),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.get.path),Some(d._2._1.cid)),
-        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.get.path), d._3._1 match {
-          case o: AdmSubject => Some(o.cid)
-          case _ => None
-        })) ++
+        NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.get.path), Some(d._2._1.cid)),
+        NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.get.path), d._3._1 match {
+                  case o: AdmSubject => Some(o.cid)
+                  case _ => None
+                })) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       d => Set(d._1.latestTimestampNanos),
@@ -441,13 +393,13 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         }
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
-        NamespacedUuidDetails(d._2._1.uuid,d._2._2.map(_.path)),
-        NamespacedUuidDetails(d._3._1.uuid,d._3._2.map(_.path))) ++
+        NamespacedUuidDetails(d._2._1.uuid, d._2._2.map(_.path)),
+        NamespacedUuidDetails(d._3._1.uuid, d._3._2.map(_.path))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       d => Set(d._1.latestTimestampNanos),
       shouldApplyThreshold = false,
-      alarmFilter = _ => false
+      noveltyFilter = _ => false
     )(thisActor.context, context.self, hostName, graphService)
   ).par
 
@@ -725,13 +677,31 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
   var didReceiveInit = false
   var didReceiveComplete = false
 
+  def alarmFromProbabilityData(probabilityData: List[(ExtractedValue,Int,Int)]): Alarm = {
+    val (_,parentCount,siblingCount) = probabilityData.takeWhile(_._3 > 1).last // First novel node
+    val alarmLocalProbability = (siblingCount + 1).toFloat / (parentCount + siblingCount + 1) // Alarm local prob is a function of the first novel node
+    val treeObservationCount = probabilityData.head._2
+    val lastAlarmListIndex = probabilityData.size - 2
+
+    probabilityData.iterator.sliding(2).zipWithIndex.map {
+      case (extractedPair, depth) =>
+        val (ev, parentCount, siblingCount) = extractedPair.head
+        val (_, count, _) = extractedPair(1)
+        if (depth == lastAlarmListIndex)
+          PpmTreeNodeAlarm(ev,alarmLocalProbability,count.toFloat/treeObservationCount,count,siblingCount+1,parentCount,depth)
+        else
+          PpmTreeNodeAlarm(ev,count.toFloat/parentCount.toFloat,count.toFloat/treeObservationCount,count,siblingCount+1,parentCount,depth)
+    }.toList
+
+  }
+
   def receive = {
 
-    case PpmNodeActorAlarmDetected(treeName: String, alarmData: Alarm, collectedUuids: Set[NamespacedUuidDetails], dataTimestamp: Long) =>
+    case msg @ Novelty(treeName: String, probabilityData: List[(ExtractedValue,Int,Int)], collectedUuids: Set[NamespacedUuidDetails], timestamps: Set[Long]) =>
       ppm(treeName).fold(
-        log.warning(s"Could not find tree named: $treeName to record Alarm: $alarmData with UUIDs: $collectedUuids, with dataTimestamp: $dataTimestamp from: $sender")
+        log.warning(s"Could not find tree named: $treeName to record Alarm related to: $probabilityData with UUIDs: $collectedUuids, with dataTimestamps: $timestamps from: $sender")
       ){ tree =>
-        val alarmOpt = Some((alarmData, collectedUuids, dataTimestamp))
+        val alarmOpt = if (tree.noveltyFilter(msg)) Some((alarmFromProbabilityData(probabilityData), collectedUuids, timestamps)) else None
         tree.recordAlarm(alarmOpt)
         tree.insertIntoLocalProbAccumulator(alarmOpt)
       }
@@ -770,11 +740,11 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         if (queryPath.isEmpty) tree.alarms.values.map(a => a.copy(_5 = a._5.get(namespace))).toList
         else tree.alarms.collect{ case (k,v) if k.startsWith(queryPath) => v.copy(_5 = v._5.get(namespace))}.toList
       ).map { r =>
-        val filteredResults = r.filter { case (dataTimestamp, observationMillis, alarm, uuids, ratingOpt) =>
-          (if (forwardFromStartTime) dataTimestamp >= startAtTime else dataTimestamp <= startAtTime) &&
+        val filteredResults = r.filter { case (dataTimestamps, observationMillis, alarm, uuids, ratingOpt) =>
+          (if (forwardFromStartTime) dataTimestamps.min >= startAtTime else dataTimestamps.max <= startAtTime) &&
             excludeRatingBelow.forall(test => ratingOpt.forall(given => given >= test))
         }
-        val sortedResults = filteredResults.sortBy[Long](i => if (forwardFromStartTime) i._1 else Long.MaxValue - i._1)
+        val sortedResults = filteredResults.sortBy[Long](i => if (forwardFromStartTime) i._1.min else Long.MaxValue - i._1.max)
         resultSizeLimit.fold(sortedResults)(limit => sortedResults.take(limit))
       }
       sender() ! PpmTreeAlarmResult(resultOpt)
@@ -785,7 +755,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
     case msg @ PpmNodeActorBeginGetTreeRepr(treeName, startingKey) =>
       implicit val timeout = Timeout(30 seconds)
       val reprFut = ppm(treeName)
-        .map(d => graphService.treeRepr(d.treeRootQid,treeName,startingKey).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity))
+        .map(d => graphService.getTreeRepr(d.treeRootQid,treeName,startingKey).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity))
         .getOrElse(Future.failed(new NoSuchElementException(s"No tree found with name $treeName")))
       sender() ! reprFut
 
@@ -810,11 +780,11 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 case object ListPpmTrees
 case class PpmTreeNames(namesAndCounts: Map[String, Int])
 case class PpmTreeAlarmQuery(treeName: String, queryPath: List[ExtractedValue], namespace: String, startAtTime: Long = 0L, forwardFromStartTime: Boolean = true, resultSizeLimit: Option[Int] = None, excludeRatingBelow: Option[Int] = None)
-case class PpmTreeAlarmResult(results: Option[List[(Long, Long, Alarm, Set[NamespacedUuidDetails], Option[Int])]]) {
+case class PpmTreeAlarmResult(results: Option[List[(Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Option[Int])]]) {
   def toUiTree: List[UiTreeElement] = results.map { l =>
     l.foldLeft(Set.empty[UiTreeElement]){ (a, b) =>
       val names = b._3.map(_.key)
-      val someUiData = UiDataContainer(b._5, names.mkString("∫"), b._1, b._2, b._3.last.localProb, b._4.map(_.extendedUuid.rendered))
+      val someUiData = UiDataContainer(b._5, names.mkString("∫"), b._1.min, b._2, b._3.last.localProb, b._4.map(_.extendedUuid.rendered)) // Only shows min datatime in UI
       UiTreeElement(names, someUiData).map(_.merge(a)).getOrElse(a)
     }.toList
   }.getOrElse(List.empty).sortBy(_.title)
