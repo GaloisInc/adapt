@@ -6,15 +6,14 @@ import akka.util.Timeout
 import com.galois.adapt.adm._
 import com.rrwright.quine.runtime.{GraphService, NameSpacedUuidProvider, QuineIdProvider, StandingFetchActor, StandingQueryId}
 import java.util.UUID
-
 import spray.json.{JsArray, JsNumber, JsObject, JsString, JsValue, RootJsonFormat}
-
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import com.rrwright.quine.gremlin.{GremlinQueryRunner, TypeAnnotationFieldReader}
 import com.rrwright.quine.language.{DomainNode, DomainNodeSetSingleton, NoConstantsDomainNode, PickleReader, QuineId}
 import com.rrwright.quine.language.EdgeDirections._
+import com.rrwright.quine.runtime.{NameSpacedUuidProvider, QuineIdProvider}
 import com.rrwright.quine.language.BoopickleScheme._
 //import com.rrwright.quine.language.JavaObjectSerializationScheme._
 
