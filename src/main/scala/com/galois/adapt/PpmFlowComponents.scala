@@ -130,7 +130,7 @@ object PpmFlowComponents {
                 val hostName = Try(p.asInstanceOf[AdmSubject].hostName).getOrElse("")
                 val admParentTime = Try(p.asInstanceOf[AdmSubject].startTimestampNanos).getOrElse(0L)
                 val admChildTime = Try(c.asInstanceOf[AdmSubject].startTimestampNanos).getOrElse(0L)
-                (AdmEvent(Seq.empty, PSEUDO_EVENT_PARENT_SUBJECT, admParentTime, admChildTime, None, None, hostName, provider), c, c.uuid, p, p.uuid)
+                (AdmEvent(Set.empty, PSEUDO_EVENT_PARENT_SUBJECT, admParentTime, admChildTime, None, None, hostName, provider), c, c.uuid, p, p.uuid)
               }
             }
           )

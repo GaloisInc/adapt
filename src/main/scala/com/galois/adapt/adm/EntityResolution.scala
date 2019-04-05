@@ -87,8 +87,8 @@ object EntityResolution {
       .concat(Source.fromIterator(() => Iterator(maxTimeRemapper)))           // Expire everything in UuidRemapper
       .buffer(2000, OverflowStrategy.backpressure)
       .via(remapper)                                                          // Remap UUIDs
-      .buffer(2000, OverflowStrategy.backpressure)
-      .via(deduplicate)                                                       // Order nodes/edges
+//      .buffer(2000, OverflowStrategy.backpressure)
+//      .via(deduplicate)                                                       // Order nodes/edges
   }
 
 
