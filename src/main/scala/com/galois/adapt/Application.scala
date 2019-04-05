@@ -26,8 +26,8 @@ import scala.language.postfixOps
 import scala.util.{Failure, Random, Success, Try}
 import sys.process._
 import com.rrwright.quine.runtime._
-import com.rrwright.quine.language.JavaObjectSerializationScheme._
-// import com.rrwright.quine.language.BoopickleScheme._
+//import com.rrwright.quine.language.JavaObjectSerializationScheme._
+import com.rrwright.quine.language.BoopickleScheme._
 import shapeless._
 import shapeless.syntax.singleton._
 import AdaptConfig._
@@ -125,6 +125,7 @@ object Application extends App {
         config = ConfigFactory.parseString(clusterConfigSrc),
         persistor = as => MapDBMultimap()(as),
         idProvider = AdmUuidProvider,
+        indexer = Indexer.currentIndex(EmptyIndex),
         inMemorySoftNodeLimit = Some(100000),
         inMemoryHardNodeLimit = Some(200000),
         uiPort = None
