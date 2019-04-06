@@ -56,7 +56,7 @@ object NoveltyDetection {
   val execDeleteTypes = Set[EventType](EVENT_EXECUTE, EVENT_UNLINK)
   val march1Nanos = 1519862400000000L
 
-  case class NamespacedUuidDetails(extendedUuid: AdmUUID, name: Option[String] = None, pid: Option[Int] = None)
+  case class NamespacedUuidDetails(extendedUuid: NamespacedUuid, name: Option[String] = None, pid: Option[Int] = None)
 }
 
 case object AlarmExclusions {
@@ -68,7 +68,7 @@ case object AlarmExclusions {
   val trace = Set()
   val general = Set("<no_subject_path_node>")
   val allExclusions = cadets ++ clearscope ++ fivedirections ++ marple ++ theia ++ trace ++ general
-  def filter(novelty: Novelty[Set[NamespacedUuidDetails]]): Boolean = // true == allow an alarm to be reported.
+  def filter(novelty: Novelty[_]): Boolean = // true == allow an alarm to be reported.
     ! novelty.probabilityData.exists(level => allExclusions.contains(level._1))
 }
 
@@ -80,7 +80,7 @@ case class PpmDefinition[DataShape](
   uuidCollector: DataShape => Set[NamespacedUuidDetails],
   timestampExtractor: DataShape => Set[Long],
   shouldApplyThreshold: Boolean,
-  noveltyFilter: Novelty[Set[NamespacedUuidDetails]] => Boolean = AlarmExclusions.filter
+  noveltyFilter: Novelty[_] => Boolean = AlarmExclusions.filter
 )(
   context: ActorContext,
   alarmActor: ActorRef,
