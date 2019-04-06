@@ -252,7 +252,7 @@ object Application extends App {
     case "accept" => Map.empty
     case _ =>
       ingestConfig.hosts.map { host: IngestHost =>
-        val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows)
+        val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows, actorSystemGraphService._2.get)
         val ref = system.actorOf(props, s"ppm-actor-${host.hostName}")
 //        ppmConfig.saveintervalseconds match {
 //          case Some(i) if i > 0L =>
@@ -262,7 +262,7 @@ object Application extends App {
 //          case _ => println("Not going to periodically save PPM trees.")
 //        }
         host.hostName -> ref
-      }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false), s"ppm-actor-$hostNameForAllHosts"))
+      }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false, actorSystemGraphService._2.get), s"ppm-actor-$hostNameForAllHosts"))
         // TODO nichole:  what instrumentation source should I give to the `hostNameForAllHosts` PpmManager? This smells bad...
   }
 
