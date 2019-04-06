@@ -7,7 +7,7 @@ import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Flow, Sink}
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm19._
+import com.galois.adapt.cdm20._
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success, Try}
@@ -130,7 +130,7 @@ object PpmFlowComponents {
                 val hostName = Try(p.asInstanceOf[AdmSubject].hostName).getOrElse("")
                 val admParentTime = Try(p.asInstanceOf[AdmSubject].startTimestampNanos).getOrElse(0L)
                 val admChildTime = Try(c.asInstanceOf[AdmSubject].startTimestampNanos).getOrElse(0L)
-                (AdmEvent(Seq.empty, PSEUDO_EVENT_PARENT_SUBJECT, admParentTime, admChildTime, None, None, hostName, provider), c, c.uuid, p, p.uuid)
+                (AdmEvent(Set.empty, PSEUDO_EVENT_PARENT_SUBJECT, admParentTime, admChildTime, None, None, hostName, provider), c, c.uuid, p, p.uuid)
               }
             }
           )

@@ -4,19 +4,20 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import akka.util.Timeout
 import com.galois.adapt.adm._
-import com.rrwright.quine.runtime.GraphService
+import com.rrwright.quine.runtime.{GraphService, NameSpacedUuidProvider, QuineIdProvider, StandingFetchActor, StandingQueryId}
 import java.util.UUID
-
+import com.galois.adapt.cdm19._
 import spray.json.{JsArray, JsNumber, JsObject, JsString, JsValue, RootJsonFormat}
-
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import com.rrwright.quine.gremlin.{GremlinQueryRunner, TypeAnnotationFieldReader}
+import com.rrwright.quine.language.{DomainNode, DomainNodeSetSingleton, NoConstantsDomainNode, PickleReader, QuineId}
+import com.rrwright.quine.language.EdgeDirections._
 import com.rrwright.quine.runtime.{NameSpacedUuidProvider, QuineIdProvider}
-import com.rrwright.quine.language.{DomainNodeSetSingleton, PickleReader, QuineId}
 import com.rrwright.quine.language.BoopickleScheme._
 //import com.rrwright.quine.language.JavaObjectSerializationScheme._
+
 
 object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
   val underlying = NameSpacedUuidProvider(List("synthetic"),0)
@@ -51,6 +52,14 @@ object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
   }
 }
 
+
+case class ESOSubject(subjectTypes: Set[SubjectType], cmdLine: AdmPathNode) extends NoConstantsDomainNode
+
+case class ESOFileObject(fileObjectType: FileObjectType, path: AdmPathNode) extends NoConstantsDomainNode
+
+case class ESOInstance(eventType: EventType, subject: ESOSubject, predicateObject: ESOFileObject) extends NoConstantsDomainNode
+
+
 class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQueryProxyActor {
 
   implicit val service = graphService
@@ -66,24 +75,26 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         "provider" -> "String",
         "fileObjectType" -> "FileObjectType",
         "eventType" -> "EventType",
-        "originalCdmUuids" -> "Seq[CdmUUID]",
+        "originalCdmUuids" -> "Set[CdmUUID]",
         "size" -> "Option[Long]",
         "inputType" -> "Option[String]",
-        "deviceType" -> "Option[String]"
+        "deviceType" -> "Option[String]",
+        "subjectTypes" -> "Set[SubjectType]"
       ),
       defaultTypeNames = Seq("Boolean", "Long", "Int", "List[Int]", "List[Long]", "String"),
       typeNameToPickleReader = Map(
-        "Boolean"         -> PickleReader[Boolean],   
-        "Long"            -> PickleReader[Long],
-        "Int"             -> PickleReader[Int],
-        "List[Long]"      -> PickleReader[List[Long]],
-        "List[Int]"       -> PickleReader[List[Int]],
-        "String"          -> PickleReader[String],
-        "FileObjectType"  -> PickleReader[com.galois.adapt.cdm19.FileObjectType],
-        "EventType"       -> PickleReader[com.galois.adapt.cdm19.EventType],
-        "Seq[CdmUUID]"    -> PickleReader[List[CdmUUID]],
-        "Option[Long]"    -> PickleReader[Option[Long]],
-        "Option[String]"  -> PickleReader[Option[String]]
+        "Boolean"          -> PickleReader[Boolean],
+        "Long"             -> PickleReader[Long],
+        "Int"              -> PickleReader[Int],
+        "List[Long]"       -> PickleReader[List[Long]],
+        "List[Int]"        -> PickleReader[List[Int]],
+        "String"           -> PickleReader[String],
+        "FileObjectType"   -> PickleReader[FileObjectType],
+        "EventType"        -> PickleReader[EventType],
+        "Set[CdmUUID]"     -> PickleReader[Set[CdmUUID]],
+        "Option[Long]"     -> PickleReader[Option[Long]],
+        "Option[String]"   -> PickleReader[Option[String]],
+        "Set[SubjectType]" -> PickleReader[Set[SubjectType]]
       )
     ),
     labelKey = "type_of"
@@ -110,8 +121,12 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
     Duration.Inf
   ))
 
+
   def writeAdm(a: ADM): Future[Unit] = (a match {
-    case anAdm: AdmEvent              => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
+    case anAdm: AdmEvent              =>
+      val f = anAdm.create(Some(anAdm.uuid))
+      graphService.standingFetch[ESOInstance](anAdm.uuid, Some(StandingQueryId("standing-find_ESO-accumulator")))(println(_))
+      f
     case anAdm: AdmSubject            => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
     case anAdm: AdmPrincipal          => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
     case anAdm: AdmFileObject         => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))

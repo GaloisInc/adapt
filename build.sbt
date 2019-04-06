@@ -35,6 +35,8 @@ lazy val adapt = (project in file(".")).settings(
     "com.rrwright" %% "quine-boopickle" % quineV,
     "com.rrwright" %% "quine-gremlin"   % quineV,
 
+    "org.lmdbjava" % "lmdbjava" % "0.6.3",
+
     "com.typesafe.akka" %% "akka-stream-kafka" % "0.22",
     "com.github.alexandrnikitin" %% "bloom-filter" % "0.10.1",
     "org.mapdb" % "mapdb" % "3.0.7",

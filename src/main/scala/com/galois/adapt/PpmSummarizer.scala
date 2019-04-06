@@ -7,10 +7,10 @@ import com.galois.adapt.NoveltyDetection.ExtractedValue
 import scala.concurrent.Future
 import scala.util.Try
 import scala.concurrent.duration._
+import cdm20._
 
 
 object PpmSummarizer {
-  import cdm19._
   import Application.system.dispatcher
 
   sealed trait AbstractionOne {

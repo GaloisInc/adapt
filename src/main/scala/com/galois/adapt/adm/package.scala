@@ -5,7 +5,7 @@ import java.util
 import java.util.{Arrays, Comparator, UUID}
 
 import com.galois.adapt.AdaptConfig.HostName
-import com.galois.adapt.cdm19._
+import com.galois.adapt.cdm20._
 import org.mapdb.{DataInput2, DataOutput2, Serializer}
 import org.mapdb.serializer.GroupSerializer
 
@@ -71,7 +71,7 @@ package object adm {
 
   // Edges are now first class values in the stream.
   sealed trait Edge {
-    def applyRemap(cdmUuids: Seq[CdmUUID], admUUID: AdmUUID): Edge = this match {
+    def applyRemap(cdmUuids: Set[CdmUUID], admUUID: AdmUUID): Edge = this match {
       case EdgeCdm2Cdm(s, l, t) if cdmUuids.contains(s) => EdgeAdm2Cdm(admUUID, l, t)
       case EdgeCdm2Cdm(s, l, t) if cdmUuids.contains(t) => EdgeCdm2Adm(s, l, admUUID)
       case EdgeCdm2Adm(s, l, t) if cdmUuids.contains(s) => EdgeAdm2Adm(admUUID, l, t)
@@ -79,7 +79,7 @@ package object adm {
       case e => e
     }
 
-    def applyRemaps(cdmUuids: Seq[CdmUUID], admUUID: AdmUUID): Edge = {
+    def applyRemaps(cdmUuids: Set[CdmUUID], admUUID: AdmUUID): Edge = {
       var curr = this
       var next = this.applyRemap(cdmUuids, admUUID)
       while (curr != next) {
@@ -125,7 +125,7 @@ package object adm {
    */
   sealed trait ADM extends DBWritable with Product with DomainNode {
     val uuid: AdmUUID                  // The current UUID
-    val originalCdmUuids: Seq[CdmUUID] // The UUIDs of all the CDM nodes that were merged to produce this node
+    val originalCdmUuids: Set[CdmUUID] // The UUIDs of all the CDM nodes that were merged to produce this node
 
     def getHostName: Option[HostName]
 
@@ -145,7 +145,7 @@ package object adm {
    *   - 'programPoint' is too much information
    */
   final case class AdmEvent(
-    originalCdmUuids: Seq[CdmUUID],
+    originalCdmUuids: Set[CdmUUID],
 
     eventType: EventType,
     earliestTimestampNanos: Long,
@@ -162,7 +162,7 @@ package object adm {
 
     def getHostName: Option[HostName] = Some(hostName)
 
-    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.toList.sorted.map(_.uuid)), provider)
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -180,10 +180,8 @@ package object adm {
       "provider" -> provider
     )
 
-    val nodeConstants = AdmEvent
+    object nodeConstants extends NodeConstants(Record(type_of = "AdmEvent"))
   }
-  object AdmEvent extends NodeConstants(Record(type_of = "AdmEvent"))
-
 
   /* Compared to 'cdm.Subject', the following are omitted
    *
@@ -194,7 +192,7 @@ package object adm {
    *  - 'importedLibraries' and 'exportedLibraries' aren't used
    */
   final case class AdmSubject(
-    originalCdmUuids: Seq[CdmUUID],
+    originalCdmUuids: Set[CdmUUID],
 
     subjectTypes: Set[SubjectType],
     cid: Int,
@@ -206,7 +204,7 @@ package object adm {
 
     def getHostName: Option[HostName] = Some(hostName)
 
-    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.toList.sorted.map(_.uuid)), provider)
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -234,7 +232,7 @@ package object adm {
      provider: String
    ) extends ADM with DBWritable with DomainNode {
     val uuid = AdmUUID(DeterministicUUID(path), provider)
-    val originalCdmUuids: Seq[CdmUUID] = Nil
+    val originalCdmUuids: Set[CdmUUID] = Set.empty
 
     def getHostName: Option[HostName] = None
 
@@ -383,7 +381,7 @@ package object adm {
    *  - hashes
    */
   final case class AdmFileObject(
-     originalCdmUuids: Seq[CdmUUID],
+     originalCdmUuids: Set[CdmUUID],
 
      fileObjectType: FileObjectType,
      size: Option[Long],
@@ -392,7 +390,7 @@ package object adm {
      provider: String
   ) extends ADM with DBWritable with DomainNode {
 
-    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.toList.sorted.map(_.uuid)), provider)
 
     def getHostName: Option[HostName] = Some(hostName)
 
@@ -425,7 +423,7 @@ package object adm {
    *  It also splits ports and addresses into seperate nodes
    */
   final case class AdmNetFlowObject(
-    originalCdmUuids: Seq[CdmUUID],
+    originalCdmUuids: Set[CdmUUID],
 
     localAddress: Option[String],
     localPort: Option[Int],
@@ -468,7 +466,7 @@ package object adm {
   ) extends ADM with DBWritable with DomainNode {
 
     val uuid = AdmUUID(DeterministicUUID(address), "")
-    override val originalCdmUuids: Seq[CdmUUID] = List.empty
+    override val originalCdmUuids: Set[CdmUUID] = Set.empty
 
     def getHostName: Option[HostName] = None
 
@@ -493,7 +491,7 @@ package object adm {
   ) extends ADM with DBWritable with DomainNode {
 
     val uuid = AdmUUID(DeterministicUUID(port.toString), "")
-    override val originalCdmUuids: Seq[CdmUUID] = List.empty
+    override val originalCdmUuids: Set[CdmUUID] = Set.empty
 
     def getHostName: Option[HostName] = None
 
@@ -517,7 +515,7 @@ package object adm {
    *  - fileDescriptor
    */
   final case class AdmSrcSinkObject(
-    originalCdmUuids: Seq[CdmUUID],
+    originalCdmUuids: Set[CdmUUID],
 
     srcSinkType: SrcSinkType,
 
@@ -525,7 +523,7 @@ package object adm {
     provider: String
   ) extends ADM with DBWritable with DomainNode {
 
-    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.toList.sorted.map(_.uuid)), provider)
 
     def getHostName: Option[HostName] = Some(hostName)
 
@@ -555,7 +553,7 @@ package object adm {
    * TODO: get rid of this in favor of an enumeration (this is a lot of edges for not much)
    */
   final case class AdmPrincipal(
-    originalCdmUuids: Seq[CdmUUID],
+    originalCdmUuids: Set[CdmUUID],
 
     userId: String,
     groupIds: Seq[String],
@@ -606,7 +604,7 @@ package object adm {
    *  - 'ctag'
    */
   final case class AdmProvenanceTagNode(
-    originalCdmUuids: Seq[CdmUUID],
+    originalCdmUuids: Set[CdmUUID],
 
     programPoint: Option[String] = None,
 
@@ -614,7 +612,7 @@ package object adm {
     provider: String
   ) extends ADM with DBWritable with DomainNode {
 
-    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.toList.sorted.map(_.uuid)), provider)
 
     def getHostName: Option[HostName] = Some(hostName)
 
@@ -639,7 +637,7 @@ package object adm {
   object AdmProvenanceTagNode extends NodeConstants(Record(type_of = "AdmProvenanceTagNode"))
 
   final case class AdmHost(
-    originalCdmUuids: Seq[CdmUUID],          // universally unique identifier for the host
+    originalCdmUuids: Set[CdmUUID],          // universally unique identifier for the host
 
     hostName: String,                        // hostname or machine name
     hostIdentifiers: Seq[HostIdentifier],    // list of identifiers, such as serial number, IMEI number
@@ -652,7 +650,7 @@ package object adm {
 
     def getHostName: Option[HostName] = Some(hostName)
 
-    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.sorted.map(_.uuid)), provider)
+    val uuid = AdmUUID(DeterministicUUID(originalCdmUuids.toList.sorted.map(_.uuid)), provider)
 
     def asDBKeyValues = List(
       "uuid" -> uuid.uuid,
@@ -683,13 +681,13 @@ package object adm {
 
   // TODO: make this deterministic
   final case class AdmSynthesized(
-    originalCdmUuids: Seq[CdmUUID]
+    originalCdmUuids: Set[CdmUUID]
   ) extends ADM with DBWritable with DomainNode {
 
     def getHostName: Option[HostName] = None
 
     val uuid = {
-      val original = originalCdmUuids.sorted
+      val original = originalCdmUuids.toList.sorted
       AdmUUID(DeterministicUUID(original.map(_.uuid)), original.headOption.fold("")(_.namespace))
     }
 

@@ -9,7 +9,7 @@ import akka.stream.{FlowShape, OverflowStrategy}
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.adm.ERStreamComponents.{EventResolution, _}
 import com.galois.adapt.adm.UuidRemapper.{JustTime, UuidRemapperInfo}
-import com.galois.adapt.cdm19._
+import com.galois.adapt.cdm20._
 import scala.collection.mutable.{Map => MutableMap}
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -87,8 +87,8 @@ object EntityResolution {
       .concat(Source.fromIterator(() => Iterator(maxTimeRemapper)))           // Expire everything in UuidRemapper
       .buffer(2000, OverflowStrategy.backpressure)
       .via(remapper)                                                          // Remap UUIDs
-      .buffer(2000, OverflowStrategy.backpressure)
-      .via(deduplicate)                                                       // Order nodes/edges
+//      .buffer(2000, OverflowStrategy.backpressure)
+//      .via(deduplicate)                                                       // Order nodes/edges
   }
 
 
