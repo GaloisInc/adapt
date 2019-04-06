@@ -1,9 +1,24 @@
+ifndef URL
+  URL=http://localhost
+endif
+
+ifndef PORT
+  PORT=8080
+endif
+
+ifndef DATABASE
+  DATABASE=adapt
+endif
 
 all: extract avfbatch
 
-contexts = ProcessEvent ProcessExec ProcessParent ProcessChild ProcessNetflow
+basecontexts = ProcessEvent ProcessExec ProcessParent ProcessNetflow
 
-extract: $(foreach context,$(contexts), contexts/$(context).csv)
+contexts = $(basecontexts) ProcessUniform ProcessCombined  ProcessGeometric ProcessAverage ProcessMin ProcessMedian
+
+extract: $(foreach context,$(basecontexts), contexts/$(context).csv)
+dat: $(foreach context,$(contexts), contexts/$(context).dat)
+mat: $(foreach context,$(contexts), contexts/$(context).mat)
 
 avfbatch: $(foreach context,$(contexts), results/$(context).avf.batch.scored.csv)
 
@@ -20,11 +35,54 @@ raspstream: $(foreach context,$(contexts), results/$(context).rasp.stream.scored
 klmeansbatch: $(foreach context,$(contexts), results/$(context).klmeans.batch.scored.csv)
 klmeansstream: $(foreach context,$(contexts), results/$(context).klmeans.stream.scored.csv)
 
-contexts/%.csv: specifications/%.json
-	python3 extract.py -i specifications/$*.json -o contexts/$*.csv
+krimpbatch: $(foreach context,$(contexts), results/$(context).krimp.batch.scored.csv)
+
+contexts/ProcessTimes.csv:
+	python3 times.py --url $(URL) --port $(PORT) --database $(DATABASE) $(PROVIDER) -o contexts/ProcessTimes.csv
+
+contexts/%.csv: specifications/%.json contexts/ProcessTimes.csv
+	python3 extract.py --url $(URL) --port $(PORT) --database $(DATABASE) $(PROVIDER) -i specifications/$*.json -o contexts/$*Raw.csv
+	python3 timesort.py -i contexts/$*Raw.csv -t contexts/ProcessTimes.csv -o contexts/$*.csv
+
+contexts/%.dat: contexts/%.csv
+	python3 convert.py -i contexts/$*.csv -o contexts/$*.dat
+
+results/ProcessGeometric.avf.%.scored.csv: results/ProcessEvent.avf.%.scored.csv results/ProcessExec.avf.%.scored.csv results/ProcessParent.avf.%.scored.csv results/ProcessNetflow.avf.%.scored.csv
+	python3 combine.py $^ -t contexts/ProcessTimes.csv -a geometric -o results/ProcessGeometric.avf.$*.scored.csv
+
+results/ProcessAverage.avf.%.scored.csv: results/ProcessEvent.avf.%.scored.csv results/ProcessExec.avf.%.scored.csv results/ProcessParent.avf.%.scored.csv results/ProcessNetflow.avf.%.scored.csv
+	python3 combine.py $^ -t contexts/ProcessTimes.csv -a average -o results/ProcessAverage.avf.$*.scored.csv
+
+results/ProcessMin.avf.%.scored.csv: results/ProcessEvent.avf.%.scored.csv results/ProcessExec.avf.%.scored.csv results/ProcessParent.avf.%.scored.csv results/ProcessNetflow.avf.%.scored.csv
+	python3 combine.py $^ -t contexts/ProcessTimes.csv -a min -o results/ProcessMin.avf.$*.scored.csv
+
+results/ProcessMedian.avf.%.scored.csv: results/ProcessEvent.avf.%.scored.csv results/ProcessExec.avf.%.scored.csv results/ProcessParent.avf.%.scored.csv results/ProcessNetflow.avf.%.scored.csv
+	python3 combine.py $^ -t contexts/ProcessTimes.csv -a median -o results/ProcessMedian.avf.$*.scored.csv
+
+results/ProcessGeometric.%.scored.csv: results/ProcessEvent.%.scored.csv results/ProcessExec.%.scored.csv results/ProcessParent.%.scored.csv results/ProcessNetflow.%.scored.csv
+	python3 combine.py $^ -t contexts/ProcessTimes.csv -r -a geometric -o results/ProcessGeometric.$*.scored.csv
+
+results/ProcessAverage.%.scored.csv: results/ProcessEvent.%.scored.csv results/ProcessExec.%.scored.csv results/ProcessParent.%.scored.csv results/ProcessNetflow.%.scored.csv
+	python3 combine.py $^ -t contexts/ProcessTimes.csv -r -a average -o results/ProcessAverage.$*.scored.csv
+
+results/ProcessMin.%.scored.csv: results/ProcessEvent.%.scored.csv results/ProcessExec.%.scored.csv results/ProcessParent.%.scored.csv results/ProcessNetflow.%.scored.csv
+	python3 combine.py $^ -t contexts/ProcessTimes.csv -r -a min -o results/ProcessMin.$*.scored.csv
+
+results/ProcessMedian.%.scored.csv: results/ProcessEvent.%.scored.csv results/ProcessExec.%.scored.csv results/ProcessParent.%.scored.csv results/ProcessNetflow.%.scored.csv
+	python3 combine.py $^ -t contexts/ProcessTimes.csv -r -a median -o results/ProcessMedian.$*.scored.csv
+
+results/ProcessUniform.%.scored.csv: results/ProcessEvent.%.scored.csv results/ProcessExec.%.scored.csv results/ProcessParent.%.scored.csv results/ProcessNetflow.%.scored.csv
+	python3 combine.py $^ -t contexts/ProcessTimes.csv -a uniform -o results/ProcessUniform.$*.scored.csv
+
+results/ProcessCombined.%.scored.csv: results/ProcessEvent.%.scored.csv results/ProcessExec.%.scored.csv results/ProcessParent.%.scored.csv results/ProcessNetflow.%.scored.csv
+	python3 combine.py $^ -t contexts/ProcessTimes.csv -a weighted -o results/ProcessCombined.$*.scored.csv
+
+contexts/%.mat: contexts/%.csv
+	python3 convertmat.py -i contexts/$*.csv -o contexts/$*.mat
 
 results/%.avf.batch.scored.csv: contexts/%.csv
 	python3 ad.py -i contexts/$*.csv -o results/$*.avf.batch.scored.csv -s avf
+
 
 results/%.avc.batch.scored.csv: contexts/%.csv
 	python3 ad.py -i contexts/$*.csv -o results/$*.avc.batch.scored.csv -s avc
@@ -33,7 +91,10 @@ results/%.rasp.batch.scored.csv: contexts/%.csv
 	python3 ad.py -i contexts/$*.csv -o results/$*.rasp.batch.scored.csv -s rasp
 
 results/%.klmeans.batch.scored.csv: contexts/%.csv
-	python3 klmeans.py -n 5 -k 10 -i contexts/$*.csv -o results/$*.klmeans.batch.scored.csv
+	python3 klmeans.py -k 10 -i contexts/$*.csv -o results/$*.klmeans.batch.scored.csv
+
+results/%.krimp.batch.scored.csv: contexts/%.csv
+	python3 krimp.py -i contexts/$*.csv -o results/$*.krimp.batch.scored.csv
 
 results/%.avf.stream.scored.csv: contexts/%.csv
 	python3 ad.py -i contexts/$*.csv -o results/$*.avf.stream.scored.csv -s avf -m stream
@@ -52,4 +113,4 @@ clean:
 	rm -rf test/*ranked.csv test/*scored.csv results/*.ranked.csv results/*.scored.csv
 
 spotless: clean
-	rm -rf contexts/*.csv
+	rm -rf contexts/*.csv contexts/*.dat contexts/*.mat

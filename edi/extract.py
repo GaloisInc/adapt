@@ -24,6 +24,13 @@ parser.add_argument('--output','-o',
 					help = 'Output context filename. ',
 					type = str,
 					required = True)
+parser.add_argument('--database','-d',
+					choices = ['neo4j','adapt'],
+					help = 'neo4j or adapt',
+					default = 'adapt')
+parser.add_argument('--provider','-r',
+					help = 'provider name',
+					default = None)
 parser.add_argument('--verbose','-v',
 					help = 'Print verbose output',
 					action = 'store_true')
@@ -34,14 +41,19 @@ if __name__ == '__main__':
 	url = args.url
 	port = args.port
 	spec_file = args.input
+	provider = args.provider
 	output_file = args.output
 	if args.verbose:
 		print('URL: %s' % url)
 		print('Port: %d' % port)
 		print('Specification: %s' % spec_file)
+		print('Provider: ' + str(provider))
 		print('Context output: %s' % output_file)
 	if not(os.path.exists(spec_file)):
 		sys.exit('Context specification file not found: %s' % spec_file)
-	db = database.Database(url=url,port=port)
-	ext.convert2InputCSV(spec_file,output_file,db)
+	if args.database == 'adapt':
+		db = database.AdaptDatabase(url=url,port=port)
+	elif args.database == 'neo4j':
+		db = database.Neo4jDatabase(url=url,port=port)
+	ext.convert2InputCSV(spec_file,output_file,db,provider)
 

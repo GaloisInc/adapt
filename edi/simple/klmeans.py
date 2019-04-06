@@ -16,13 +16,14 @@ from ..util import utils
 class KLMeans:
 
 	# Step 1: Initialize classes randomly and initialize cost to |n|*|l|
-	def __init__(self,attrs,data,k):
+	def __init__(self,attrs,data,k,epsilon=0.01):
 		self.attrs = attrs
 		self.data = data
 		self.n = len(data)
 		self.l = len(attrs)
 		self.k = k
 		self.cost = self.n*self.l
+		self.epsilon = epsilon
 		self.models = [model.AVCOnlineModel(self.attrs)
 					   for i in range(0,self.k)]
 		self.assignment  = [None for i in range(0, self.n)]
@@ -119,8 +120,11 @@ def test(k,n):
 	x = KLMeans({'a','b'},data,k)
 	for i in range(0,n):
 		print(x.cost)
+		oldcost = x.cost
 		x.iterate()
-	print(x.cost)
+		if x.cost > (1-x.epsilon)*oldcost:
+			break
+	print("Final cost: " + str(x.cost))
 	for j in range(0,x.k):
 		for rec in x.classes[j]:
 			print (rec, j, x.score(rec))
@@ -128,12 +132,11 @@ def test(k,n):
 
 # TODO: Unify this framing code with that in ad.py
 
-def run(inputfile,outputfile,k,n,modelfile=None):
+def run(inputfile,outputfile,k,modelfile=None,epsilon=0.01):
 	print(inputfile)
 	print(outputfile)
 	print(k)
-	print(n)
-	def buildmodel(csvfile):
+	def buildmodel(csvfile,k):
 		reader = csv.reader(csvfile)
 		header = next(reader)[1:]
 
@@ -143,11 +146,14 @@ def run(inputfile,outputfile,k,n,modelfile=None):
 			data.append(record)
 		m = KLMeans(header,data,k)
 		print(m.cost)
-		for i in range(0,n):
+		while True:
+			oldcost = m.cost
 			m.iterate()
 			print(m.cost)
+			if m.cost > (1-m.epsilon)*oldcost:
+				break
 		m.recost()
-		print(m.cost)
+		print("Final cost: " + str(m.cost))
 
 		return m
 
@@ -177,8 +183,24 @@ def run(inputfile,outputfile,k,n,modelfile=None):
 										for att in attrs])
 							+ '\n')
 
-	with open(inputfile,'rt') as csvfile:
-		m = buildmodel(csvfile)
+	models = [None for i in range(0,k-1)]
+	for i in range(0,k-1):
+		max_k = i+1
+		with open(inputfile,'rt') as csvfile:
+			models[i] = buildmodel(csvfile,i+1)
+			models[i].cost = models[i].cost + models[i].k*models[i].l*numpy.log2(models[i].n)
+		if i > 1 and models[i-1].cost < models[i].cost and models[i-2].cost < models[i-1].cost:
+			break
+	mincost = models[0].cost
+	m = models[0]
+	min_k = 1
+	for i in range(0,max_k-1):
+		if models[i].cost < mincost:
+			mincost = models[i].cost
+			m = models[i]
+			min_k = i+1
+	print("Chose k = " + str(min_k))
+
 	with open(inputfile,'rt') as csvfile, open(outputfile,'w') as scorefile:
 		writescores(csvfile,scorefile,m,'UUID,Score,Class\n')
 	if modelfile != None:

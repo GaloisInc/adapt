@@ -6,17 +6,15 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import edi.util.context as context
+import extract.extract as extract
 
 parser = argparse.ArgumentParser(description='Join two contexts')
-parser.add_argument('--left',
-                    '-l',
-                    help='left input context file',
-					required = True)
-parser.add_argument('--right', '-r',
-                    help='right input context file',
-					required = True)
+parser.add_argument('inputs', metavar='<Context>', type=str, nargs='+',
+					help='inputs to combine')
+parser.add_argument('--times', '-t',
+					help='time file')
 parser.add_argument('--output', '-o',
-                    help='output file',
+					help='output file',
 					required = True)
 
 
@@ -24,12 +22,11 @@ parser.add_argument('--output', '-o',
 def zeroVec(header):
 	return {h:0 for h in header}
 
-def combine(vec1,vec2):
+def combine(vecs):
 	dict = {}
-	for k in vec1.keys():
-		dict['l_' + k] = vec1[k]
-	for k in vec2.keys():
-		dict['r_' + k] = vec2[k]
+	for i in range(len(vecs)):
+		for k in vecs[i].keys():
+			dict['X' + str(i) + '_' + k] = vecs[i][k]
 	return dict
 
 def vec2str(header,dict):
@@ -37,38 +34,46 @@ def vec2str(header,dict):
 
 
 if __name__ == '__main__':
-    args = parser.parse_args()
-    leftfile = args.left
-    outputfile = args.output
-    rightfile = args.right
+	args = parser.parse_args()
+	outputfile = args.output
 
-    with open(leftfile) as lfile:
-        left = context.Context(csv.reader(lfile))
+	n = len(args.inputs)
+	contexts = [None for i in range(n)]
+	allkeys = set()
+	for i in range(n):
+		with open(args.inputs[i]) as ctxfile:
+			contexts[i] = context.Context(csv.reader(ctxfile))
+		print('File %s has %d keys' % (args.inputs[i], len(contexts[i].data.keys())))
+		allkeys = allkeys | contexts[i].data.keys()
 
-    lkeys = set(left.data.keys())
-    print('Left file %s has %d keys' % (leftfile, len(lkeys)))
+	print('%d keys appear in at least one context' % len(allkeys))
 
-    with open(rightfile) as rfile:
-        right = context.Context(csv.reader(rfile))
+		# read in the times, if present, and use them for the master key list
+	if args.times != None:
+		with open(args.times) as time_file:
+			time_reader = csv.reader(time_file)
+			header = next(time_reader)
+			times = [(row[0], int(row[1]))
+						for row in time_reader]
+			times = sorted(times,
+							key=lambda x: x[1])
+			allkeys = [x[0] for x in times]
 
-    rkeys = set(right.data.keys())
-    print('Right file %s has %d keys' % (rightfile, len(rkeys)))
+	output = {}
+	for k in allkeys:
+		vecs = [{} for i in range(n)]
+		for i in range(n):
+			if k in contexts[i].data.keys():
+				vecs[i] = contexts[i].data[k]
+			else:
+				vecs[i] = zeroVec(contexts[i].header)
+		output[k] = combine(vecs)
 
-
-    keys = lkeys | rkeys
-    print('%d keys appear in either one' % len(keys))
-
-    output = {}
-    for k in keys:
-        if k in lkeys and not(k in rkeys):
-            output[k] = combine(left.data[k],zeroVec(right.header))
-        elif k in rkeys and not (k in lkeys):
-            output[k] = combine(zeroVec(left.header),right.data[k])
-        else:
-            output[k] = combine(left.data[k], right.data[k])
-
-    header = ['l_'+h for h in left.header] + ['r_' + h for h in right.header]
-    with open(outputfile,'w') as outfile:
-        print('UUID,%s' % ','.join(header),file=outfile)
-        for k in output.keys():
-            print('%s,%s' % (k,vec2str(header,output[k])),file=outfile)
+	header = ['X'+str(i)+'_'+att
+			  for i in range(n)
+			  for att in contexts[i].header]
+	escapedheader = [extract.escape(h) for h in header]
+	with open(outputfile,'w') as outfile:
+		print('UUID,%s' % ','.join(escapedheader),file=outfile)
+		for k in allkeys:
+			print('%s,%s' % (k,vec2str(header,output[k])),file=outfile)

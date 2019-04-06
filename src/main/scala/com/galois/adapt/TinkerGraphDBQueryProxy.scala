@@ -142,7 +142,7 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
 
       var toDisplay = scala.collection.mutable.ListBuffer.empty[String]
       var somethingFailed = false
-      val updateStatus = (status: Boolean) => { somethingFailed = somethingFailed || status }
+      val updateStatus = (status: Boolean) => { somethingFailed = somethingFailed || !status }
 
       val instrumentationSource = AdaptConfig.ingestConfig.asSingleHost.simpleTa1Name
 
