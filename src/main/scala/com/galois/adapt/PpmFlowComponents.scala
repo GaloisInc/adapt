@@ -7,7 +7,7 @@ import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Flow, Sink}
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm19._
+import com.galois.adapt.cdm20._
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success, Try}

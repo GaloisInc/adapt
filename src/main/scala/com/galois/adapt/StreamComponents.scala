@@ -8,7 +8,7 @@ import akka.actor.ActorRef
 import akka.stream.{FlowShape, OverflowStrategy}
 import akka.util.ByteString
 import scala.collection.mutable
-import com.galois.adapt.cdm19._
+import com.galois.adapt.cdm20._
 
 
 object FlowComponents {

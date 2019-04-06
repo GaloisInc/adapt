@@ -6,6 +6,7 @@ import akka.util.Timeout
 import com.galois.adapt.adm._
 import com.rrwright.quine.runtime.{GraphService, NameSpacedUuidProvider, QuineIdProvider, StandingFetchActor, StandingQueryId}
 import java.util.UUID
+import com.galois.adapt.cdm19._
 import spray.json.{JsArray, JsNumber, JsObject, JsString, JsValue, RootJsonFormat}
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -51,11 +52,11 @@ object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
 }
 
 
-case class ESOSubject(subjectTypes: Set[cdm19.SubjectType], cmdLine: AdmPathNode) extends NoConstantsDomainNode
+case class ESOSubject(subjectTypes: Set[SubjectType], cmdLine: AdmPathNode) extends NoConstantsDomainNode
 
-case class ESOFileObject(fileObjectType: cdm19.FileObjectType, path: AdmPathNode) extends NoConstantsDomainNode
+case class ESOFileObject(fileObjectType: FileObjectType, path: AdmPathNode) extends NoConstantsDomainNode
 
-case class ESOInstance(eventType: cdm19.EventType, subject: ESOSubject, predicateObject: ESOFileObject) extends NoConstantsDomainNode
+case class ESOInstance(eventType: EventType, subject: ESOSubject, predicateObject: ESOFileObject) extends NoConstantsDomainNode
 
 
 class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQueryProxyActor {
@@ -87,12 +88,12 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         "List[Long]"       -> PickleReader[List[Long]],
         "List[Int]"        -> PickleReader[List[Int]],
         "String"           -> PickleReader[String],
-        "FileObjectType"   -> PickleReader[com.galois.adapt.cdm19.FileObjectType],
-        "EventType"        -> PickleReader[com.galois.adapt.cdm19.EventType],
+        "FileObjectType"   -> PickleReader[FileObjectType],
+        "EventType"        -> PickleReader[EventType],
         "Set[CdmUUID]"     -> PickleReader[Set[CdmUUID]],
         "Option[Long]"     -> PickleReader[Option[Long]],
         "Option[String]"   -> PickleReader[Option[String]],
-        "Set[SubjectType]" -> PickleReader[Set[com.galois.adapt.cdm19.SubjectType]]
+        "Set[SubjectType]" -> PickleReader[Set[SubjectType]]
       )
     ),
     labelKey = "type_of"

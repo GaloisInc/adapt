@@ -7,7 +7,7 @@ import com.galois.adapt.AdaptConfig.IngestHost
 import com.galois.adapt.CurrentCdm
 import com.galois.adapt.adm.EntityResolution._
 import com.galois.adapt.adm.UuidRemapper.{AnAdm, AnEdge, UuidRemapperInfo}
-import com.galois.adapt.cdm19._
+import com.galois.adapt.cdm20._
 
 import scala.collection.mutable
 import scala.collection.mutable.{ListBuffer, Map => MutableMap}

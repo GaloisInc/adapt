@@ -2,7 +2,7 @@ package com.galois.adapt.adm
 
 import com.galois.adapt.AdaptConfig.HostName
 import com.galois.adapt.adm.UuidRemapper.CdmMerge
-import com.galois.adapt.cdm19._
+import com.galois.adapt.cdm20._
 
 object ERRules {
 

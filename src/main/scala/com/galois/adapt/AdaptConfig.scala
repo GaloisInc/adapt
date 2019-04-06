@@ -312,11 +312,11 @@ object AdaptConfig extends Utils {
       .toLowerCase
 
 
-    def toCdmSource(handler: ErrorHandler = ErrorHandler.print): Source[(Namespace,CDM19), NotUsed] = {
-      val linearized = parallel.foldLeft(Source.empty[(Namespace,CDM19)])((acc, li: LinearIngest) => acc.merge(li.toCdmSource(handler, updateHost _)))
+    def toCdmSource(handler: ErrorHandler = ErrorHandler.print): Source[(Namespace,CDM20), NotUsed] = {
+      val linearized = parallel.foldLeft(Source.empty[(Namespace,CDM20)])((acc, li: LinearIngest) => acc.merge(li.toCdmSource(handler, updateHost _)))
       val offsetApplied = startatoffset.fold(linearized){offset => println(s"Starting at offset: $offset"); linearized.drop(offset)}
       val limitApplied = loadlimit.fold(offsetApplied){limit => offsetApplied.take(limit)} //.take(loadlimit.getOrElse(Long.MaxValue))
-      limitApplied.filter { case (_, cdm: CDM19) => filter.fold(true)(applyFilter(cdm, _)) }
+      limitApplied.filter { case (_, cdm: CDM20) => filter.fold(true)(applyFilter(cdm, _)) }
     }
 
     def updateHost(is: DataProvider): Unit = ta1 match {

@@ -144,7 +144,7 @@ object Cdm17to18 {
   implicit def subject(s: cdm17.Subject)(implicit dummyHost: UUID): cdm18.Subject = cdm18.Subject(
     s.uuid,
     s.subjectType,
-    s.pid,
+    s.cid,
     s.localPrincipal,
     s.startTimestampNanos,
     s.parentSubject,

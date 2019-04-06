@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import com.galois.adapt.NoveltyDetection.{NamespacedUuidDetails, PpmTreeNodeAlarm}
 import com.galois.adapt.adm._
-import com.galois.adapt.cdm19.{CustomEnum, EventType, FileObjectType, HostIdentifier, HostType, Interface, PrincipalType, SrcSinkType, SubjectType}
+import com.galois.adapt.cdm20.{CustomEnum, EventType, FileObjectType, HostIdentifier, HostType, Interface, PrincipalType, SrcSinkType, SubjectType}
 import org.apache.tinkerpop.gremlin.structure.{Edge, Vertex}
 import spray.json._
 

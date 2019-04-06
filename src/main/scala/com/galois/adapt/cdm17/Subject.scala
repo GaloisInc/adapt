@@ -11,7 +11,7 @@ import scala.util.Try
 case class Subject(
   uuid: UUID,
   subjectType: SubjectType,
-  pid: Int,
+  cid: Int,
   localPrincipal: UUID,
   startTimestampNanos: Long,
   parentSubject: Option[UUID] = None,
@@ -31,7 +31,7 @@ case class Subject(
   def asDBKeyValues = List(
     ("uuid", uuid),
     ("subjectType", subjectType.toString),
-    ("cid", pid),
+    ("cid", cid),
     ("localPrincipalUuid", localPrincipal),
     ("startTimestampNanos", startTimestampNanos)
   ) ++
@@ -53,7 +53,7 @@ case class Subject(
   def toMap: Map[String, Any] = Map(
     "uuid" -> uuid,
     "subjectType" -> subjectType.toString,
-    "cid" -> pid,
+    "cid" -> cid,
     "localPrincipalUuid" -> localPrincipal,
     "startTimestampNanos" -> startTimestampNanos,
     "parentSubjectUuid" -> parentSubject.getOrElse(""),

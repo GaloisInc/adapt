@@ -444,7 +444,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
           classOf[StandingFetchActor[ESOInstance]],
           implicitly[Queryable[ESOInstance]],
           (l: List[ESOInstance]) => if (l.nonEmpty) {
-//            println(s"RESULT: ${l.head}")
+            println(s"RESULT: ${l.head}")
           }
         ), sqid.name
       )

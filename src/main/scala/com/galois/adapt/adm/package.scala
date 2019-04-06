@@ -5,7 +5,7 @@ import java.util
 import java.util.{Arrays, Comparator, UUID}
 
 import com.galois.adapt.AdaptConfig.HostName
-import com.galois.adapt.cdm19._
+import com.galois.adapt.cdm20._
 import org.mapdb.{DataInput2, DataOutput2, Serializer}
 import org.mapdb.serializer.GroupSerializer
 
