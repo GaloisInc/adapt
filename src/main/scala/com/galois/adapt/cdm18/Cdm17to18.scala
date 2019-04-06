@@ -31,7 +31,7 @@ object Cdm17to18 {
   // Value types
   implicit def fixedShort(f: cdm17.FixedShort): cdm18.FixedShort = cdm18.FixedShort(f.bytes)
   implicit def abstractObject(a: cdm17.AbstractObject): cdm18.AbstractObject = cdm18.AbstractObject(
-    a.permission.map(fixedShort),
+    None,   //a.permission.map(fixedShort),
     a.epoch,
     a.properties
   )
@@ -64,7 +64,7 @@ object Cdm17to18 {
     e.eventType,
     Some(e.threadId),
     dummyHost,
-    Some(e.subjectUuid),
+    Some(e.subject),
     e.timestampNanos,
     e.predicateObject,
     e.predicateObjectPath,
@@ -144,7 +144,7 @@ object Cdm17to18 {
   implicit def subject(s: cdm17.Subject)(implicit dummyHost: UUID): cdm18.Subject = cdm18.Subject(
     s.uuid,
     s.subjectType,
-    s.cid,
+    s.pid,
     s.localPrincipal,
     s.startTimestampNanos,
     s.parentSubject,

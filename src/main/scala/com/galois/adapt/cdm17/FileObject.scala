@@ -3,10 +3,10 @@ package com.galois.adapt.cdm17
 import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm17
-import com.galois.adapt.{DBWritable, DBNodeable}
-import org.apache.tinkerpop.gremlin.structure.T.label
-
+import com.galois.adapt.{DBNodeable, DBWritable}
 import scala.util.Try
+import com.rrwright.quine.language._
+import com.rrwright.quine.language.EdgeDirections._
 
 
 case class FileObject(
@@ -18,7 +18,10 @@ case class FileObject(
   size: Option[Long] = None,
   peInfo: Option[String] = None,
   hashes: Option[Seq[CryptographicHash]] = None
-) extends CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode
+  with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+
+  val companion = FileObject
 
   def asDBKeyValues = baseObject.asDBKeyValues ++
     List(
@@ -52,6 +55,8 @@ case class FileObject(
 
 
 case object FileObject extends CDM17Constructor[FileObject] {
+  type ClassType = FileObject
+
   type RawCDMType = cdm17.FileObject
 
   def from(cdm: RawCDM17Type): Try[FileObject] = Try(

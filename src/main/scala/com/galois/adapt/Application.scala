@@ -3,7 +3,6 @@ package com.galois.adapt
 import java.io._
 import java.nio.file.Paths
 import java.util.UUID
-
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.RouteResult._
@@ -15,18 +14,24 @@ import com.galois.adapt.adm._
 import FlowComponents._
 import akka.NotUsed
 import akka.event.{Logging, LoggingAdapter}
+import shapeless._
+import shapeless.syntax.singleton._
+import AdaptConfig._
+import com.galois.adapt.PpmFlowComponents.CompletedESO
+import com.typesafe.config.{Config, ConfigFactory}
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.cdm20._
-
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.language.postfixOps
+import scala.util.{Failure, Random, Success, Try}
 import sys.process._
-import scala.util.{Failure, Success, Try}
-import AdaptConfig._
-import com.galois.adapt.PpmFlowComponents.CompletedESO
+import com.rrwright.quine.runtime._
+import com.rrwright.quine.language._
+//import com.rrwright.quine.language.JavaObjectSerializationScheme._
+import com.rrwright.quine.language.BoopickleScheme._
 
 
 object Application extends App {
@@ -95,8 +100,43 @@ object Application extends App {
   }
   println(s"Information identifying this run:\n${summary.map(x => s"  ${x._1} ${x._2}").mkString("\n")}")
 
+  val actorSystemGraphService: (ActorSystem, Option[GraphService[AdmUUID]]) = runFlow match {
+    case "quine" =>
+      val hostConfigSrcs: List[String] = quineConfig.hosts
+        .zipWithIndex  
+        .map { case (QuineHost(ip, _), idx) => 
+          s"""|  {
+              |    hostname = $ip
+              |    port = 2551
+              |    first-shard = ${idx * quineConfig.shardsperhost}
+              |    last-shard = ${(idx + 1) * quineConfig.shardsperhost - 1}
+              |  }
+              |""".stripMargin
+        }
+    
+      val clusterConfigSrc =
+        s"""|name = "adapt-cluster"
+            |hostname = "${quineConfig.thishost}"
+            |port = 2551
+            |host-shard-ranges = ${hostConfigSrcs.mkString("[\n",",","]\n")}
+            |""".stripMargin
 
-  implicit val system = ActorSystem("production-actor-system")
+      val graphService = GraphService.clustered(
+        config = ConfigFactory.parseString(clusterConfigSrc),
+        persistor = as => LMDBSnapshotPersistor()(as), // EmptyPersistor()(as),
+        idProvider = AdmUuidProvider,
+        indexer = Indexer.currentIndex(EmptyIndex),
+        inMemorySoftNodeLimit = Some(100000),
+        inMemoryHardNodeLimit = Some(200000),
+        uiPort = None
+      )
+      (graphService.system, Some(graphService))
+
+    case _ =>
+      (ActorSystem("production-actor-system"), None)
+  }
+
+  implicit val system = actorSystemGraphService._1 
   val log: LoggingAdapter = Logging.getLogger(system, this)
 
   // All large maps should be store in `MapProxy`
@@ -131,21 +171,22 @@ object Application extends App {
   implicit val executionContext = system.dispatcher
 
   val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
-  val logFile = runtimeConfig.logfile
-  val scheduledLogging = system.scheduler.schedule(10.seconds, 10.seconds, statusActor, LogToDisk(logFile))
-  system.registerOnTermination(scheduledLogging.cancel())
+//  val logFile = config.getString("adapt.logfile")
+//  val scheduledLogging = system.scheduler.schedule(10.seconds, 10.seconds, statusActor, LogToDisk(logFile))
+//  system.registerOnTermination(scheduledLogging.cancel())
 
   val ppmBaseDirFile = new File(ppmConfig.basedir)
   if ( ! ppmBaseDirFile.exists()) ppmBaseDirFile.mkdir()
 
   // Start up the database
-  val dbActor: ActorRef = runFlow match {
+  var dbActor: ActorRef = runFlow match {
     case "accept" => system.actorOf(Props(classOf[TinkerGraphDBQueryProxy]))
-    case _ => system.actorOf(Props(classOf[Neo4jDBQueryProxy], statusActor))
+    case "quine" => ActorRef.noSender
+    case _ => ???
   }
   val dbStartUpTimeout = Timeout(600 seconds)  // Don't make this implicit.
-  println(s"Waiting for DB indices to become active: $dbStartUpTimeout")
-  Await.result(dbActor.?(Ready)(dbStartUpTimeout), dbStartUpTimeout.duration)
+//  println(s"Waiting for DB indices to become active: $dbStartUpTimeout")
+//  Await.result(dbActor.?(Ready)(dbStartUpTimeout), dbStartUpTimeout.duration)
 
   // These are the maps that `UUIDRemapper` will use
   val cdm2cdmMaps: Map[HostName, Array[AlmostMap[CdmUUID,CdmUUID]]] = mapProxy.cdm2cdmMapShardsMap
@@ -233,7 +274,7 @@ object Application extends App {
     actorList.foreach { ref => broadcast ~> Sink.actorRefWithAck[T](ref, InitMsg, Ack, CompleteMsg) }
     SinkShape(broadcast.in)
   })
-
+  
   def startWebServer(): Http.ServerBinding = {
     println(s"Starting the web server at: http://${runtimeConfig.webinterface}:${runtimeConfig.port}")
     val route = Routes.mainRoute(dbActor, statusActor, ppmManagerActors)
@@ -388,6 +429,63 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       )
       Runtime.getRuntime.halt(1)
 
+    case "quine" =>
+      println("Running Quine ingest.")
+
+      implicit val graph: GraphService[AdmUUID] = actorSystemGraphService._2.get
+
+      implicit val timeout = Timeout(30.4 seconds)
+
+      val parallelism = quineConfig.quineactorparallelism
+
+      val sqid = StandingQueryId("standing-find_ESO-accumulator")
+      val standingFetchActor = system.actorOf(
+        Props(
+          classOf[StandingFetchActor[ESOInstance]],
+          implicitly[Queryable[ESOInstance]],
+          (l: List[ESOInstance]) => if (l.nonEmpty) {
+//            println(s"RESULT: ${l.head}")
+          }
+        ), sqid.name
+      )
+      graph.currentGraph.standingQueryActors = graph.currentGraph.standingQueryActors + (sqid -> standingFetchActor)
+      println(branchOf[ESOInstance]())
+
+
+      val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
+      dbActor = quineRouter
+
+      startWebServer()
+      statusActor ! InitMsg
+
+      // Write out debug states
+//      val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
+
+      val clusterStartupDeadline: Deadline = 60.seconds.fromNow
+      while ( ! graph.clusterIsReady) {
+        if (clusterStartupDeadline.isOverdue()) throw new RuntimeException(s"Timeout expired while waiting for cluster hosts to become active.")
+        Thread.sleep(1000)
+      }
+
+      RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
+        import GraphDSL.Implicits._
+
+        val hostSources = cdmSources.values.toSeq
+
+        for (((host, source), i) <- hostSources.zipWithIndex) {
+          source
+            .via(printCounter(host.hostName, statusActor, 0))
+//            .via(debug.debugBuffer(s"[${host.hostName}] 0 before ER"))
+            .via(erMap(host.hostName))
+            .mapAsyncUnordered(parallelism)(cdm => quineRouter ? cdm)
+            .recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace()}
+            .runWith(Sink.ignore)
+        }
+
+        ClosedShape
+      }).run()
+
+
     case "pre-e4-test" =>
       startWebServer()
       statusActor ! InitMsg
@@ -396,7 +494,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         import GraphDSL.Implicits._
         val hostSources = cdmSources.values.toSeq
         for (((host, source), i) <- hostSources.zipWithIndex) {
-          source.via(printCounter(host.hostName, statusActor, 0)) ~> Sink.ignore
+          source.via(printCounter(host.hostName, statusActor)) ~> Sink.ignore
         }
         ClosedShape
       }).run()
@@ -418,7 +516,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 
         for (((host, source), i) <- hostSources.zipWithIndex) {
           val broadcast = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
-          (source.via(printCounter(host.hostName, statusActor, 0)) via debug.debugBuffer(s"[${host.hostName}] 0 before ER")) ~>
+          (source.via(printCounter(host.hostName, statusActor)) via debug.debugBuffer(s"[${host.hostName}] 0 before ER")) ~>
             (erMap(host.hostName) via debug.debugBuffer(s"[${host.hostName}] 1 after ER")) ~>
             broadcast.in
 
@@ -521,64 +619,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       }).run()
 
     case "event-matrix" =>
-      // Produce a CSV of which fields in a CDM event are filled in
-
-      startWebServer()
-      statusActor ! InitMsg
-
-      def getKeys(e: Event): Set[String] = List.concat(
-        if (e.sequence.isDefined) List("sequence") else Nil,
-        if (e.threadId.isDefined) List("threadId") else Nil,
-        if (e.subjectUuid.isDefined) List("subjectUuid") else Nil,
-        if (e.predicateObject.isDefined) List("predicateObject") else Nil,
-        if (e.predicateObjectPath.isDefined) List("predicateObjectPath") else Nil,
-        if (e.predicateObject2.isDefined) List("predicateObject2") else Nil,
-        if (e.predicateObject2Path.isDefined) List("predicateObject2Path") else Nil,
-        if (e.names.nonEmpty) List("name") else Nil,
-        if (e.parameters.isDefined) List("parameters") else Nil,
-        if (e.location.isDefined) List("location") else Nil,
-        if (e.size.isDefined) List("size") else Nil,
-        if (e.programPoint.isDefined) List("programPoint") else Nil,
-        e.properties.getOrElse(Map.empty).keys.toList
-      ).toSet
-
-      var keysSeen: Set[String] = Set.empty
-      var currentKeys: List[String] = List.empty
-
-      val tempFile = File.createTempFile("event-matrix","csv")
-      tempFile.deleteOnExit()
-      val tempPath: String = tempFile.getPath
-
-      assert(cdmSources.size == 1, "Cannot produce event matrix for more than once host at a time")
-      val (host, cdmSource) = cdmSources.head._2
-
-      assert(host.parallel.size == 1, "Cannot produce event matrix for more than one linear ingest stream")
-      val li = host.parallel.head
-
-      cdmSource
-        .via(printCounter("CDM", statusActor, li.range.startInclusive))
-        .collect { case (_, e: Event) => getKeys(e) }
-        .map((keysHere: Set[String]) => {
-          val newKeys: Set[String] = keysHere.diff(keysSeen)
-          currentKeys ++= newKeys
-          keysSeen ++= newKeys
-          ByteString(currentKeys.map(k => if (keysHere.contains(k)) "1" else "").mkString(",") + "\n")
-        })
-        .runWith(FileIO.toPath(Paths.get(tempPath)))
-        .onComplete {
-          case Failure(f) =>
-            println("Failed to write out 'event-matrix.csv")
-            f.printStackTrace()
-
-          case Success(t) =>
-            t.status.map { _ =>
-              val tempFileInputStream = new FileInputStream(tempFile)
-              val eventFileOutputStream = new FileOutputStream(new File("event-matrix.csv"))
-              eventFileOutputStream.write((currentKeys.mkString(",") + "\n").getBytes)
-              org.apache.commons.io.IOUtils.copy(tempFileInputStream, eventFileOutputStream)
-              println("Done")
-            }
-        }
+      println("Producing event matrix CSVs is no longer supported")
 
     case "csvmaker" | "csv" =>
       val odir = pureconfig.loadConfig[String]("adapt.outdir").right.getOrElse(".")

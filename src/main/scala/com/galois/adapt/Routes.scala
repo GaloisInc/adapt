@@ -120,6 +120,51 @@ object Routes {
             complete(
               (statusActor ? GetStats).mapTo[StatusReport]
             )
+          }
+      //    pathPrefix("ppm") {
+      //      path("listTrees") {
+      //        complete(
+      //          (ppmActor ? ListPpmTrees).mapTo[Future[PpmTreeNames]].flatMap(_.map(_.namesAndCounts))
+      //        )
+      //      } ~
+      //      path("setRatings") {
+      //        parameter('rating.as(validRating), 'namespace ? "adapt", 'pathsPerTree.as[Map[String, List[String]]]) { setRatings }
+      //      } ~
+      //      path(Segment) { treeName =>
+      //        parameter('query.as[String].?, 'namespace ? "adapt", 'startTime ? 0L, 'forwardFromStartTime ? true, 'resultSizeLimit.as[Int].?, 'excludeRatingBelow.as[Int].?) {
+      //          (queryString, namespace, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
+      //            val query = queryString.map(_.split("∫", -1)).getOrElse(Array.empty[String]).toList
+      //            import ApiJsonProtocol._
+      //            complete(
+      //              (ppmActor ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow))
+      //                .mapTo[PpmTreeAlarmResult]
+      //                .map(t => List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
+      //            )
+      //        }
+      //      }
+      //    } ~
+        } ~
+        pathPrefix("query") {
+          pathPrefix("nodes") {
+            path(RemainingPath) { queryString =>
+              complete(
+                queryResult(NodeQuery(queryString.toString), dbActor)
+              )
+            }
+          } ~
+          pathPrefix("edges") {
+            path(RemainingPath) { queryString =>
+              complete(
+                queryResult(EdgeQuery(queryString.toString), dbActor)
+              )
+            }
+          } ~
+          pathPrefix("generic") {
+            path(RemainingPath) { queryString =>
+              complete(
+                queryResult(StringQuery(queryString.toString), dbActor)
+              )
+            }
           } ~
           pathPrefix("ingest") {
             path("terminate"){
@@ -166,7 +211,7 @@ object Routes {
             )
           } ~
           pathPrefix("ppm") {
-            pathPrefix("listTrees") {
+              pathPrefix("listTrees") {
               path(Segment) { hostName =>
                 complete(
                   (ppmActors(hostName) ? ListPpmTrees).mapTo[Future[PpmTreeNames]].flatMap(_.map(_.namesAndCounts))

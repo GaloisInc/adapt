@@ -8,7 +8,6 @@ import com.bbn.tc.schema.avro.{cdm18 => bbnCdm18}
 import org.apache.avro.file.DataFileReader
 import org.apache.avro.specific.SpecificDatumReader
 import org.apache.avro.util.Utf8
-import org.neo4j.graphdb.RelationshipType
 import shapeless.Lazy
 
 import scala.collection.JavaConverters._
@@ -25,10 +24,6 @@ package object cdm18 {
     object EdgeTypes extends Enumeration {
       type EdgeTypes = Value
       val localPrincipal, subject, /*host,*/ predicateObject, predicateObject2, parameterTagId, flowObject, prevTagId, parentSubject, dependentUnit, unit, tag, tagId, source, sink = Value
-
-      implicit def conv(rt: EdgeTypes) = new RelationshipType() {
-        def name = rt.toString
-      }
     }
 
     def readData(filePath: String, limit: Option[Int] = None): Try[(InstrumentationSource, Iterator[Lazy[Try[CDM18]]])] = {

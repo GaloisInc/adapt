@@ -1,9 +1,10 @@
-val scalaV = "2.11.12"   // "2.12.2"  // Scala 2.12 requires JVM 1.8.0_111 or newer.
-val akkaV = "2.5.17"
-val akkaHttpV = "10.1.5"
-val neoV = "3.3.3"
+val scalaV = "2.12.8"   // "2.12.2"  // Scala 2.12 requires JVM 1.8.0_111 or newer.
+val akkaV = "2.5.21"
+val akkaHttpV = "10.1.7"
+val quineV = "0.1-SNAPSHOT"
 
-resolvers += Resolver.jcenterRepo  // for akka persistence in memory
+//resolvers += Resolver.jcenterRepo  // for akka persistence in memory
+resolvers += Resolver.sonatypeRepo("snapshots")  // for scala-pickling 0.10.2-SNAPSHOT  // for Quine
 
 resolvers += Resolver.mavenLocal  // for BBN repositories built locally
 
@@ -20,34 +21,35 @@ lazy val adapt = (project in file(".")).settings(
     "org.scala-lang" % "scala-library" % scalaV,
 //    "com.typesafe" % "config" % "1.3.1",
     "com.github.pureconfig" %% "pureconfig" % "0.9.2",
-    "org.scalatest" %% "scalatest" % "3.0.0", // % "test",
-    "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
+    "org.scalatest" %% "scalatest" % "3.0.0",
     "org.apache.avro" % "avro" % "1.8.2",
     "com.typesafe.scala-logging" %% "scala-logging" % "3.7.2",
-    "com.typesafe.akka" %% "akka-actor" % akkaV,
-    "com.typesafe.akka" %% "akka-http" % akkaHttpV,
+
+    "com.typesafe.akka" %% "akka-actor"           % akkaV,
+    "com.typesafe.akka" %% "akka-stream"          % akkaV,
+    "com.typesafe.akka" %% "akka-cluster"         % akkaV,
+    "com.typesafe.akka" %% "akka-http"            % akkaHttpV,
     "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV,
-    "com.typesafe.akka" %% "akka-stream" % akkaV,
+
+    "com.rrwright" %% "quine"           % quineV,
+    "com.rrwright" %% "quine-boopickle" % quineV,
+    "com.rrwright" %% "quine-gremlin"   % quineV,
+
+    "org.lmdbjava" % "lmdbjava" % "0.6.3",
+
     "com.typesafe.akka" %% "akka-stream-kafka" % "0.22",
-    "org.scala-lang.modules" %% "scala-parser-combinators" % "1.1.1",
-    "org.mapdb" % "mapdb" % "3.0.7",
     "com.github.alexandrnikitin" %% "bloom-filter" % "0.10.1",
-    "org.neo4j" % "neo4j-community" % neoV,
-    "org.neo4j" % "neo4j-cypher" % neoV,
-    "org.neo4j" % "neo4j-tinkerpop-api" % "0.1",
-    "org.neo4j" % "neo4j-tinkerpop-api-impl" % "0.7-3.2.3" exclude("org.neo4j", "neo4j-enterprise"),
-    "org.apache.tinkerpop" % "neo4j-gremlin" % neoV,
-    "org.apache.tinkerpop" % "tinkergraph-gremlin" % neoV,
-
-
+    "org.mapdb" % "mapdb" % "3.0.7",
+    "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.3.3",
 
 //  , "com.bbn" % "tc-avro" % "1.0-SNAPSHOT"
-    "commons-io" % "commons-io" % "2.6",
     "com.univocity" % "univocity-parsers" % "2.6.1",
     "com.github.felfert" % "cidrutils" % "1.1",  // For testing IP address ranges in the policy enforcement demo.
 
-    "com.lihaoyi" % "ammonite-sshd" % "1.1.2" cross CrossVersion.full
+    "com.lihaoyi" % "ammonite-sshd" % "1.6.3" cross CrossVersion.full
   ),
+
+  offline := true,
 
 //  fork in run := true,
 //  javaOptions in run ++= Seq("-Xmx6G"),
@@ -72,10 +74,8 @@ lazy val adapt = (project in file(".")).settings(
 
   assemblyMergeStrategy in assembly := {
     case PathList("reference.conf") => MergeStrategy.concat
-//    case PathList("META-INF", "services" /*, "org.neo4j.kernel.extension.KernelExtensionFactory"*/) => MergeStrategy.first
     case PathList("META-INF", xs @ _*) => xs.map(_.toLowerCase) match {
       case "services" :: rfqdn :: Nil => MergeStrategy.first
-      case list if list.exists(_.contains("neo4j")) => MergeStrategy.first
       case _ => MergeStrategy.discard
     }
     case x => MergeStrategy.first

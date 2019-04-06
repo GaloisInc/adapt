@@ -41,8 +41,18 @@ var node_appearance = [
         size: 54
         // make_node_label : SPECIAL CASE!!! Don't put anything here for Clusters right now.
     }, {
+        name : "Socket",
+        is_relevant : function(n) { return n.properties.hasOwnProperty("fileObjectType") && n.properties.fileObjectType === "FILE_OBJECT_UNIX_SOCKET" },
+        icon_unicode : "\uf342",
+        size: 40,
+        make_node_label : function(node) {
+           var fd = (node.hasOwnProperty('fileDescriptor') ? node['fileDescriptor'] : "")
+            var fp = (node['properties'].hasOwnProperty('path') ? node['properties']['path'] : "none")
+            return fp + " fd " + fd
+        }
+    }, {
         name : "File",
-        is_relevant : function(n) { return n.db_label === "FileObject" },
+        is_relevant : function(n) { return n.properties.hasOwnProperty("fileObjectType") },
         icon_unicode : "\uf41b",
         size: 40,
         make_node_label : function(node) {
@@ -52,7 +62,7 @@ var node_appearance = [
         }
     }, {
         name : "MemoryObject",
-        is_relevant : function(n) { return n.db_label === "MemoryObject" },
+        is_relevant : function(n) { return n.properties.hasOwnProperty("memoryAddress") },
         icon_unicode : "\uf376",
         size: 40,
         make_node_label : function(node) {
@@ -61,8 +71,8 @@ var node_appearance = [
             return addr + "\nsize: " + size
         }
     }, {
-        name : "Pipe",
-        is_relevant : function(n) { return n.db_label === "UnnamedPipeObject" },
+        name : "UnnamedPipeObject",
+        is_relevant : function(n) { return n.properties.hasOwnProperty("sourceFileDescriptor") /*"UnnamedPipeObject"*/ },
         icon_unicode : "\uf2c0",
         size: 40,
         make_node_label : function(node) {
@@ -72,7 +82,7 @@ var node_appearance = [
         }
     }, {
         name : "Principal",
-        is_relevant : function(n) { return n.db_label === "Principal" },
+        is_relevant : function(n) { return n.properties.hasOwnProperty("principalType") },
         icon_unicode : "\uf419",
         size: 50,
         make_node_label : function(node) {
@@ -80,8 +90,8 @@ var node_appearance = [
             return "userId: " + at
         }
     }, {
-        name : "NetFlow",
-        is_relevant : function(n) { return n.db_label === "NetFlowObject" },
+        name : "NetFlowObject",
+        is_relevant : function(n) { return n.properties.hasOwnProperty("remoteAddress") },
         icon_unicode : "\uf262",
         make_node_label : function(node) {
             var localA = (node['properties'].hasOwnProperty('localAddress') ? node['properties']['localAddress'] : "None")
@@ -90,18 +100,18 @@ var node_appearance = [
             var remoteP = (node['properties'].hasOwnProperty('remotePort') ? node['properties']['remotePort'] : "None")
             return "Local: " + localA + ":" + localP + "\nRemote: " + remoteA + ":" + remoteP
         }
-    }, {
-        name : "RegistryKey",
-        is_relevant : function(n) { return n.db_label === "RegistryKeyObject" },
-        icon_unicode : "\uf296",
-        make_node_label : function(node) {
-            var key = (node['properties'].hasOwnProperty('key') ? node['properties']['key'] : "None")
-            var value = (node['properties'].hasOwnProperty('value') ? node['properties']['value'] : "None")
-            return key + " : " + value
-        }
+    // }, {
+    //     name : "RegistryKey",
+    //     is_relevant : function(n) { return n.db_label === "RegistryKeyObject" },
+    //     icon_unicode : "\uf296",
+    //     make_node_label : function(node) {
+    //         var key = (node['properties'].hasOwnProperty('key') ? node['properties']['key'] : "None")
+    //         var value = (node['properties'].hasOwnProperty('value') ? node['properties']['value'] : "None")
+    //         return key + " : " + value
+    //     }
     }, {
         name : "Event",
-        is_relevant : function(n) { return n.db_label === "Event" },
+        is_relevant : function(n) { return n.properties.hasOwnProperty("eventType") },
         icon_unicode : "\uf375",
         make_node_label : function(node) {
             var sequence = (node['properties'].hasOwnProperty('sequence') ? node['properties']['sequence'] : "None")
@@ -111,8 +121,8 @@ var node_appearance = [
             return type + "\n# " + sequence
         }
     }, {
-        name : "SrcSink",
-        is_relevant : function(n) { return n.db_label === "SrcSinkObject" },
+        name : "SrcSinkObject",
+        is_relevant : function(n) { return n.properties.hasOwnProperty("srcSinkType") },
         icon_unicode : "\uf313",
         make_node_label : function(node) {
             // var uuid = (node['properties'].hasOwnProperty('uuid') ? node['properties']['uuid'] : "None")
@@ -132,7 +142,7 @@ var node_appearance = [
         }
     }, {
        name : "Subject",
-        is_relevant : function(n) { return n.db_label === "Subject" },
+        is_relevant : function(n) { return n.properties.hasOwnProperty("subjectType") },
         icon_unicode : "\uf375",
         make_node_label : function(node) {
             var cid = (node['properties'].hasOwnProperty('cid') ? node['properties']['cid'] : "None")
@@ -268,6 +278,8 @@ var node_appearance = [
 
 
 var predicates = [
+// Each object here will have a key added for `starting_node_id` before its floating_query is executed. Do no set the `starting_node_id` field here.
+
 // ProvenanceTagNode
        {
         name: "RefObject",

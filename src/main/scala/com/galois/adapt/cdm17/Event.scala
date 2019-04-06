@@ -1,9 +1,12 @@
 package com.galois.adapt.cdm17
 
-import com.galois.adapt.{DBWritable, DBNodeable}
+import com.galois.adapt.{DBNodeable, DBWritable}
 import scala.util.Try
 import java.util.UUID
+import com.galois.adapt.cdm17.CDM17.EdgeTypes._
 import com.bbn.tc.schema.avro.cdm17
+import com.rrwright.quine.language.EdgeDirections._
+import com.rrwright.quine.language._
 import scala.collection.JavaConverters._
 
 
@@ -12,19 +15,22 @@ case class Event(
   sequence: Long = 0,
   eventType: EventType,
   threadId: Int,
-  subjectUuid: UUID,
+  subject: UUID,
   timestampNanos: Long,
   predicateObject: Option[UUID] = None,
   predicateObjectPath: Option[String] = None,
   predicateObject2: Option[UUID] = None,
   predicateObject2Path: Option[String] = None,
   name: Option[String] = None,
-  parameters: Option[Seq[Value]] = None,
+  parameters: Option[List[Value]] = None,
   location: Option[Long] = None,
   size: Option[Long] = None,
   programPoint: Option[String] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM17 with DBWritable with Comparable[Event] with Ordering[Event] with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode
+  with CDM17 with DBWritable with Comparable[Event] with Ordering[Event] with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+  val companion = Event
+
   val foldedParameters: List[Value] = parameters.fold[List[Value]](List.empty)(_.toList)
 
   def asDBKeyValues = List(
@@ -32,7 +38,7 @@ case class Event(
     ("sequence", sequence),
     ("eventType", eventType.toString),
     ("threadId", threadId),
-    ("subjectUuid", subjectUuid),
+    ("subjectUuid", subject),
     ("timestampNanos", timestampNanos)
   ) ++
     predicateObject.fold[List[(String,Any)]](List.empty)(v => List(("predicateObjectUuid", v))) ++
@@ -47,7 +53,7 @@ case class Event(
     DBOpt.fromKeyValMap(properties)  // Flattens out nested "properties"
 
   def asDBEdges = List.concat(
-    List((CDM17.EdgeTypes.subject,subjectUuid)),
+    List((CDM17.EdgeTypes.subject,subject)),
     predicateObject.map(p => (CDM17.EdgeTypes.predicateObject,p)),
     predicateObject2.map(p => (CDM17.EdgeTypes.predicateObject2,p)),
     foldedParameters.flatMap(value => value.tagsFolded.map(tag => (CDM17.EdgeTypes.parameterTagId, tag.tagId)))
@@ -65,7 +71,7 @@ case class Event(
     "sequence" -> sequence,
     "eventType" -> eventType.toString,
     "threadId" -> threadId,
-    "subjectUuid" -> subjectUuid,
+    "subjectUuid" -> subject,
     "timestampNanos" -> timestampNanos,
     "predicateObjectUuid" -> predicateObject.getOrElse(""),
     "predicateObjectPath" -> predicateObjectPath.getOrElse(""),
@@ -84,6 +90,8 @@ case class Event(
 }
 
 case object Event extends CDM17Constructor[Event] {
+  type ClassType = Event
+
   type RawCDMType = cdm17.Event
 
   def from(cdm: RawCDM17Type): Try[Event] = Try(

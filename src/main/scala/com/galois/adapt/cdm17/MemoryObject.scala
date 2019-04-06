@@ -3,7 +3,8 @@ package com.galois.adapt.cdm17
 import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm17
-import com.galois.adapt.{DBWritable, DBNodeable}
+import com.galois.adapt.{DBNodeable, DBWritable}
+import com.rrwright.quine.language._
 import org.apache.tinkerpop.gremlin.structure.T.label
 
 import scala.util.Try
@@ -15,7 +16,10 @@ case class MemoryObject(
   pageNumber: Option[Long] = None,
   pageOffset: Option[Long] = None,
   size: Option[Long] = None
-) extends CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode
+  with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+
+  val companion = MemoryObject
 
   def asDBKeyValues = baseObject.asDBKeyValues ++ List(
     ("uuid", uuid),
@@ -31,6 +35,9 @@ case class MemoryObject(
 }
 
 case object MemoryObject extends CDM17Constructor[MemoryObject] {
+
+  type ClassType = MemoryObject
+
   type RawCDMType = cdm17.MemoryObject
 
   def from(cdm: RawCDM17Type): Try[MemoryObject] = Try(

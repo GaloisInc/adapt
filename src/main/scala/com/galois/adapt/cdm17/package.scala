@@ -12,7 +12,6 @@ import org.apache.avro.util.Utf8
 
 import scala.util.Try
 import scala.collection.JavaConverters._
-import org.neo4j.graphdb.RelationshipType
 import shapeless.Lazy
 
 package object cdm17 {
@@ -24,11 +23,8 @@ package object cdm17 {
 
     object EdgeTypes extends Enumeration {
       type EdgeTypes = Value
-      val localPrincipal, subject, predicateObject, predicateObject2, parameterTagId, flowObject, prevTagId, parentSubject, dependentUnit, unit, tag, tagId = Value
-
-      implicit def conv(rt: EdgeTypes) = new RelationshipType() {
-        def name = rt.toString
-      }
+      val localPrincipal,
+      subject, predicateObject, predicateObject2, parameterTagId, flowObject, prevTagId, parentSubject, dependentUnit, unit, tag, tagId = Value
     }
 
     def readData(filePath: String, limit: Option[Int] = None): Try[(InstrumentationSource, Iterator[Lazy[Try[CDM17]]])] = {
@@ -113,7 +109,7 @@ package object cdm17 {
     def privilegeLevel(x: => bbnCdm17.PrivilegeLevel): Option[PrivilegeLevel] = Try(makePrivilegeLevel(x)).toOption
     def fixedShort(x: => bbnCdm17.SHORT): Option[FixedShort] = Try(x).map(x => new FixedShort(x.bytes)).toOption
     def byteArr(x: java.nio.ByteBuffer): Option[Array[Byte]] = Try(Option(x)).toOption.flatten.map(_.array)
-    def listValue(x: java.util.List[bbnCdm17.Value]): Option[Seq[Value]] = Try(Option(x)).toOption.flatten.map(
+    def listValue(x: java.util.List[bbnCdm17.Value]): Option[List[Value]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(x => Value.from(new RawCDM17Type(x)).get))
     def listProvTagNode(x: java.util.List[bbnCdm17.ProvenanceTagNode]): Option[Seq[ProvenanceTagNode]] = Try(Option(x)).toOption.flatten.map(
       _.asScala.toList.map(x => ProvenanceTagNode.from(new RawCDM17Type(x)).get))

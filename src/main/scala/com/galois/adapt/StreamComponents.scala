@@ -41,7 +41,7 @@ object FlowComponents {
         val nowNanos = System.nanoTime()
         val durationSeconds = (nowNanos - lastTimestampNanos) / 1e9
 
-        println(s"$counterName ingested: $counter   Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${(every / durationSeconds).toInt} items/second.  Rate since beginning: ${((counter - startingCount) / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.")
+        println(s"$counterName ingested: $counter   Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${(every / durationSeconds).toInt} items/second. At time: ${System.currentTimeMillis}") //  Rate since beginning: ${((counter - startingCount) / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.")
 
         statusActor ! PopulationLog(
           counterName,

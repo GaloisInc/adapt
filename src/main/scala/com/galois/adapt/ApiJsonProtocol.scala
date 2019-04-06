@@ -157,6 +157,55 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   val vertexTypeTuple = "type" -> JsString("vertex")
   val edgeTypeTuple   = "type" -> JsString("edge")
 
+  def anyToJson(any: Any): JsValue = {
+    import scala.collection.JavaConversions._
+
+    any match {
+      // Null value
+      case x if Option(x).isEmpty => JsNull
+      
+      // Option
+      case None => JsNull
+      case Some(x) => anyToJson(x)
+
+      // Numbers
+      case n: Byte => JsNumber(n)
+      case n: Int => JsNumber(n)
+      case n: Long => JsNumber(n)
+      case n: Double => JsNumber(n)
+      case n: java.lang.Long => JsNumber(n)
+      case n: java.lang.Double => JsNumber(n)
+
+      // Strings
+      case s: String => JsString(s)
+
+      // Booleans
+      case b: Boolean => JsBoolean(b)
+      case b: java.lang.Boolean => JsBoolean(b)
+
+      // Lists
+      case l: java.util.List[_] => anyToJson(l.toList)
+      case l: List[_] => JsArray(l map anyToJson)
+      case a: Array[_] => anyToJson(a.toList)
+
+      // Maps
+      case m: java.util.Map[_,_] => anyToJson(m.toMap)
+      case m: Map[_,_] => JsObject(m map { case (k,v) => (k.toString, anyToJson(v)) })
+
+      // ADM UUID
+      case a: AdmUUID => JsString(a.rendered)
+
+      // Special cases (commented out because they are pretty verbose) and functionality is
+      // anyways accessible via the "vertex" and "edges" endpoints
+      //   case v: Vertex => ApiJsonProtocol.vertexToJson(v)
+      //   case e: Edge => ApiJsonProtocol.edgeToJson(e)
+
+      // Other: Any custom 'toString'
+      case o => JsString(o.toString)
+
+    }
+  }
+
   def vertexToJson(v: Vertex): JsValue = {
     val jsProps = v.keys().asScala.toList.map { k =>
       v.value[Any](k) match {
@@ -181,6 +230,21 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
     )
   }
 
+  def quineVertexToJson(result: Any): JsValue = {
+    val selected = result.asInstanceOf[Map[String,Any]]
+    val propertiesVal = selected("valueMap")
+      .asInstanceOf[Map[String, Any]]
+
+
+    JsObject(
+      vertexTypeTuple,
+      "id" -> anyToJson(selected("id")),
+      "label" -> JsString(propertiesVal.get("type_of").fold("UNKNOWN")(_.asInstanceOf[String])),
+      "properties" -> JsObject(
+        propertiesVal.filterKeys(_ != "type_of").mapValues(v => JsArray(JsObject("value" -> anyToJson(v))))
+      )
+    )
+  }
 
   def edgeToJson(e: Edge): JsValue = JsObject(
     "id" -> JsString(e.id().toString),
@@ -191,6 +255,19 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
     "inV" -> JsNumber(e.inVertex().id().asInstanceOf[Long]),
     "outV" -> JsNumber(e.outVertex().id().asInstanceOf[Long])
   )
+
+  def quineEdgeToJson(e: com.rrwright.quine.gremlin.Edge): JsValue = {
+    val fromId: AdmUUID = AdmUuidProvider.customIdFromBytes(e.fromId.array).get
+    val toId: AdmUUID = AdmUuidProvider.customIdFromBytes(e.toId.array).get
+
+    JsObject(
+      edgeTypeTuple,
+      "id" -> JsString(fromId + "-[" + e.label.name + "]->" + toId),
+      "label" -> JsString(e.label.name),
+      "inV" -> anyToJson(fromId),
+      "outV" -> anyToJson(toId)
+    )
+  }
 
   implicit val alarmMetadataFormat = jsonFormat2(AlarmEventMetaData)
   implicit val processDetailsFormat = jsonFormat3(ProcessDetails)

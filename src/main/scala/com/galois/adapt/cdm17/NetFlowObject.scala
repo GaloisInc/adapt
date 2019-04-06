@@ -1,9 +1,11 @@
 package com.galois.adapt.cdm17
 
 import java.util.UUID
+
 import com.bbn.tc.schema.avro.cdm17
-import com.galois.adapt.{DBWritable, DBNodeable}
-import org.apache.tinkerpop.gremlin.structure.T.label
+import com.galois.adapt.{DBNodeable, DBWritable}
+import com.rrwright.quine.language._
+
 import scala.util.Try
 
 
@@ -16,7 +18,10 @@ case class NetFlowObject(
   remotePort: Int,
   ipProtocol: Option[Int] = None,
   fileDescriptor: Option[Int] = None
-) extends CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode
+  with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+
+  val companion = NetFlowObject
 
   def asDBKeyValues =
     baseObject.asDBKeyValues ++
@@ -48,6 +53,8 @@ case class NetFlowObject(
 }
 
 case object NetFlowObject extends CDM17Constructor[NetFlowObject] {
+  type ClassType = NetFlowObject
+
   type RawCDMType = cdm17.NetFlowObject
 
   def from(cdm: RawCDM17Type): Try[NetFlowObject] = Try(

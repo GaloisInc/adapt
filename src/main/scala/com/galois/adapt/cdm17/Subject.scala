@@ -3,16 +3,15 @@ package com.galois.adapt.cdm17
 import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm17
-import com.galois.adapt.{DBWritable, DBNodeable}
-import org.apache.tinkerpop.gremlin.structure.T.label
-
+import com.galois.adapt.{DBNodeable, DBWritable}
+import com.rrwright.quine.language._
 import scala.util.Try
 
 
 case class Subject(
   uuid: UUID,
   subjectType: SubjectType,
-  cid: Int,
+  pid: Int,
   localPrincipal: UUID,
   startTimestampNanos: Long,
   parentSubject: Option[UUID] = None,
@@ -21,15 +20,18 @@ case class Subject(
   count: Option[Int] = None,
   cmdLine: Option[String] = None,
   privilegeLevel: Option[PrivilegeLevel] = None,
-  importedLibraries: Option[Seq[String]] = None,
-  exportedLibraries: Option[Seq[String]] = None,
+  importedLibraries: Option[List[String]] = None,
+  exportedLibraries: Option[List[String]] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode
+  with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+
+  val companion = Subject
 
   def asDBKeyValues = List(
     ("uuid", uuid),
     ("subjectType", subjectType.toString),
-    ("cid", cid),
+    ("cid", pid),
     ("localPrincipalUuid", localPrincipal),
     ("startTimestampNanos", startTimestampNanos)
   ) ++
@@ -51,7 +53,7 @@ case class Subject(
   def toMap: Map[String, Any] = Map(
     "uuid" -> uuid,
     "subjectType" -> subjectType.toString,
-    "cid" -> cid,
+    "cid" -> pid,
     "localPrincipalUuid" -> localPrincipal,
     "startTimestampNanos" -> startTimestampNanos,
     "parentSubjectUuid" -> parentSubject.getOrElse(""),
@@ -68,6 +70,8 @@ case class Subject(
 
 
 case object Subject extends CDM17Constructor[Subject] {
+  type ClassType = Subject
+
   type RawCDMType = cdm17.Subject
 
   def from(cdm: RawCDM17Type): Try[Subject] = Try {

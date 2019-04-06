@@ -2,7 +2,8 @@ package com.galois.adapt.cdm17
 
 import java.util.UUID
 import com.bbn.tc.schema.avro.cdm17
-import com.galois.adapt.{DBWritable, DBNodeable}
+import com.galois.adapt.{DBNodeable, DBWritable}
+import com.rrwright.quine.language._
 import scala.util.Try
 
 
@@ -14,11 +15,14 @@ case class ProvenanceTagNode(
   programPoint: Option[String] = None,
   prevTagId: Option[UUID] = None,
   opcode: Option[TagOpCode] = None,
-  tagIds: Option[Seq[UUID]] = None,
+  tagIds: Option[List[UUID]] = None,
   itag: Option[IntegrityTag] = None,
   ctag: Option[ConfidentialityTag] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode
+  with CDM17 with DBWritable with DBNodeable[CDM17.EdgeTypes.EdgeTypes] {
+
+  val companion = ProvenanceTagNode
 
   def asDBKeyValues = List(
     ("uuid", tagIdUuid),
@@ -39,7 +43,7 @@ case class ProvenanceTagNode(
     prevTagId.fold[List[(CDM17.EdgeTypes.EdgeTypes,UUID)]](Nil)(p => List((CDM17.EdgeTypes.prevTagId, p))) ++
     tagIds.fold[List[(CDM17.EdgeTypes.EdgeTypes,UUID)]](Nil)(ts => ts.toList.map(t => (CDM17.EdgeTypes.tagId, t)))
 
-  def getUuid = tagIdUuid
+  def getUuid = UUID.randomUUID()
 
   def toMap: Map[String, Any] = Map(
     "uuid" -> tagIdUuid,
@@ -57,6 +61,9 @@ case class ProvenanceTagNode(
 }
 
 case object ProvenanceTagNode extends CDM17Constructor[ProvenanceTagNode] {
+
+  type ClassType = ProvenanceTagNode
+
   type RawCDMType = cdm17.ProvenanceTagNode
 
   def from(cdm: RawCDM17Type): Try[ProvenanceTagNode] = Try(
@@ -68,7 +75,7 @@ case object ProvenanceTagNode extends CDM17Constructor[ProvenanceTagNode] {
       AvroOpt.str(cdm.getProgramPoint),
       AvroOpt.uuid(cdm.getPrevTagId),
       AvroOpt.tagOpCode(cdm.getOpcode),
-      AvroOpt.listUuid(cdm.getTagIds),
+      AvroOpt.listUuid(cdm.getTagIds).map(_.toList),
       AvroOpt.integrityTag(cdm.getItag),
       AvroOpt.confidentialityTag(cdm.getCtag),
       AvroOpt.map(cdm.getProperties)
