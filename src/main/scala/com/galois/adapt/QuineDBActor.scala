@@ -6,7 +6,7 @@ import akka.util.Timeout
 import com.galois.adapt.adm._
 import com.rrwright.quine.runtime.{GraphService, NameSpacedUuidProvider, QuineIdProvider, StandingFetchActor, StandingQueryId}
 import java.util.UUID
-import com.galois.adapt.cdm19._
+import com.galois.adapt.cdm20._
 import spray.json.{JsArray, JsNumber, JsObject, JsString, JsValue, RootJsonFormat}
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
