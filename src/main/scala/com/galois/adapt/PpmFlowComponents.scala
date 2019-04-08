@@ -20,10 +20,14 @@ object PpmFlowComponents {
   import ApiJsonProtocol._
   import spray.json._
 
+  type Event = AdmEvent
+  type Subject = (AdmSubject, Option[AdmPathNode])
+  type Object = (ADM, Option[AdmPathNode])
+
   type SubjectPathNodeKey = AdmUUID
   type ObjectPathNodeKey = AdmUUID
-  type DelayedESO = (NoveltyDetection.Event, ADM, SubjectPathNodeKey, ADM, ObjectPathNodeKey)
-  type CompletedESO = (NoveltyDetection.Event, ADM, Set[AdmPathNode], ADM, Set[AdmPathNode])
+  type DelayedESO = (Event, ADM, SubjectPathNodeKey, ADM, ObjectPathNodeKey)
+  type CompletedESO = (Event, ADM, Set[AdmPathNode], ADM, Set[AdmPathNode])
   type AdmUUIDReferencingPathNode = AdmUUID
 
   def ppmSink(implicit system: ActorSystem, ec: ExecutionContext): Sink[Either[ADM, EdgeAdm2Adm], NotUsed] =

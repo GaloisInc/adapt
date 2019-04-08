@@ -36,9 +36,20 @@ import scala.annotation.tailrec
 case class AnAlarm(key:List[String], details:(Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
 
 object NoveltyDetection {
-  type Event = AdmEvent
-  type Subject = (AdmSubject, Option[AdmPathNode])
-  type Object = (ADM, Option[AdmPathNode])
+  case class PpmEvent(eventType: EventType,earliestTimestampNanos: Long, latestTimestampNanos: Long, uuid: NamespacedUuid)
+  case class PpmSubject(cid: Int, subjectTypes: Set[SubjectType], uuid: NamespacedUuid)
+
+  trait PpmObject {
+    val uuid: NamespacedUuid
+  }
+
+  case class PpmFileObject(fileObjectType: FileObjectType, uuid: NamespacedUuid) extends PpmObject
+  case class PpmSrcSinkObject(srcSinkType: SrcSinkType, uuid: NamespacedUuid) extends PpmObject
+  case class PpmNetFlowObject(remotePort: Option[Int], localPort: Option[Int], remoteAddress: Option[String], localAddress: Option[String], uuid: NamespacedUuid) extends PpmObject
+
+  type Event = PpmEvent// AdmEvent
+  type Subject = (PpmSubject, Option[AdmPathNode])
+  type Object = (PpmObject, Option[AdmPathNode])
 
   type DataShape = (Event, Subject, Object)
 
@@ -132,6 +143,7 @@ case class PpmDefinition[DataShape](
 
   def insertIntoLocalProbAccumulator(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Set[Long])]): Unit = alarmOpt.foreach {
     case (alarm, _, _) =>
+      println(alarm)
       alarm.lastOption.foreach { alarmNode =>
         val lp = alarmNode.localProb
         if (shouldApplyThreshold) {
@@ -247,7 +259,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
   lazy val esoTrees = List(
     PpmDefinition[DataShape]( "ProcessFileTouches",
-      d => readAndWriteTypes.contains(d._1.eventType),
+      d => readAndWriteTypes.contains(d._1.eventType) && d._3._1.isInstanceOf[PpmFileObject],
       List(
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
@@ -262,7 +274,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
     )(thisActor.context, context.self, hostName, graphService),
 
     PpmDefinition[DataShape]( "FilesTouchedByProcesses",
-      d => readAndWriteTypes.contains(d._1.eventType),
+      d => readAndWriteTypes.contains(d._1.eventType) && d._3._1.isInstanceOf[PpmFileObject],
       List(
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>")),
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>"))
@@ -277,7 +289,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
     )(thisActor.context, context.self, hostName, graphService),
 
     PpmDefinition[DataShape]( "FilesExecutedByProcesses",
-      d => d._1.eventType == EVENT_EXECUTE,
+      d => d._1.eventType == EVENT_EXECUTE && d._3._1.isInstanceOf[PpmFileObject],
       List(
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
@@ -292,17 +304,17 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
     )(thisActor.context, context.self, hostName, graphService),
 
     PpmDefinition[DataShape]( "ProcessesWithNetworkActivity",
-      d => d._3._1.isInstanceOf[AdmNetFlowObject],
+      d => d._3._1.isInstanceOf[PpmNetFlowObject],
       List(
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
         d => {
-          val nf = d._3._1.asInstanceOf[AdmNetFlowObject]
-          List(nf.remoteAddress.getOrElse("NULL_value_from_CDM"), nf.remotePort.toString)
+          val nf = d._3._1.asInstanceOf[PpmNetFlowObject]
+          List(nf.remoteAddress.getOrElse("NULL_value_from_CDM"), nf.remotePort.getOrElse("NULL_value_from_CDM").toString)
         }
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
         NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid)),
-        NamespacedUuidDetails(d._3._1.uuid, Some(d._3._1.asInstanceOf[AdmNetFlowObject].remoteAddress.getOrElse("no_address_from_CDM")))) ++
+        NamespacedUuidDetails(d._3._1.uuid, Some(d._3._1.asInstanceOf[PpmNetFlowObject].remoteAddress.getOrElse("no_address_from_CDM")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       d => Set(d._1.latestTimestampNanos),
@@ -310,7 +322,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
     )(thisActor.context, context.self, hostName, graphService),
 
     PpmDefinition[DataShape]( "ProcessDirectoryReadWriteTouches",
-      d => d._3._1.isInstanceOf[AdmFileObject] && d._3._2.isDefined && readAndWriteTypes.contains(d._1.eventType),
+      d => d._3._1.isInstanceOf[PpmFileObject] && d._3._2.isDefined && readAndWriteTypes.contains(d._1.eventType),
       List(
         d => List(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),  // Process name or UUID
         d => d._3._2.map { _.path.split(pathDelimiterRegexPattern, -1).toList match {
@@ -366,7 +378,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
       d => Set(NamespacedUuidDetails(d._1.uuid),
         NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.get.path), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.get.path), d._3._1 match {
-                  case o: AdmSubject => Some(o.cid)
+                  case o: PpmSubject => Some(o.cid)
                   case _ => None
                 })) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
@@ -382,13 +394,13 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
           d._2._1.cid.toString,      // 2.) PID, to disambiguate process instances. (collisions are assumed to be ignorably unlikely)
           d._1.eventType.toString    // 3.) Event type
         ), _._3 match {              // 4.) identifier(s) for the object, based on its type
-          case (adm: AdmFileObject, pathOpt) => pathOpt.map(_.path.split(pathDelimiterRegexPattern, -1).toList match {
+          case (adm: PpmFileObject, pathOpt) => pathOpt.map(_.path.split(pathDelimiterRegexPattern, -1).toList match {
             case "" :: remainder => pathDelimiterChar :: remainder
             case x => x
           }).getOrElse(List(s"${adm.fileObjectType}:${adm.uuid.rendered}"))
-          case (adm: AdmSubject, pathOpt) => List(pathOpt.map(_.path).getOrElse(s"{${adm.subjectTypes.toList.map(_.toString).sorted.mkString(",")}}:${adm.cid}"))
-          case (adm: AdmSrcSinkObject, _) => List(s"${adm.srcSinkType}:${adm.uuid.rendered}")
-          case (adm: AdmNetFlowObject, _) => List(s"${adm.remoteAddress}:${adm.remotePort}")
+          case (adm: PpmSubject, pathOpt) => List(pathOpt.map(_.path).getOrElse(s"{${adm.subjectTypes.toList.map(_.toString).sorted.mkString(",")}}:${adm.cid}"))
+          case (adm: PpmSrcSinkObject, _) => List(s"${adm.srcSinkType}:${adm.uuid.rendered}")
+          case (adm: PpmNetFlowObject, _) => List(s"${adm.remoteAddress}:${adm.remotePort}")
           case (adm, pathOpt) => List(s"UnhandledType:$adm:$pathOpt")
         }
       ),
@@ -678,7 +690,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
   var didReceiveComplete = false
 
   def alarmFromProbabilityData(probabilityData: List[(ExtractedValue,Int,Int)]): Alarm = {
-    val (_,parentCount,siblingCount) = probabilityData.takeWhile(_._3 > 1).last // First novel node
+    val (_,parentCount,siblingCount) = probabilityData.takeWhile(_._3 > 1).lastOption.getOrElse("",1,1) // First novel node with default for first observation
     val alarmLocalProbability = (siblingCount + 1).toFloat / (parentCount + siblingCount + 1) // Alarm local prob is a function of the first novel node
     val treeObservationCount = probabilityData.head._2
     val lastAlarmListIndex = probabilityData.size - 2
@@ -706,34 +718,53 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         tree.insertIntoLocalProbAccumulator(alarmOpt)
       }
 
-    case msg @ (e: Event, s: AdmSubject, subPathNodes: Set[_], o: ADM, objPathNodes: Set[_]) =>
-
-      def flatten(e: Event, s: AdmSubject, subPathNodes: Set[AdmPathNode], o: ADM, objPathNodes: Set[AdmPathNode]): Set[(Event, Subject, Object)] = {
-        val subjects: Set[(AdmSubject, Option[AdmPathNode])] = if (subPathNodes.isEmpty) Set(s -> None) else subPathNodes.map(p => s -> Some(p))
-        val objects: Set[(ADM, Option[AdmPathNode])] = if (objPathNodes.isEmpty) Set(o -> None) else objPathNodes.map(p => o -> Some(p))
-        subjects.flatMap(sub => objects.map(obj => (e, sub, obj)))
+    case msg @ ESOInstance(eventType,earliestTimestampNanos,latestTimestampNanos,subject,predicateObject) =>
+      val objUuid = graphService.idProvider.customIdFromQid(predicateObject.qid.get).get
+      val e: Event = PpmEvent(eventType,earliestTimestampNanos,latestTimestampNanos, graphService.idProvider.customIdFromQid(msg.qid.get).get)
+      val s: Subject = (PpmSubject(subject.cid,subject.subjectTypes, graphService.idProvider.customIdFromQid(subject.qid.get).get),Some(subject.cmdLine))
+      val o: Object = predicateObject match {
+        case obj: ESOFileObject => (PpmFileObject(obj.fileObjectType,objUuid), None)
+        case obj: ESONetFlowObject => (PpmNetFlowObject(obj.remotePort, obj.localPort,obj.remoteAddress,obj.localAddress, objUuid),None)
+        case obj: ESOSrcSinkObject => (PpmSrcSinkObject(obj.srcSinkType,objUuid), None)
       }
 
-      val f = Try(
-        flatten(e, s, subPathNodes.asInstanceOf[Set[AdmPathNode]], o, objPathNodes.asInstanceOf[Set[AdmPathNode]])
-      ) match {
-        case Success(flatEvents) =>
-          Future {
-            admPpmTrees.foreach(ppm =>
-              flatEvents.foreach(e =>
-                ppm.observe(e)
-              )
-            )
-          }
-        case Failure(err) =>
-          log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
-          Future.successful(())
+
+      val f = Future {
+        admPpmTrees.foreach(ppm => ppm.observe((e, s, o)))
       }
 
       Try(
         Await.result(f, 15 seconds)
       ).failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
 
+//    case msg @ (e: Event, s: AdmSubject, subPathNodes: Set[_], o: ADM, objPathNodes: Set[_]) =>
+//
+//      def flatten(e: Event, s: AdmSubject, subPathNodes: Set[AdmPathNode], o: ADM, objPathNodes: Set[AdmPathNode]): Set[(Event, Subject, Object)] = {
+//        val subjects: Set[(AdmSubject, Option[AdmPathNode])] = if (subPathNodes.isEmpty) Set(s -> None) else subPathNodes.map(p => s -> Some(p))
+//        val objects: Set[(ADM, Option[AdmPathNode])] = if (objPathNodes.isEmpty) Set(o -> None) else objPathNodes.map(p => o -> Some(p))
+//        subjects.flatMap(sub => objects.map(obj => (e, sub, obj)))
+//      }
+//
+//      val f = Try(
+//        flatten(e, s, subPathNodes.asInstanceOf[Set[AdmPathNode]], o, objPathNodes.asInstanceOf[Set[AdmPathNode]])
+//      ) match {
+//        case Success(flatEvents) =>
+//          Future {
+//            admPpmTrees.foreach(ppm =>
+//              flatEvents.foreach(e =>
+//                ppm.observe(e)
+//              )
+//            )
+//          }
+//        case Failure(err) =>
+//          log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
+//          Future.successful(())
+//      }
+//
+//      Try(
+//        Await.result(f, 15 seconds)
+//      ).failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
+//
 
     case PpmTreeAlarmQuery(treeName, queryPath, namespace, startAtTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
       val resultOpt = ppm(treeName).map( tree =>

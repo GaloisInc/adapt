@@ -53,11 +53,17 @@ object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
 }
 
 
-case class ESOSubject(subjectTypes: Set[SubjectType], cmdLine: AdmPathNode) extends NoConstantsDomainNode
+case class ESOSubject(cid: Int, subjectTypes: Set[SubjectType], cmdLine: AdmPathNode) extends NoConstantsDomainNode
 
 case class ESOFileObject(fileObjectType: FileObjectType, path: AdmPathNode) extends NoConstantsDomainNode
+case class ESOSrcSinkObject(srcSinkType: SrcSinkType) extends NoConstantsDomainNode
+case class ESONetFlowObject(remoteAddress: Option[String], localAddress: Option[String], remotePort: Option[Int], localPort: Option[Int]) extends NoConstantsDomainNode
 
-case class ESOInstance(eventType: EventType, subject: ESOSubject, predicateObject: ESOFileObject) extends NoConstantsDomainNode
+// trait ESOObject extends NoConstantsDomainNode
+
+// case class ESOInstance(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, subject: ESOSubject, predicateObject: ESOFileObject) extends NoConstantsDomainNode
+// case class ESOInstance(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, subject: ESOSubject, predicateObject: ESOSrcSinkObject) extends NoConstantsDomainNode
+case class ESOInstance(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, subject: ESOSubject, predicateObject: ESONetFlowObject) extends NoConstantsDomainNode
 
 
 class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQueryProxyActor {
