@@ -1,5 +1,6 @@
 package com.galois.adapt
 
+import shapeless.cachedImplicit
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import akka.util.Timeout
@@ -12,7 +13,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import com.rrwright.quine.gremlin.{GremlinQueryRunner, TypeAnnotationFieldReader}
-import com.rrwright.quine.language.{DomainNode, DomainNodeSetSingleton, NoConstantsDomainNode, PickleReader, QuineId}
+import com.rrwright.quine.language.{DomainNode, DomainNodeSetSingleton, NoConstantsDomainNode, PickleReader, QuineId, Queryable}
 import com.rrwright.quine.language.EdgeDirections._
 import com.rrwright.quine.runtime.{NameSpacedUuidProvider, QuineIdProvider}
 import com.rrwright.quine.language.BoopickleScheme._
@@ -120,6 +121,18 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
     Duration.Inf
   ))
 
+  implicit val queryableEsoInstance: Queryable[ESOInstance] = cachedImplicit
+  implicit val admSubjectInstance: Queryable[AdmSubject] = cachedImplicit
+  implicit val admPrincipalInstance: Queryable[AdmPrincipal] = cachedImplicit
+  implicit val admFileObjectInstance: Queryable[AdmFileObject] = cachedImplicit
+  implicit val admNetFlowObjectInstance: Queryable[AdmNetFlowObject] = cachedImplicit
+  implicit val admPathNodeInstance: Queryable[AdmPathNode] = cachedImplicit
+  implicit val admPortInstance: Queryable[AdmPort] = cachedImplicit
+  implicit val admAddressInstance: Queryable[AdmAddress] = cachedImplicit
+  implicit val admSrcSinkObjectInstance: Queryable[AdmSrcSinkObject] = cachedImplicit
+  implicit val admProvenanceTagNodeInstance: Queryable[AdmProvenanceTagNode] = cachedImplicit
+  implicit val admHostInstance: Queryable[AdmHost] = cachedImplicit
+  implicit val admSynthesizedInstance: Queryable[AdmSynthesized] = cachedImplicit
 
   def writeAdm(a: ADM): Future[Unit] = (a match {
     case anAdm: AdmEvent              =>
