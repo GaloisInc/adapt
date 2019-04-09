@@ -123,7 +123,7 @@ object Application extends App {
 
       val graphService = GraphService.clustered(
         config = ConfigFactory.parseString(clusterConfigSrc),
-        persistor = as => LMDBSnapshotPersistor()(as), // EmptyPersistor()(as),
+        persistor = as => LMDBSnapshotPersistor()(as), // MapDBMultimap()(as), // EmptyPersistor()(as),
         idProvider = AdmUuidProvider,
         indexer = Indexer.currentIndex(EmptyIndex),
         inMemorySoftNodeLimit = Some(100000),
