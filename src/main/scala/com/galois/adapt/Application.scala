@@ -444,7 +444,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
           classOf[StandingFetchActor[ESOInstance]],
           implicitly[Queryable[ESOInstance]],
           (l: List[ESOInstance]) => if (l.nonEmpty) {
-            println(s"RESULT: ${l.head}")
+            // println(s"RESULT: ${l.head}")
           }
         ), sqid.name
       )
@@ -459,7 +459,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       statusActor ! InitMsg
 
       // Write out debug states
-//      val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
+      val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
 
       val clusterStartupDeadline: Deadline = 60.seconds.fromNow
       while ( ! graph.clusterIsReady) {
@@ -475,8 +475,9 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         for (((host, source), i) <- hostSources.zipWithIndex) {
           source
             .via(printCounter(host.hostName, statusActor, 0))
-//            .via(debug.debugBuffer(s"[${host.hostName}] 0 before ER"))
+            .via(debug.debugBuffer(s"[${host.hostName}] 0 before ER"))
             .via(erMap(host.hostName))
+            .via(debug.debugBuffer(s"[${host.hostName}] 1 after ER / before DB"))
             .mapAsyncUnordered(parallelism)(cdm => quineRouter ? cdm)
             .recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace()}
             .runWith(Sink.ignore)
