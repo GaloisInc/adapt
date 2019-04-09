@@ -137,7 +137,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   def writeAdm(a: ADM): Future[Unit] = (a match {
     case anAdm: AdmEvent              =>
       val f = anAdm.create(Some(anAdm.uuid))
-      graphService.standingFetch[ESOInstance](anAdm.uuid, Some(StandingQueryId("standing-find_ESO-accumulator")))(println(_))
+      graphService.standingFetch[ESOInstance](anAdm.uuid, Some(StandingQueryId("standing-find_ESO-accumulator")))( x => { }) // (println(_))
       f
     case anAdm: AdmSubject            => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
     case anAdm: AdmPrincipal          => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
