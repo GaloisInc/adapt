@@ -36,7 +36,7 @@ object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
   def customIdToBytes(typed: AdmUUID) = underlying.customIdToBytes(typed)
   def customIdFromBytes(bytes: Array[Byte]) = underlying.customIdFromBytes(bytes).map(x => x)
   def customIdFromString(str: String) = Try(AdmUUID.fromRendered(str))
-  def ppmTreeRootNodeId(host: String,treeName: String) = new QuineId(underlying.customIdToBytes(host,UUID.nameUUIDFromBytes("FileExecuteDelete".getBytes)))
+  def ppmTreeRootNodeId(host: String,treeName: String) = new QuineId(underlying.customIdToBytes(host,UUID.nameUUIDFromBytes(treeName.getBytes)))
 
   override def qidDistribution(qid: QuineId): (HostIdx, LocalShardIdx) = {
     customIdFromQid(qid) match {
