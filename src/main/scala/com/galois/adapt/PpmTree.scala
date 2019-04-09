@@ -273,7 +273,6 @@ case class PpmDefinition[DataShape](
 
   def prettyString: Future[String] = {
     implicit val timeout = Timeout(593 seconds)
-    println("QID BASED ON:",treeRootQid, hostName, name)
     graphService.getTreeRepr(treeRootQid,name,List()).map(_.repr.toString())
   }
 }
@@ -813,11 +812,13 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
       val f = Future { admPpmTrees.foreach(ppm => ppm.observe((e, s, o))) }
 
-//      val r: Future[String] = esoTrees(0).prettyString
-//      r onComplete {
-//        case Success(repr) => println(repr)
-//        case Failure(t) => println("Why has an error has occurred? " + t.getMessage)
-//      }
+      val r = esoTrees.filter(_.name != "SummarizedProcessActivity").map(_.prettyString)
+      r.foreach(tr => tr onComplete {
+        case Success(repr) => println(repr)
+        case Failure(t) => println("Why has an error has occurred? " + t.getMessage)
+      }
+      )
+
 
       Try(
         Await.result(f, 15 seconds)
