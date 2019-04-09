@@ -123,7 +123,7 @@ object Application extends App {
 
       val graphService = GraphService.clustered(
         config = ConfigFactory.parseString(clusterConfigSrc),
-        persistor = as => LMDBSnapshotPersistor()(as), // EmptyPersistor()(as),
+        persistor = as => MapDBMultimap()(as), // LMDBSnapshotPersistor()(as), // EmptyPersistor()(as),
         idProvider = AdmUuidProvider,
         indexer = Indexer.currentIndex(EmptyIndex),
         inMemorySoftNodeLimit = Some(100000),
@@ -438,19 +438,47 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 
       val parallelism = quineConfig.quineactorparallelism
 
-      val sqid = StandingQueryId("standing-find_ESO-accumulator")
-      val standingFetchActor = system.actorOf(
-        Props(
-          classOf[StandingFetchActor[ESOInstance]],
-          implicitly[Queryable[ESOInstance]],
-          (l: List[ESOInstance]) => if (l.nonEmpty) {
-            ppmManagerActors(hostNames.head) ! l.head
-            println(s"RESULT: ${l.head}")
-          }
-        ), sqid.name
-      )
-      graph.currentGraph.standingQueryActors = graph.currentGraph.standingQueryActors + (sqid -> standingFetchActor)
-      println(branchOf[ESOInstance]())
+      val sqidFile = StandingQueryId("standing-find_ESOFile-accumulator")
+      val standingFetchFileActor = system.actorOf(
+      Props(
+        classOf[StandingFetchActor[ESOFileInstance]],
+        implicitly[Queryable[ESOFileInstance]],
+        (l: List[ESOFileInstance]) => if (l.nonEmpty) {
+          ppmManagerActors(hostNames.head) ! l.head
+          println(s"RESULT: ${l.head}")
+        }
+      ), sqidFile.name
+    )
+
+      val sqidSrcSnk = StandingQueryId("standing-find_ESOSrcSnk-accumulator")
+      val standingFetchSrcSnkActor = system.actorOf(
+      Props(
+        classOf[StandingFetchActor[ESOSrcSnkInstance]],
+        implicitly[Queryable[ESOSrcSnkInstance]],
+        (l: List[ESOSrcSnkInstance]) => if (l.nonEmpty) {
+          ppmManagerActors(hostNames.head) ! l.head
+          println(s"RESULT: ${l.head}")
+        }
+      ), sqidSrcSnk.name
+    )
+
+      val sqidNetwork = StandingQueryId("standing-find_ESONetwork-accumulator")
+      val standingFetchNetworkActor = system.actorOf(
+      Props(
+        classOf[StandingFetchActor[ESONetworkInstance]],
+        implicitly[Queryable[ESONetworkInstance]],
+        (l: List[ESONetworkInstance]) => if (l.nonEmpty) {
+          ppmManagerActors(hostNames.head) ! l.head
+          println(s"RESULT: ${l.head}")
+        }
+      ), sqidNetwork.name
+    )
+
+      graph.currentGraph.standingQueryActors = graph.currentGraph.standingQueryActors +
+        (sqidFile -> standingFetchFileActor) +
+        (sqidSrcSnk -> standingFetchSrcSnkActor)+
+        (sqidNetwork -> standingFetchNetworkActor)
+      println(branchOf[ESOFileInstance]())
 
 
       val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))

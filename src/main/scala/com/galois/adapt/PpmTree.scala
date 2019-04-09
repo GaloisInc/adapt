@@ -19,7 +19,7 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.collection.JavaConverters._
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
-import scala.collection.{SortedMap, mutable}
+import scala.collection.{GenSeq, SortedMap, mutable}
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 import AdaptConfig._
@@ -100,6 +100,9 @@ case class PpmDefinition[DataShape](
 ) extends LazyLogging {
 
   val basePath: String = ppmConfig.basedir + name + "-" + hostName
+
+  val inputFilePath  = basePath + ppmConfig.loadfilesuffix + ".csv"
+  val outputFilePath = basePath + ppmConfig.savefilesuffix + ".csv"
 
   val inputAlarmFilePath  = basePath + ppmConfig.loadfilesuffix + "_alarm.json"
   val outputAlarmFilePath = basePath + ppmConfig.savefilesuffix + "_alarm.json"
@@ -224,15 +227,54 @@ case class PpmDefinition[DataShape](
     }
   }
 
-  val saveEveryAndNoMoreThan = 0L //ppmConfig.saveintervalseconds.getOrElse(0L) * 1000  // convert seconds to milliseconds
+  val saveEveryAndNoMoreThan = 3600L * 1000L //ppmConfig.saveintervalseconds.getOrElse(0L) * 1000  // convert seconds to milliseconds
   val lastSaveCompleteMillis = new AtomicLong(0L)
   val isCurrentlySaving = new AtomicBoolean(false)
 
   def getRepr(implicit timeout: Timeout): Future[TreeRepr] = graphService.getTreeRepr(treeRootQid,name,List()).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{ _.repr }
 
+  def saveStateAsync(): Future[Unit] = {
+    val now = System.currentTimeMillis
+    val expectedSaveCostMillis = 1000  // Allow repeated saving in subsequent attempts if total save time took no longer than this time.
+    if ( ! isCurrentlySaving.get() && lastSaveCompleteMillis.get() + saveEveryAndNoMoreThan - expectedSaveCostMillis <= now ) {
+      isCurrentlySaving.set(true)
+
+      implicit val timeout = Timeout(593 seconds)
+      val treeWriteF = if (ppmConfig.shouldsaveppmtrees) {
+        println("Trying to save ppm tree repr...")
+        graphService.getTreeRepr(treeRootQid,name,List()).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map { reprResult =>
+          if (ppmConfig.shouldsaveppmtrees) reprResult.repr.writeToFile(outputFilePath)
+        }
+      } else Future.successful( () )
+
+      if (ppmConfig.shouldsavealarms) {
+        val content = alarms.toList.toJson.prettyPrint
+        val outputFile = new File(outputAlarmFilePath)
+        if ( ! outputFile.exists) outputFile.createNewFile()
+        Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
+      }
+
+      //if (this.isInstanceOf[PartialPpm[_]] && ppmConfig.shouldsaveppmpartialobservationaccumulators)
+      //  this.asInstanceOf[PartialPpm[_]].saveStateSync(hostName)
+
+      treeWriteF.transform(
+        _ => {
+          lastSaveCompleteMillis.set(System.currentTimeMillis)
+          isCurrentlySaving.set(false)
+        },
+        e => {
+          println(s"Error writing to file for $name tree: ${e.getMessage}")
+          isCurrentlySaving.set(false)
+          e
+        }
+      )
+    } else Future.successful(())
+  }
+
   def prettyString: Future[String] = {
     implicit val timeout = Timeout(593 seconds)
-    graphService.getTreeRepr(treeRootQid,name,List()).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map(_.repr.toString)
+    println("QID BASED ON:",treeRootQid, hostName, name)
+    graphService.getTreeRepr(treeRootQid,name,List()).map(_.repr.toString())
   }
 }
 
@@ -309,7 +351,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
         d => {
           val nf = d._3._1.asInstanceOf[PpmNetFlowObject]
-          List(nf.remoteAddress.getOrElse("NULL_value_from_CDM"), nf.remotePort.getOrElse("NULL_value_from_CDM").toString)
+          List(nf.remoteAddress.getOrElse("no_address_from_CDM"), nf.remotePort.getOrElse("no_port_from_CDM").toString)
         }
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
@@ -684,16 +726,36 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
   val ppmList = admPpmTrees
 
+  def saveTrees(): Future[Unit] = {
+    ppmList.toList.foldLeft(Future.successful(()))((acc, ppmTree) => acc.flatMap(_ => ppmTree.saveStateAsync()))
+  }
+
+    println(s"Setting shutdown hook to save PPM trees for $hostName, shouldsave: ${ppmConfig.shouldsaveppmtrees}")
+  //  override def postStop(): Unit = {
+      context.system.registerOnTermination{
+        println(s"Post stop: $didReceiveComplete && ${ppmConfig.shouldsaveppmtrees}")
+        if ( ! didReceiveComplete && ppmConfig.shouldsaveppmtrees) {
+          didReceiveComplete = true
+          val ppmSaveFutures: Future[GenSeq[Unit]] = Future.sequence(ppmList.map(_.saveStateAsync()).seq)
+          ppmSaveFutures onComplete {
+              case Success(_) => println("The Trees were saved!")
+              case Failure(t) => println("Why has an error has occurred? " + t.getMessage)
+          }
+        }
+    //    super.postStop()
+      }
+
   def ppm(name: String): Option[PpmDefinition[_]] = ppmList.find(_.name == name)
 
   var didReceiveInit = false
   var didReceiveComplete = false
 
+  // TODO: Add comments to explain this function.
   def alarmFromProbabilityData(probabilityData: List[(ExtractedValue,Int,Int)]): Alarm = {
     val (_,parentCount,siblingCount) = probabilityData.takeWhile(_._3 > 1).lastOption.getOrElse("",1,1) // First novel node with default for first observation
     val alarmLocalProbability = (siblingCount + 1).toFloat / (parentCount + siblingCount + 1) // Alarm local prob is a function of the first novel node
-    val treeObservationCount = probabilityData.head._2
-    val lastAlarmListIndex = probabilityData.size - 2
+    val treeObservationCount = probabilityData.headOption.map(_._2).getOrElse(1) //
+    val lastAlarmListIndex = if (probabilityData.size < 2) 0 else  probabilityData.size - 2
 
     probabilityData.iterator.sliding(2).zipWithIndex.map {
       case (extractedPair, depth) =>
@@ -718,20 +780,44 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         tree.insertIntoLocalProbAccumulator(alarmOpt)
       }
 
-    case msg @ ESOInstance(eventType,earliestTimestampNanos,latestTimestampNanos,subject,predicateObject) =>
+    case msg @ ESOFileInstance(eventType,earliestTimestampNanos,latestTimestampNanos,subject,predicateObject) =>
       val objUuid = graphService.idProvider.customIdFromQid(predicateObject.qid.get).get
       val e: Event = PpmEvent(eventType,earliestTimestampNanos,latestTimestampNanos, graphService.idProvider.customIdFromQid(msg.qid.get).get)
       val s: Subject = (PpmSubject(subject.cid,subject.subjectTypes, graphService.idProvider.customIdFromQid(subject.qid.get).get),Some(subject.cmdLine))
-      val o: Object = predicateObject match {
-        case obj: ESOFileObject => (PpmFileObject(obj.fileObjectType,objUuid), None)
-        case obj: ESONetFlowObject => (PpmNetFlowObject(obj.remotePort, obj.localPort,obj.remoteAddress,obj.localAddress, objUuid),None)
-        case obj: ESOSrcSinkObject => (PpmSrcSinkObject(obj.srcSinkType,objUuid), None)
-      }
+      val o: Object = (PpmFileObject(predicateObject.fileObjectType,objUuid), None)
+
+      val f = Future { admPpmTrees.foreach(ppm => ppm.observe((e, s, o))) }
+
+      Try(
+        Await.result(f, 15 seconds)
+      ).failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
+
+    case msg @ ESONetworkInstance(eventType,earliestTimestampNanos,latestTimestampNanos,subject,predicateObject) =>
+      val objUuid = graphService.idProvider.customIdFromQid(predicateObject.qid.get).get
+      val e: Event = PpmEvent(eventType,earliestTimestampNanos,latestTimestampNanos, graphService.idProvider.customIdFromQid(msg.qid.get).get)
+      val s: Subject = (PpmSubject(subject.cid,subject.subjectTypes, graphService.idProvider.customIdFromQid(subject.qid.get).get),Some(subject.cmdLine))
+      val o: Object = (PpmNetFlowObject(predicateObject.remotePort, predicateObject.localPort,predicateObject.remoteAddress,predicateObject.localAddress, objUuid),None)
+
+      val f = Future { admPpmTrees.foreach(ppm => ppm.observe((e, s, o))) }
+
+      Try(
+        Await.result(f, 15 seconds)
+      ).failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
+
+    case msg @ ESOSrcSnkInstance(eventType,earliestTimestampNanos,latestTimestampNanos,subject,predicateObject) =>
+      val objUuid = graphService.idProvider.customIdFromQid(predicateObject.qid.get).get
+      val e: Event = PpmEvent(eventType,earliestTimestampNanos,latestTimestampNanos, graphService.idProvider.customIdFromQid(msg.qid.get).get)
+      val s: Subject = (PpmSubject(subject.cid,subject.subjectTypes, graphService.idProvider.customIdFromQid(subject.qid.get).get),Some(subject.cmdLine))
+      val o: Object = (PpmSrcSinkObject(predicateObject.srcSinkType,objUuid), None)
 
 
-      val f = Future {
-        admPpmTrees.foreach(ppm => ppm.observe((e, s, o)))
-      }
+      val f = Future { admPpmTrees.foreach(ppm => ppm.observe((e, s, o))) }
+
+//      val r: Future[String] = esoTrees(0).prettyString
+//      r onComplete {
+//        case Success(repr) => println(repr)
+//        case Failure(t) => println("Why has an error has occurred? " + t.getMessage)
+//      }
 
       Try(
         Await.result(f, 15 seconds)

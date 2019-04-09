@@ -59,11 +59,9 @@ case class ESOFileObject(fileObjectType: FileObjectType, path: AdmPathNode) exte
 case class ESOSrcSinkObject(srcSinkType: SrcSinkType) extends NoConstantsDomainNode
 case class ESONetFlowObject(remoteAddress: Option[String], localAddress: Option[String], remotePort: Option[Int], localPort: Option[Int]) extends NoConstantsDomainNode
 
-// trait ESOObject extends NoConstantsDomainNode
-
-// case class ESOInstance(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, subject: ESOSubject, predicateObject: ESOFileObject) extends NoConstantsDomainNode
-// case class ESOInstance(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, subject: ESOSubject, predicateObject: ESOSrcSinkObject) extends NoConstantsDomainNode
-case class ESOInstance(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, subject: ESOSubject, predicateObject: ESONetFlowObject) extends NoConstantsDomainNode
+case class ESOFileInstance(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, subject: ESOSubject, predicateObject: ESOFileObject) extends NoConstantsDomainNode
+case class ESOSrcSnkInstance(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, subject: ESOSubject, predicateObject: ESOSrcSinkObject) extends NoConstantsDomainNode
+case class ESONetworkInstance(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, subject: ESOSubject, predicateObject: ESONetFlowObject) extends NoConstantsDomainNode
 
 
 class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQueryProxyActor {
@@ -131,7 +129,9 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   def writeAdm(a: ADM): Future[Unit] = (a match {
     case anAdm: AdmEvent              =>
       val f = anAdm.create(Some(anAdm.uuid))
-      graphService.standingFetch[ESOInstance](anAdm.uuid, Some(StandingQueryId("standing-find_ESO-accumulator")))(println(_))
+      graphService.standingFetch[ESOFileInstance](anAdm.uuid, Some(StandingQueryId("standing-find_ESOFile-accumulator")))(println(_))
+      graphService.standingFetch[ESOSrcSnkInstance](anAdm.uuid, Some(StandingQueryId("standing-find_ESOSrcSnk-accumulator")))(println(_))
+      graphService.standingFetch[ESONetworkInstance](anAdm.uuid, Some(StandingQueryId("standing-find_ESONetwork-accumulator")))(println(_))
       f
     case anAdm: AdmSubject            => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
     case anAdm: AdmPrincipal          => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
