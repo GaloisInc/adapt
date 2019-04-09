@@ -187,7 +187,7 @@ case class PpmDefinition[DataShape](
 
   def observe(observation: DataShape): Unit = if (incomingFilter(observation)) {
     implicit val timeout = Timeout(6.1 seconds)
-    graphService.observe(treeRootQid, name, PpmTree.prepareObservation[DataShape](observation, discriminators), uuidCollector(observation), timestampExtractor(observation), alarmActor)
+    graphService.observe(treeRootQid, name, PpmTree.prepareObservation[DataShape](observation, discriminators), uuidCollector(observation), timestampExtractor(observation), alarmActor, noveltyFilter)
   }
 
   //process name and pid/uuid
@@ -780,10 +780,12 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
       }
 
     case msg @ ESOFileInstance(eventType,earliestTimestampNanos,latestTimestampNanos,subject,predicateObject) =>
-      val objUuid = graphService.idProvider.customIdFromQid(predicateObject.qid.get).get
-      val e: Event = PpmEvent(eventType,earliestTimestampNanos,latestTimestampNanos, graphService.idProvider.customIdFromQid(msg.qid.get).get)
-      val s: Subject = (PpmSubject(subject.cid,subject.subjectTypes, graphService.idProvider.customIdFromQid(subject.qid.get).get),Some(subject.cmdLine))
-      val o: Object = (PpmFileObject(predicateObject.fileObjectType,objUuid), None)
+      val objUuid = predicateObject.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get // TODO: Fix these gets before engagement
+      val subUuid = subject.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
+      val eventUuid = msg.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
+      val e: Event = PpmEvent(eventType,earliestTimestampNanos,latestTimestampNanos, eventUuid)
+      val s: Subject = (PpmSubject(subject.cid,subject.subjectTypes, subUuid),Some(subject.cmdLine))
+      val o: Object = (PpmFileObject(predicateObject.fileObjectType, objUuid), Some(predicateObject.path))
 
       val f = Future { admPpmTrees.foreach(ppm => ppm.observe((e, s, o))) }
 
@@ -792,9 +794,11 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
       ).failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
 
     case msg @ ESONetworkInstance(eventType,earliestTimestampNanos,latestTimestampNanos,subject,predicateObject) =>
-      val objUuid = graphService.idProvider.customIdFromQid(predicateObject.qid.get).get
-      val e: Event = PpmEvent(eventType,earliestTimestampNanos,latestTimestampNanos, graphService.idProvider.customIdFromQid(msg.qid.get).get)
-      val s: Subject = (PpmSubject(subject.cid,subject.subjectTypes, graphService.idProvider.customIdFromQid(subject.qid.get).get),Some(subject.cmdLine))
+      val objUuid = predicateObject.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
+      val subUuid = subject.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
+      val eventUuid = msg.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
+      val e: Event = PpmEvent(eventType,earliestTimestampNanos,latestTimestampNanos, eventUuid)
+      val s: Subject = (PpmSubject(subject.cid,subject.subjectTypes, subUuid),Some(subject.cmdLine))
       val o: Object = (PpmNetFlowObject(predicateObject.remotePort, predicateObject.localPort,predicateObject.remoteAddress,predicateObject.localAddress, objUuid),None)
 
       val f = Future { admPpmTrees.foreach(ppm => ppm.observe((e, s, o))) }
@@ -804,10 +808,12 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
       ).failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
 
     case msg @ ESOSrcSnkInstance(eventType,earliestTimestampNanos,latestTimestampNanos,subject,predicateObject) =>
-      val objUuid = graphService.idProvider.customIdFromQid(predicateObject.qid.get).get
-      val e: Event = PpmEvent(eventType,earliestTimestampNanos,latestTimestampNanos, graphService.idProvider.customIdFromQid(msg.qid.get).get)
-      val s: Subject = (PpmSubject(subject.cid,subject.subjectTypes, graphService.idProvider.customIdFromQid(subject.qid.get).get),Some(subject.cmdLine))
-      val o: Object = (PpmSrcSinkObject(predicateObject.srcSinkType,objUuid), None)
+      val objUuid = predicateObject.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
+      val subUuid = subject.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
+      val eventUuid = msg.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
+      val e: Event = PpmEvent(eventType,earliestTimestampNanos,latestTimestampNanos, eventUuid)
+      val s: Subject = (PpmSubject(subject.cid,subject.subjectTypes, subUuid),Some(subject.cmdLine))
+      val o: Object = (PpmSrcSinkObject(predicateObject.srcSinkType, objUuid), None)
 
 
       val f = Future { admPpmTrees.foreach(ppm => ppm.observe((e, s, o))) }
