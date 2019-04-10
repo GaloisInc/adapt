@@ -75,7 +75,8 @@ object AdaptConfig extends Utils {
     neo4jfile: String,
     systemname: String,
     quitonerror: Boolean,
-    logfile: String
+    logfile: String,
+    lmdbgigabytes: Long = 4
   )
 
   case class EnvironmentConfig(
