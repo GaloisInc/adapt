@@ -9,6 +9,7 @@ usage ()
   echo "  -i path    : Use this public key for autheticating to 'gw.tc.bbn.com'"
   echo "  -k         : Kill all other java processes before starting this up"
   echo "  -d path    : File to clear before running quine-adapt"
+  echo "  -s         : Skip assembly."
   echo "  -v         : Be verbose." 
   echo "  -h         : Display this message."
   exit
@@ -16,16 +17,18 @@ usage ()
 
 BBN_AUTH=""
 FOLDER=""
-DELETEME="persistence-multimap_by_event.db"
+DELETEME="/data/persistence-lmdb.db/*"
 KILLALL="NO"
+SKIPASSEMBLY="NO"
 OUTSTUFF=/dev/null
 
 # Options
-while getopts "hi:kd:v" OPT; do
+while getopts "hi:ksd:v" OPT; do
   case $OPT in
     h)  usage $PROG_NAME ;;
     i)  BBN_AUTH="-i$OPTARG" ;;
     k)  KILLALL="YES" ;;
+    s)  SKIPASSEMBLY="YES" ;;
     d)  DELETEME=$OPTARG ;;
     v)  OUTSTUFF=/dev/stdout ;;
     \?) echo "Invalid option: -$OPTARG" >&2; usage $PROG_NAME ;;
@@ -54,8 +57,11 @@ if [ "YES" = "$KILLALL" ]; then
 fi
 
 # Build JAR an upload it to gateway server
-SBT_OPTS=-Xss4m sbt 'set assemblyJarName := "../../quine-adapt.jar"' assembly
-scp $BBN_AUTH quine-adapt.jar gw.tc.bbn.com:~/quine-adapt.jar
+if [ "NO" = "$SKIPASSEMBLY" ]; then
+  echo "Rebuilding and uploading the JAR..."
+  SBT_OPTS=-Xss4m sbt 'set assemblyJarName := "../../quine-adapt.jar"' assembly
+  scp $BBN_AUTH quine-adapt.jar gw.tc.bbn.com:~/quine-adapt.jar
+fi
 
 # Deploy and run one each node
 for NODENUM in {1..3}; do

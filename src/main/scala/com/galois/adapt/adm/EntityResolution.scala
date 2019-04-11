@@ -76,8 +76,8 @@ object EntityResolution {
       UuidRemapper.sharded(uuidExpiryTime, cdm2cdmMaps, cdm2admMaps, blockedEdges, remapperShardCount, ignoreEventUuids, log, numUuidRemapperShards)
     }
 
-    val deduplicate: DeduplicateNodesAndEdges.OrderAndDedupFlow =
-      DeduplicateNodesAndEdges.apply(numUuidRemapperShards, seenNodesSets, seenEdgesSets, deduplicateShardCount)
+//    val deduplicate: DeduplicateNodesAndEdges.OrderAndDedupFlow =
+//      DeduplicateNodesAndEdges.apply(numUuidRemapperShards, seenNodesSets, seenEdgesSets, deduplicateShardCount)
 
     Flow[(String, CurrentCdm)]
       .via(annotateTime(maxTimeJump))                                         // Annotate with a monotonic time

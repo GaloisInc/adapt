@@ -1,5 +1,5 @@
-val scalaV = "2.12.8"   // "2.12.2"  // Scala 2.12 requires JVM 1.8.0_111 or newer.
-val akkaV = "2.5.21"
+val scalaV = "2.12.8"   // Scala 2.12 requires JVM 1.8.0_111 or newer.
+val akkaV = "2.5.22"
 val akkaHttpV = "10.1.7"
 val quineV = "0.1-SNAPSHOT"
 
@@ -10,7 +10,7 @@ resolvers += Resolver.mavenLocal  // for BBN repositories built locally
 
 lazy val adapt = (project in file(".")).settings(
   name := "adapt",
-  version := "0.6.2",
+  version := "0.7.0",
   organization := "com.galois",
   scalaVersion := scalaV,
 
@@ -37,7 +37,7 @@ lazy val adapt = (project in file(".")).settings(
 
     "org.lmdbjava" % "lmdbjava" % "0.6.3",
 
-    "com.typesafe.akka" %% "akka-stream-kafka" % "0.22",
+    "com.typesafe.akka" %% "akka-stream-kafka" % "1.0.1", // "0.22",
     "com.github.alexandrnikitin" %% "bloom-filter" % "0.10.1",
     "org.mapdb" % "mapdb" % "3.0.7",
     "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.3.3",
