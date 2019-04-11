@@ -107,7 +107,21 @@ case class PpmDefinition[DataShape](
   val inputAlarmFilePath  = basePath + ppmConfig.loadfilesuffix + "_alarm.json"
   val outputAlarmFilePath = basePath + ppmConfig.savefilesuffix + "_alarm.json"
 
-  val treeRootQid = AdmUuidProvider.ppmTreeRootNodeId(hostName,name)//context.actorOf(Props(classOf[PpmNodeActor], name, alarmActor, startingState), name = name)
+  val treeRootQid = AdmUuidProvider.ppmTreeRootNodeId(hostName, name)
+
+  private val startingState =
+    if (ppmConfig.shouldloadppmtrees)
+      TreeRepr.readFromFile(inputFilePath).map { t => println(s"Reading tree $name on host: $hostName in from file: $inputFilePath"); t }
+        .orElse {println(s"FAILED to load data for tree: $name  on host: $hostName"); None}
+    else None
+
+  private val trainingDataUsed: Boolean =
+    if (ppmConfig.shouldloadppmtrees) {
+      startingState.foreach(t => graphService.initializeTree(treeRootQid, name, t.toQuineRepr))
+      true
+    }
+    else false
+
 
   var alarms: Map[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])] =
     if (ppmConfig.shouldloadalarms)
@@ -117,7 +131,7 @@ case class PpmDefinition[DataShape](
       } match {
         case Success(alarm) => alarm
         case Failure(e) =>
-          println(s"FAILED to load alarms for tree: $name  on host: $hostName. Starting with empty tree state.")
+          println(s"FAILED to load alarms for tree: $name  on host: $hostName. Starting with no alarms.")
           e.printStackTrace()
           Map.empty[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])]
       }
@@ -130,15 +144,22 @@ case class PpmDefinition[DataShape](
           val content = new String(Files.readAllBytes(new File(inputAlarmFilePath).toPath), StandardCharsets.UTF_8)
           content.parseJson.convertTo[List[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].map(_._2._3.last.localProb).groupBy(identity).mapValues(_.size)
         } match {
-          case Success(lps) => lps
+          case Success(lps) =>
+            println(s"Successfully loaded local probability alarms for tree: $name on host: $hostName.")
+            lps
           case Failure(e) =>
             println(s"FAILED to load local probability alarms for tree: $name  on host: $hostName. Starting with empty local probability accumulator.")
             e.printStackTrace()
             Map.empty[Float, Int]
         }
+      val noveltiesLoaded = noveltyLPs.values.sum
+      println(s"Loaded $noveltiesLoaded for $name on $hostName")
       SortedMap.empty(Ordering[Float]) ++ noveltyLPs
     }
-    else SortedMap.empty(Ordering[Float])
+    else {
+      println(s"Starting with empty local probability accumulator for $name on host $hostName")
+      SortedMap.empty(Ordering[Float])
+    }
 
   var localProbCount: Int = localProbAccumulator.values.sum
 
@@ -146,7 +167,7 @@ case class PpmDefinition[DataShape](
 
   def insertIntoLocalProbAccumulator(alarmOpt: Option[(Alarm, Set[NamespacedUuidDetails], Set[Long])]): Unit = alarmOpt.foreach {
     case (alarm, _, _) =>
-      println(alarm)
+      // println(alarm)
       alarm.lastOption.foreach { alarmNode =>
         val lp = alarmNode.localProb
         if (shouldApplyThreshold) {
@@ -242,8 +263,11 @@ case class PpmDefinition[DataShape](
       implicit val timeout = Timeout(593 seconds)
       val treeWriteF = if (ppmConfig.shouldsaveppmtrees) {
         println("Trying to save ppm tree repr...")
-        graphService.getTreeRepr(treeRootQid,name,List()).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map { reprResult =>
-          if (ppmConfig.shouldsaveppmtrees) reprResult.repr.writeToFile(outputFilePath)
+        graphService.getTreeRepr(treeRootQid,name,List()).mapTo[com.rrwright.quine.runtime.PpmNodeActorGetTreeReprResult].map { quineReprResult =>
+          if (ppmConfig.shouldsaveppmtrees) {
+            val reprResult = PpmNodeActorGetTreeReprResult(TreeRepr.fromQuine(quineReprResult.repr))
+            reprResult.repr.writeToFile(outputFilePath)
+          }
         }
       } else Future.successful( () )
 
@@ -730,9 +754,9 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
   }
 
     println(s"Setting shutdown hook to save PPM trees for $hostName, shouldsave: ${ppmConfig.shouldsaveppmtrees}")
+
   //  override def postStop(): Unit = {
       context.system.registerOnTermination{
-        println(s"Post stop: $didReceiveComplete && ${ppmConfig.shouldsaveppmtrees}")
         if ( ! didReceiveComplete && ppmConfig.shouldsaveppmtrees) {
           didReceiveComplete = true
           val ppmSaveFutures: Future[GenSeq[Unit]] = Future.sequence(ppmList.map(_.saveStateAsync()).seq)
@@ -749,23 +773,25 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
   var didReceiveInit = false
   var didReceiveComplete = false
 
-  // TODO: Add comments to explain this function.
   def alarmFromProbabilityData(probabilityData: List[(ExtractedValue,Int,Int)]): Alarm = {
-    val (_,parentCount,siblingCount) = probabilityData.takeWhile(_._3 > 1).lastOption.getOrElse("",1,1) // First novel node with default for first observation
-    val alarmLocalProbability = (siblingCount + 1).toFloat / (parentCount + siblingCount + 1) // Alarm local prob is a function of the first novel node
+    // println(probabilityData)
+    val (_,parentCount,siblingCount) = probabilityData.takeWhile(_._2 > 1).lastOption.getOrElse("",1,1) // First novel node with default for first observation
+    val alarmLocalProbability = siblingCount.toFloat / (parentCount + siblingCount) // Alarm local prob is a function of the first novel node
     val treeObservationCount = probabilityData.headOption.map(_._2).getOrElse(1) //
     val lastAlarmListIndex = if (probabilityData.size < 2) 0 else  probabilityData.size - 2
 
-    probabilityData.iterator.sliding(2).zipWithIndex.map {
+    val alarm = probabilityData.iterator.sliding(2).zipWithIndex.map {
       case (extractedPair, depth) =>
         val (ev, parentCount, siblingCount) = extractedPair.head
         val (_, count, _) = extractedPair(1)
         if (depth == lastAlarmListIndex)
-          PpmTreeNodeAlarm(ev,alarmLocalProbability,count.toFloat/treeObservationCount,count,siblingCount+1,parentCount,depth)
+          PpmTreeNodeAlarm(ev,alarmLocalProbability,count.toFloat/treeObservationCount,count,siblingCount,parentCount,depth + 1)
         else
-          PpmTreeNodeAlarm(ev,count.toFloat/parentCount.toFloat,count.toFloat/treeObservationCount,count,siblingCount+1,parentCount,depth)
+          PpmTreeNodeAlarm(ev,count.toFloat/parentCount.toFloat,count.toFloat/treeObservationCount,count,siblingCount,parentCount,depth + 1)
     }.toList
 
+    // println(alarm)
+    alarm
   }
 
   def receive = {
@@ -777,6 +803,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val alarmOpt = if (tree.noveltyFilter(msg)) Some((alarmFromProbabilityData(probabilityData), collectedUuids, timestamps)) else None
         tree.recordAlarm(alarmOpt)
         tree.insertIntoLocalProbAccumulator(alarmOpt)
+        if (tree.alarms.size % 10 == 0) tree.saveStateAsync()
       }
 
     case msg @ ESOFileInstance(eventType,earliestTimestampNanos,latestTimestampNanos,subject,predicateObject) =>
@@ -818,46 +845,17 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
       val f = Future { admPpmTrees.foreach(ppm => ppm.observe((e, s, o))) }
 
-      val r = esoTrees.filter(_.name != "SummarizedProcessActivity").map(_.prettyString)
-      r.foreach(tr => tr onComplete {
-        case Success(repr) => println(repr)
-        case Failure(t) => println("Why has an error has occurred? " + t.getMessage)
-      }
-      )
+//      val r = esoTrees.filter(_.name != "SummarizedProcessActivity").map(_.prettyString)
+//      r.foreach(tr => tr onComplete {
+//        case Success(repr) => println(repr)
+//        case Failure(t) => println("Why has an error has occurred? " + t.getMessage)
+//        }
+//      )
 
 
       Try(
         Await.result(f, 15 seconds)
       ).failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
-
-//    case msg @ (e: Event, s: AdmSubject, subPathNodes: Set[_], o: ADM, objPathNodes: Set[_]) =>
-//
-//      def flatten(e: Event, s: AdmSubject, subPathNodes: Set[AdmPathNode], o: ADM, objPathNodes: Set[AdmPathNode]): Set[(Event, Subject, Object)] = {
-//        val subjects: Set[(AdmSubject, Option[AdmPathNode])] = if (subPathNodes.isEmpty) Set(s -> None) else subPathNodes.map(p => s -> Some(p))
-//        val objects: Set[(ADM, Option[AdmPathNode])] = if (objPathNodes.isEmpty) Set(o -> None) else objPathNodes.map(p => o -> Some(p))
-//        subjects.flatMap(sub => objects.map(obj => (e, sub, obj)))
-//      }
-//
-//      val f = Try(
-//        flatten(e, s, subPathNodes.asInstanceOf[Set[AdmPathNode]], o, objPathNodes.asInstanceOf[Set[AdmPathNode]])
-//      ) match {
-//        case Success(flatEvents) =>
-//          Future {
-//            admPpmTrees.foreach(ppm =>
-//              flatEvents.foreach(e =>
-//                ppm.observe(e)
-//              )
-//            )
-//          }
-//        case Failure(err) =>
-//          log.warning(s"Cast Failed. Could not process/match message as types (Set[AdmPathNode] and Set[AdmPathNode]) due to erasure: $msg  Message: ${err.getMessage}")
-//          Future.successful(())
-//      }
-//
-//      Try(
-//        Await.result(f, 15 seconds)
-//      ).failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
-//
 
     case PpmTreeAlarmQuery(treeName, queryPath, namespace, startAtTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
       val resultOpt = ppm(treeName).map( tree =>
@@ -876,7 +874,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
     case SetPpmRatings(treeName, keys, rating, namespace) =>
       sender() ! ppm(treeName).map(tree => keys.map(key => tree.setAlarmRating(key, rating match {case 0 => None; case x => Some(x)}, namespace)))
 
-    case msg @ PpmNodeActorBeginGetTreeRepr(treeName, startingKey) =>
+    case PpmNodeActorBeginGetTreeRepr(treeName, startingKey) =>
       implicit val timeout = Timeout(30 seconds)
       val reprFut = ppm(treeName)
         .map(d => graphService.getTreeRepr(d.treeRootQid,treeName,startingKey).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity))
@@ -970,6 +968,9 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
     case x :: Nil => this.children.find(_.key == x)
     case x :: xs => this.children.find(_.key == x).flatMap(_.get(xs:_*))
   }
+
+  def toQuineRepr: com.rrwright.quine.runtime.TreeRepr =  com.rrwright.quine.runtime.TreeRepr(depth, key, localProb, globalProb, count, children.map(_.toQuineRepr))
+
 
   def apply(keys: ExtractedValue*): TreeRepr = get(keys:_*).get
 
@@ -1159,4 +1160,7 @@ case object TreeRepr {
     val rows: List[Array[String]] = parser.parseAll(fileHandle).asScala.toList
     TreeRepr.fromFlat(rows.map(TreeRepr.csvArrayToFlat))
   }.toOption
+
+  def fromQuine(q: com.rrwright.quine.runtime.TreeRepr): TreeRepr =
+    TreeRepr(q.depth,q.key,q.localProb,q.globalProb,q.count,q.children.map(c => fromQuine(c)))
 }
