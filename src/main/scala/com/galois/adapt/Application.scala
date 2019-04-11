@@ -445,7 +445,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         implicitly[Queryable[ESOFileInstance]],
         (l: List[ESOFileInstance]) => if (l.nonEmpty) {
           ppmManagerActors(hostNames.head) ! l.head
-          println(s"RESULT: ${l.head}")
+          // println(s"RESULT: ${l.head}")
         }
       ), sqidFile.name
     )
@@ -457,7 +457,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         implicitly[Queryable[ESOSrcSnkInstance]],
         (l: List[ESOSrcSnkInstance]) => if (l.nonEmpty) {
           ppmManagerActors(hostNames.head) ! l.head
-          println(s"RESULT: ${l.head}")
+          // println(s"RESULT: ${l.head}")
         }
       ), sqidSrcSnk.name
     )
@@ -469,7 +469,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         implicitly[Queryable[ESONetworkInstance]],
         (l: List[ESONetworkInstance]) => if (l.nonEmpty) {
           ppmManagerActors(hostNames.head) ! l.head
-          println(s"RESULT: ${l.head}")
+          // println(s"RESULT: ${l.head}")
         }
       ), sqidNetwork.name
     )
