@@ -752,21 +752,21 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
   def saveTrees(): Future[Unit] = {
     ppmList.toList.foldLeft(Future.successful(()))((acc, ppmTree) => acc.flatMap(_ => ppmTree.saveStateAsync()))
   }
-
-    println(s"Setting shutdown hook to save PPM trees for $hostName, shouldsave: ${ppmConfig.shouldsaveppmtrees}")
-
-  //  override def postStop(): Unit = {
-      context.system.registerOnTermination{
-        if ( ! didReceiveComplete && ppmConfig.shouldsaveppmtrees) {
-          didReceiveComplete = true
-          val ppmSaveFutures: Future[GenSeq[Unit]] = Future.sequence(ppmList.map(_.saveStateAsync()).seq)
-          ppmSaveFutures onComplete {
-              case Success(_) => println("The Trees were saved!")
-              case Failure(t) => println("Why has an error has occurred? " + t.getMessage)
-          }
-        }
-    //    super.postStop()
-      }
+//
+//    println(s"Setting shutdown hook to save PPM trees for $hostName, shouldsave: ${ppmConfig.shouldsaveppmtrees}")
+//
+//  //  override def postStop(): Unit = {
+//      context.system.registerOnTermination{
+//        if ( ! didReceiveComplete && ppmConfig.shouldsaveppmtrees) {
+//          didReceiveComplete = true
+//          val ppmSaveFutures: Future[GenSeq[Unit]] = Future.sequence(ppmList.map(_.saveStateAsync()).seq)
+//          ppmSaveFutures onComplete {
+//              case Success(_) => println("The Trees were saved!")
+//              case Failure(t) => println("Why has an error has occurred? " + t.getMessage)
+//          }
+//        }
+//    //    super.postStop()
+//      }
 
   def ppm(name: String): Option[PpmDefinition[_]] = ppmList.find(_.name == name)
 
@@ -803,7 +803,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val alarmOpt = if (tree.noveltyFilter(msg)) Some((alarmFromProbabilityData(probabilityData), collectedUuids, timestamps)) else None
         tree.recordAlarm(alarmOpt)
         tree.insertIntoLocalProbAccumulator(alarmOpt)
-        if (tree.alarms.size % 10 == 0) tree.saveStateAsync()
+        // if (tree.alarms.size % 10 == 0) tree.saveStateAsync()
       }
 
     case msg @ ESOFileInstance(eventType,earliestTimestampNanos,latestTimestampNanos,subject,predicateObject) =>
@@ -880,6 +880,11 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         .map(d => graphService.getTreeRepr(d.treeRootQid,treeName,startingKey).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity))
         .getOrElse(Future.failed(new NoSuchElementException(s"No tree found with name $treeName")))
       sender() ! reprFut
+
+    case SaveTrees(shouldConfirm) =>
+      val s = sender()
+      val saveTreesF = saveTrees()
+      if (shouldConfirm) saveTreesF.onComplete(_ => s ! Ack )
 
     case InitMsg =>
       if ( ! didReceiveInit) {

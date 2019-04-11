@@ -211,7 +211,17 @@ object Routes {
             )
           } ~
           pathPrefix("ppm") {
-              pathPrefix("listTrees") {
+            pathPrefix("saveTrees") {
+              path(Segment) { hostName =>
+                complete(
+                  (ppmActors(hostName) ? SaveTrees(true)).mapTo[Ack.type].map(_ => s"you saved all the tree reprs and their alarms for $hostName")
+                )
+              } ~
+                complete(
+                    ppmActors.values.toList.foldLeft(Future.successful(Ack))((a, b) => a.flatMap(_ => (b ? SaveTrees(true)).mapTo[Ack.type])).map(_ => "you saved all the trees for all the hosts")
+                )
+            } ~
+            pathPrefix("listTrees") {
               path(Segment) { hostName =>
                 complete(
                   (ppmActors(hostName) ? ListPpmTrees).mapTo[Future[PpmTreeNames]].flatMap(_.map(_.namesAndCounts))
