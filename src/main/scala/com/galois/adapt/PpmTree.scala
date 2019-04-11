@@ -199,11 +199,11 @@ case class PpmDefinition[DataShape](
   if (shouldApplyThreshold) {
     val computeAlarmLpThresholdIntervalMinutes = ppmConfig.computethresholdintervalminutes
     val alarmPercentile = ppmConfig.alarmlppercentile
+    updateThreshold(alarmPercentile) // Static Threshold
     if (computeAlarmLpThresholdIntervalMinutes > 0) { // Dynamic Threshold
       context.system.scheduler.schedule(computeAlarmLpThresholdIntervalMinutes minutes,
         computeAlarmLpThresholdIntervalMinutes minutes)(updateThreshold(alarmPercentile))
     }
-    else updateThreshold(alarmPercentile) // Static Threshold
   }
 
   def observe(observation: DataShape): Unit = if (incomingFilter(observation)) {
