@@ -255,21 +255,14 @@ object Application extends App {
   }
 
   val ppmManagerActors: Map[HostName, ActorRef] = runFlow match {
-    case "accept" => Map.empty
-    case _ =>
+    case "quine" =>
       ingestConfig.hosts.map { host: IngestHost =>
         val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows, actorSystemGraphService._2.get)
         val ref = system.actorOf(props, s"ppm-actor-${host.hostName}")
-//        ppmConfig.saveintervalseconds match {
-//          case Some(i) if i > 0L =>
-//            println(s"Saving PPM trees every $i seconds")
-//            val cancellable = system.scheduler.schedule(i.seconds, i.seconds, ref, SaveTrees())
-//            system.registerOnTermination(cancellable.cancel())
-//          case _ => println("Not going to periodically save PPM trees.")
-//        }
         host.hostName -> ref
       }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false, actorSystemGraphService._2.get), s"ppm-actor-$hostNameForAllHosts"))
         // TODO nichole:  what instrumentation source should I give to the `hostNameForAllHosts` PpmManager? This smells bad...
+    case _ => Map.empty
   }
 
   // Produce a Sink which accepts any type of observation to distribute as an observation to PPM tree actors for every host.
@@ -449,9 +442,12 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       Props(
         classOf[StandingFetchActor[ESOFileInstance]],
         implicitly[Queryable[ESOFileInstance]],
-        (l: List[ESOFileInstance]) => if (l.nonEmpty) {
-          ppmManagerActors(hostNames.head) ! l.head
-          // println(s"RESULT: ${l.head}")
+        (l: List[ESOFileInstance]) => l.foreach{ eso =>
+          Try {
+            val id = eso.qid.get
+            val namespace = graph.idProvider.customIdFromQid(id).get.namespace
+            ppmManagerActors(namespace) ! eso
+          }.recover{ case e => log.error(s"Sending an ESOFileInstance match failed with message: ${e.getMessage}")}
         }
       ), sqidFile.name
     )
@@ -461,9 +457,12 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       Props(
         classOf[StandingFetchActor[ESOSrcSnkInstance]],
         implicitly[Queryable[ESOSrcSnkInstance]],
-        (l: List[ESOSrcSnkInstance]) => if (l.nonEmpty) {
-          ppmManagerActors(hostNames.head) ! l.head
-          // println(s"RESULT: ${l.head}")
+        (l: List[ESOSrcSnkInstance]) => l.foreach{ eso =>
+          Try {
+            val id = eso.qid.get
+            val namespace = graph.idProvider.customIdFromQid(id).get.namespace
+            ppmManagerActors(namespace) ! eso
+          }.recover{ case e => log.error(s"Sending an ESOFileInstance match failed with message: ${e.getMessage}")}
         }
       ), sqidSrcSnk.name
     )
@@ -473,9 +472,12 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       Props(
         classOf[StandingFetchActor[ESONetworkInstance]],
         implicitly[Queryable[ESONetworkInstance]],
-        (l: List[ESONetworkInstance]) => if (l.nonEmpty) {
-          ppmManagerActors(hostNames.head) ! l.head
-          // println(s"RESULT: ${l.head}")
+        (l: List[ESONetworkInstance]) => l.foreach{ eso =>
+          Try {
+            val id = eso.qid.get
+            val namespace = graph.idProvider.customIdFromQid(id).get.namespace
+            ppmManagerActors(namespace) ! eso
+          }.recover{ case e => log.error(s"Sending an ESOFileInstance match failed with message: ${e.getMessage}")}
         }
       ), sqidNetwork.name
     )
