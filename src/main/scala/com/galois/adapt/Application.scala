@@ -432,63 +432,49 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       println("Running Quine ingest.")
 
       implicit val graph: GraphService[AdmUUID] = actorSystemGraphService._2.get
-
       implicit val timeout = Timeout(30.4 seconds)
-
-      val parallelism = quineConfig.quineactorparallelism
 
       val sqidFile = StandingQueryId("standing-find_ESOFile-accumulator")
       val standingFetchFileActor = system.actorOf(
-      Props(
-        classOf[StandingFetchActor[ESOFileInstance]],
-        implicitly[Queryable[ESOFileInstance]],
-        (l: List[ESOFileInstance]) => l.foreach{ eso =>
-          Try {
-            val id = eso.qid.get
-            val namespace = graph.idProvider.customIdFromQid(id).get.namespace
-            ppmManagerActors(namespace) ! eso
-          }.recover{ case e => log.error(s"Sending an ESOFileInstance match failed with message: ${e.getMessage}")}
-        }
-      ), sqidFile.name
-    )
+        Props(
+          classOf[StandingFetchActor[ESOFileInstance]],
+          implicitly[Queryable[ESOFileInstance]],
+          (l: List[ESOFileInstance]) => l.foreach{ eso =>
+            ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! eso)
+          }
+        ), sqidFile.name
+      )
 
       val sqidSrcSnk = StandingQueryId("standing-find_ESOSrcSnk-accumulator")
       val standingFetchSrcSnkActor = system.actorOf(
-      Props(
-        classOf[StandingFetchActor[ESOSrcSnkInstance]],
-        implicitly[Queryable[ESOSrcSnkInstance]],
-        (l: List[ESOSrcSnkInstance]) => l.foreach{ eso =>
-          Try {
-            val id = eso.qid.get
-            val namespace = graph.idProvider.customIdFromQid(id).get.namespace
-            ppmManagerActors(namespace) ! eso
-          }.recover{ case e => log.error(s"Sending an ESOFileInstance match failed with message: ${e.getMessage}")}
-        }
-      ), sqidSrcSnk.name
-    )
+        Props(
+          classOf[StandingFetchActor[ESOSrcSnkInstance]],
+          implicitly[Queryable[ESOSrcSnkInstance]],
+          (l: List[ESOSrcSnkInstance]) => l.foreach{ eso =>
+              ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! eso)
+          }
+        ), sqidSrcSnk.name
+      )
 
       val sqidNetwork = StandingQueryId("standing-find_ESONetwork-accumulator")
       val standingFetchNetworkActor = system.actorOf(
-      Props(
-        classOf[StandingFetchActor[ESONetworkInstance]],
-        implicitly[Queryable[ESONetworkInstance]],
-        (l: List[ESONetworkInstance]) => l.foreach{ eso =>
-          Try {
-            val id = eso.qid.get
-            val namespace = graph.idProvider.customIdFromQid(id).get.namespace
-            ppmManagerActors(namespace) ! eso
-          }.recover{ case e => log.error(s"Sending an ESOFileInstance match failed with message: ${e.getMessage}")}
-        }
-      ), sqidNetwork.name
-    )
+        Props(
+          classOf[StandingFetchActor[ESONetworkInstance]],
+          implicitly[Queryable[ESONetworkInstance]],
+          (l: List[ESONetworkInstance]) => l.foreach{ eso =>
+            ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! eso)
+          }
+        ), sqidNetwork.name
+      )
 
       graph.currentGraph.standingQueryActors = graph.currentGraph.standingQueryActors +
         (sqidFile -> standingFetchFileActor) +
         (sqidSrcSnk -> standingFetchSrcSnkActor)+
         (sqidNetwork -> standingFetchNetworkActor)
-      println(branchOf[ESOFileInstance]())
 
+//      println(branchOf[ESOFileInstance]())
 
+      val parallelism = quineConfig.quineactorparallelism
       val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
       dbActor = quineRouter
 
