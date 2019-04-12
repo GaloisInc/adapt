@@ -37,6 +37,7 @@ object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
   def customIdToBytes(typed: AdmUUID) = underlying.customIdToBytes(typed)
   def customIdFromBytes(bytes: Array[Byte]) = underlying.customIdFromBytes(bytes).map(x => x)
   def customIdFromString(str: String) = Try(AdmUUID.fromRendered(str))
+  def ppmTreeRootNodeId(host: String,treeName: String) = new QuineId(underlying.customIdToBytes(host,UUID.nameUUIDFromBytes(treeName.getBytes)))
 
   override def qidDistribution(qid: QuineId): (HostIdx, LocalShardIdx) = {
     customIdFromQid(qid) match {
@@ -53,11 +54,14 @@ object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
 }
 
 
-case class ESOSubject(subjectTypes: Set[SubjectType], cmdLine: AdmPathNode) extends NoConstantsDomainNode
-
+case class ESOSubject(cid: Int, subjectTypes: Set[SubjectType], cmdLine: AdmPathNode) extends NoConstantsDomainNode
 case class ESOFileObject(fileObjectType: FileObjectType, path: AdmPathNode) extends NoConstantsDomainNode
+case class ESOSrcSinkObject(srcSinkType: SrcSinkType) extends NoConstantsDomainNode
+case class ESONetFlowObject(remoteAddress: Option[String], localAddress: Option[String], remotePort: Option[Int], localPort: Option[Int]) extends NoConstantsDomainNode
 
-case class ESOInstance(eventType: EventType, subject: ESOSubject, predicateObject: ESOFileObject) extends NoConstantsDomainNode
+case class ESOFileInstance(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, hostName: String, subject: ESOSubject, predicateObject: ESOFileObject) extends NoConstantsDomainNode
+case class ESOSrcSnkInstance(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, hostName: String, subject: ESOSubject, predicateObject: ESOSrcSinkObject) extends NoConstantsDomainNode
+case class ESONetworkInstance(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, hostName: String, subject: ESOSubject, predicateObject: ESONetFlowObject) extends NoConstantsDomainNode
 
 
 class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQueryProxyActor {
@@ -121,7 +125,9 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
     Duration.Inf
   ))
 
-  implicit val queryableEsoInstance: Queryable[ESOInstance] = cachedImplicit
+  implicit val queryableEsoFileInstance: Queryable[ESOFileInstance] = cachedImplicit
+  implicit val queryableEsoSrcSnkInstance: Queryable[ESOSrcSnkInstance] = cachedImplicit
+  implicit val queryableEsoNetworkInstance: Queryable[ESONetworkInstance] = cachedImplicit
   implicit val admSubjectInstance: Queryable[AdmSubject] = cachedImplicit
   implicit val admPrincipalInstance: Queryable[AdmPrincipal] = cachedImplicit
   implicit val admFileObjectInstance: Queryable[AdmFileObject] = cachedImplicit
@@ -137,7 +143,10 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   def writeAdm(a: ADM): Future[Unit] = (a match {
     case anAdm: AdmEvent              =>
       val f = anAdm.create(Some(anAdm.uuid))
-      graphService.standingFetch[ESOInstance](anAdm.uuid, Some(StandingQueryId("standing-find_ESO-accumulator")))( x => { }) // (println(_))
+
+      graphService.standingFetch[ESOFileInstance](anAdm.uuid, Some(StandingQueryId("standing-find_ESOFile-accumulator")))( x => { })
+      graphService.standingFetch[ESOSrcSnkInstance](anAdm.uuid, Some(StandingQueryId("standing-find_ESOSrcSnk-accumulator")))( x => { })
+      graphService.standingFetch[ESONetworkInstance](anAdm.uuid, Some(StandingQueryId("standing-find_ESONetwork-accumulator")))( x => { })
       f
     case anAdm: AdmSubject            => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
     case anAdm: AdmPrincipal          => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))

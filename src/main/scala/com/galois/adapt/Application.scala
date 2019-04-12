@@ -255,21 +255,14 @@ object Application extends App {
   }
 
   val ppmManagerActors: Map[HostName, ActorRef] = runFlow match {
-    case "accept" => Map.empty
-    case _ =>
+    case "quine" =>
       ingestConfig.hosts.map { host: IngestHost =>
-        val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows)
+        val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows, actorSystemGraphService._2.get)
         val ref = system.actorOf(props, s"ppm-actor-${host.hostName}")
-//        ppmConfig.saveintervalseconds match {
-//          case Some(i) if i > 0L =>
-//            println(s"Saving PPM trees every $i seconds")
-//            val cancellable = system.scheduler.schedule(i.seconds, i.seconds, ref, SaveTrees())
-//            system.registerOnTermination(cancellable.cancel())
-//          case _ => println("Not going to periodically save PPM trees.")
-//        }
         host.hostName -> ref
-      }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false), s"ppm-actor-$hostNameForAllHosts"))
+      }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false, actorSystemGraphService._2.get), s"ppm-actor-$hostNameForAllHosts"))
         // TODO nichole:  what instrumentation source should I give to the `hostNameForAllHosts` PpmManager? This smells bad...
+    case _ => Map.empty
   }
 
   // Produce a Sink which accepts any type of observation to distribute as an observation to PPM tree actors for every host.
@@ -439,25 +432,49 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       println("Running Quine ingest.")
 
       implicit val graph: GraphService[AdmUUID] = actorSystemGraphService._2.get
-
       implicit val timeout = Timeout(30.4 seconds)
 
-      val parallelism = quineConfig.quineactorparallelism
-
-      val sqid = StandingQueryId("standing-find_ESO-accumulator")
-      val standingFetchActor = system.actorOf(
+      val sqidFile = StandingQueryId("standing-find_ESOFile-accumulator")
+      val standingFetchFileActor = system.actorOf(
         Props(
-          classOf[StandingFetchActor[ESOInstance]],
-          implicitly[Queryable[ESOInstance]],
-          (l: List[ESOInstance]) => if (l.nonEmpty) {
-            // println(s"RESULT: ${l.head}")
+          classOf[StandingFetchActor[ESOFileInstance]],
+          implicitly[Queryable[ESOFileInstance]],
+          (l: List[ESOFileInstance]) => l.foreach{ eso =>
+            ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! eso)
           }
-        ), sqid.name
+        ), sqidFile.name
       )
-      graph.currentGraph.standingQueryActors = graph.currentGraph.standingQueryActors + (sqid -> standingFetchActor)
-      println(branchOf[ESOInstance]())
 
+      val sqidSrcSnk = StandingQueryId("standing-find_ESOSrcSnk-accumulator")
+      val standingFetchSrcSnkActor = system.actorOf(
+        Props(
+          classOf[StandingFetchActor[ESOSrcSnkInstance]],
+          implicitly[Queryable[ESOSrcSnkInstance]],
+          (l: List[ESOSrcSnkInstance]) => l.foreach{ eso =>
+              ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! eso)
+          }
+        ), sqidSrcSnk.name
+      )
 
+      val sqidNetwork = StandingQueryId("standing-find_ESONetwork-accumulator")
+      val standingFetchNetworkActor = system.actorOf(
+        Props(
+          classOf[StandingFetchActor[ESONetworkInstance]],
+          implicitly[Queryable[ESONetworkInstance]],
+          (l: List[ESONetworkInstance]) => l.foreach{ eso =>
+            ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! eso)
+          }
+        ), sqidNetwork.name
+      )
+
+      graph.currentGraph.standingQueryActors = graph.currentGraph.standingQueryActors +
+        (sqidFile -> standingFetchFileActor) +
+        (sqidSrcSnk -> standingFetchSrcSnkActor)+
+        (sqidNetwork -> standingFetchNetworkActor)
+
+//      println(branchOf[ESOFileInstance]())
+
+      val parallelism = quineConfig.quineactorparallelism
       val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
       dbActor = quineRouter
 

@@ -100,7 +100,7 @@ case object AlarmEvent {
     val ppmTreeNodeAlarms: List[NoveltyDetection.PpmTreeNodeAlarm] = alarmDetails.alarm.details._3
 
     AlarmEvent(
-      ConciseAlarmEvent(alarmDetails.treeName, alarmDetails.hostName, key, alarmDetails.alarm.details._1, alarmDetails.alarm.details._2, alarmDetails.localProbThreshold, ppmTreeNodeAlarms, alarmID, alarmDetails.processDetailsSet),
+      ConciseAlarmEvent(alarmDetails.treeName, alarmDetails.hostName, key, alarmDetails.alarm.details._1.min, alarmDetails.alarm.details._2, alarmDetails.localProbThreshold, ppmTreeNodeAlarms, alarmID, alarmDetails.processDetailsSet),
       AlarmEventMetaData(runID, "raw")
     )
   }
