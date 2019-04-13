@@ -132,8 +132,8 @@ object Application extends App {
         )(as), // EmptyPersistor()(as),
         idProvider = AdmUuidProvider,
         indexer = Indexer.currentIndex(EmptyIndex),
-        inMemorySoftNodeLimit = Some(100000),
-        inMemoryHardNodeLimit = Some(200000),
+        inMemorySoftNodeLimit = Some(10000),
+        inMemoryHardNodeLimit = Some(20000),
         uiPort = None
       )
       (graphService.system, Some(graphService))

@@ -1,5 +1,6 @@
 package com.galois.adapt
 
+import java.nio.ByteBuffer
 import shapeless.cachedImplicit
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
@@ -13,7 +14,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import com.rrwright.quine.gremlin.{GremlinQueryRunner, TypeAnnotationFieldReader}
-import com.rrwright.quine.language.{DomainNode, DomainNodeSetSingleton, NoConstantsDomainNode, PickleReader, QuineId, Queryable}
+import com.rrwright.quine.language.{DomainNode, DomainNodeSetSingleton, NoConstantsDomainNode, PickleReader, PickleScheme, Queryable, QuineId}
 import com.rrwright.quine.language.EdgeDirections._
 import com.rrwright.quine.runtime.{NameSpacedUuidProvider, QuineIdProvider}
 import com.rrwright.quine.language.BoopickleScheme._
@@ -21,32 +22,58 @@ import com.rrwright.quine.language.BoopickleScheme._
 
 
 object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
-  val underlying = NameSpacedUuidProvider(List("synthetic"),0)
-  private implicit def toNamespacedId(a: AdmUUID): (String, UUID) = (a.namespace, a.uuid)
-  private implicit def fromNamespacedId(x: (String, UUID)): AdmUUID  = AdmUUID(x._2, x._1)
+
+  private val stringPickler = implicitly[PickleScheme[String]]
 
   // Given a namespace, get the host index
-  private val namespaceIdx: Map[String, HostIdx] = AdaptConfig.quineConfig.hosts
-    .zipWithIndex
-    .flatMap { case (AdaptConfig.QuineHost(_, namespaces), hostIdx) => namespaces.map(_ -> hostIdx) }
-    .toMap
+  private val namespaceIdx: Map[String, HostIdx] =
+    AdaptConfig.quineConfig.hosts.zipWithIndex.flatMap {
+      case (AdaptConfig.QuineHost(_, namespaces), hostIdx) => namespaces.map(_ -> hostIdx)
+    }.toMap
 
-  def newId() = underlying.newId()
-  def hashedCustomId(bytes: Array[Byte]) = underlying.hashedCustomId(bytes)
-  def customIdToString(typed: AdmUUID) = typed.rendered
-  def customIdToBytes(typed: AdmUUID) = underlying.customIdToBytes(typed)
-  def customIdFromBytes(bytes: Array[Byte]) = underlying.customIdFromBytes(bytes).map(x => x)
-  def customIdFromString(str: String) = Try(AdmUUID.fromRendered(str))
-  def ppmTreeRootNodeId(host: String,treeName: String) = new QuineId(underlying.customIdToBytes(host,UUID.nameUUIDFromBytes(treeName.getBytes)))
+  println(s"AdmUuidProvider namespaceIdx:\n${namespaceIdx.mkString("\n")}")
+
+
+  def newCustomId(): AdmUUID = AdmUUID(UUID.randomUUID(), "synthesized")
+
+  override def newCustomIdFromData(data: Any): AdmUUID = newCustomId().copy(namespace = data.asInstanceOf[String])
+
+  def customIdToString(typed: AdmUUID): String = typed.rendered
+  def customIdFromString(s: String): Try[AdmUUID] = Try(AdmUUID.fromRendered(s))
+
+  def customIdToBytes(typed: AdmUUID): Array[Byte] = {
+    val stringBytes = stringPickler.write(typed.namespace)
+    ByteBuffer.allocate(16 + stringBytes.length)
+      .putLong(typed.uuid.getMostSignificantBits).putLong(typed.uuid.getLeastSignificantBits)
+      .put(stringBytes)
+      .array()
+  }
+  def customIdFromBytes(bytes: Array[Byte]): Try[AdmUUID] = Try {
+    import com.rrwright.quine.runtime.bbRemainder
+    val bb = ByteBuffer.wrap(bytes)
+    val uuid = new UUID(bb.getLong(), bb.getLong())
+    AdmUUID(uuid, stringPickler.read(bb.remainingBytes))
+  }
+
+  def hashedCustomId(bytes: Array[Byte]): AdmUUID = AdmUUID(UUID.nameUUIDFromBytes(bytes), "synthesized")
+
+
+//  def ppmTreeRootNodeId(hostName: String, treeName: String) = new QuineId(customIdToBytes(AdmUUID(UUID.nameUUIDFromBytes(treeName.getBytes), hostName)))
+
 
   override def qidDistribution(qid: QuineId): (HostIdx, LocalShardIdx) = {
     customIdFromQid(qid) match {
       case Success(admUuid) =>
+        // Host index is defined with the first match of:
+        //   1.) saved Idx for hostname,
+        //   2.) first saved Idx for `admUuid.hostname` PREFIX,
+        //   3.) random according to hashcode  (includes namespace: "synthesized")
         val h = Math.abs(admUuid.hashCode)
-        namespaceIdx.getOrElse(admUuid.namespace, h) -> h
+        lazy val prefixMatchOrHash = namespaceIdx.keys.find(k => admUuid.namespace.startsWith(k))   // TODO: Consider adding new entries in namespaceIdx to speed this up.
+          .fold(h)(matchedKey => namespaceIdx(matchedKey))
+        namespaceIdx.getOrElse(admUuid.namespace, prefixMatchOrHash) -> h
 
       case Failure(_) =>
-        import java.nio.ByteBuffer
         val randomIdx = Math.abs(ByteBuffer.wrap(hashToLength(qid.array, 4)).getInt())
         randomIdx -> randomIdx
     }

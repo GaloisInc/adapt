@@ -93,7 +93,7 @@ object AdaptConfig extends Utils {
     quineactorparallelism: Int,
     shardsperhost: Int,
     thishost: Ip,
-    hosts: List[QuineHost]
+    hosts: List[QuineHost]  // Order matters!
   )
   case class QuineHost(
     ip: Ip,
