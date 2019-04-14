@@ -81,7 +81,14 @@ object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
 }
 
 
-case class ESOSubject(cid: Int, subjectTypes: Set[SubjectType], cmdLine: AdmPathNode) extends NoConstantsDomainNode
+
+case class ObjectWriter(did_write: <--[ESOSubject]) extends NoConstantsDomainNode
+case class ObjectExecutor(did_execute: <--[ESOSubject]) extends NoConstantsDomainNode
+
+
+// TODO: More than just `cmdLine` on Subjects?!?
+
+case class ESOSubject(cid: Int, subjectTypes: Set[SubjectType], cmdLine: Option[AdmPathNode]) extends NoConstantsDomainNode
 case class ESOFileObject(fileObjectType: FileObjectType, path: AdmPathNode) extends NoConstantsDomainNode
 case class ESOSrcSinkObject(srcSinkType: SrcSinkType) extends NoConstantsDomainNode
 case class ESONetFlowObject(remoteAddress: Option[String], localAddress: Option[String], remotePort: Option[Int], localPort: Option[Int]) extends NoConstantsDomainNode
@@ -110,7 +117,8 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         "size" -> "Option[Long]",
         "inputType" -> "Option[String]",
         "deviceType" -> "Option[String]",
-        "subjectTypes" -> "Set[SubjectType]"
+        "subjectTypes" -> "Set[SubjectType]",
+        "srcSinkType" -> "SrcSinkType"
       ),
       defaultTypeNames = Seq("Boolean", "Long", "Int", "List[Int]", "List[Long]", "String"),
       typeNameToPickleReader = Map(
@@ -125,7 +133,8 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         "Set[CdmUUID]"     -> PickleReader[Set[CdmUUID]],
         "Option[Long]"     -> PickleReader[Option[Long]],
         "Option[String]"   -> PickleReader[Option[String]],
-        "Set[SubjectType]" -> PickleReader[Set[SubjectType]]
+        "Set[SubjectType]" -> PickleReader[Set[SubjectType]],
+        "SrcSinkType"      -> PickleReader[SrcSinkType]
       )
     ),
     labelKey = "type_of"
@@ -152,6 +161,12 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
     Duration.Inf
   ))
 
+
+
+  implicit val queryableEsoSubject: Queryable[ESOSubject] = cachedImplicit
+  implicit val queryableEsoFileObject: Queryable[ESOFileObject] = cachedImplicit
+  implicit val queryableEsoSrcSinkObject: Queryable[ESOSrcSinkObject] = cachedImplicit
+  implicit val queryableEsoNetFlow: Queryable[ESONetFlowObject] = cachedImplicit
   implicit val queryableEsoFileInstance: Queryable[ESOFileInstance] = cachedImplicit
   implicit val queryableEsoSrcSnkInstance: Queryable[ESOSrcSnkInstance] = cachedImplicit
   implicit val queryableEsoNetworkInstance: Queryable[ESONetworkInstance] = cachedImplicit

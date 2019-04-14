@@ -19,7 +19,7 @@ object PpmSummarizer {
     def doAbstraction(eventType: String): Option[AbstractionOne] = if (events.exists(_.toString == eventType)) Some(this) else None
   }
   case object AbstractionOne {
-    val abstractions = List(ReadEvents, WriteEvents, ProcessTreeEvents, ExecutionEvents, MemoryMap, Unlink, AddObjectAttribute, CreateObject, FlowsTo, Update, FileSystemEvents, FileSystemEvents, NetworkManagementEvents, SystemManagementEvents, UserEvents, NonspecificEvents, DiscardedEvents)
+    val abstractions = List(ReadEvents, WriteEvents, ProcessTreeEvents, ExecutionEvents, MemoryMap, DeleteEvents, AddObjectAttribute, CreateObject, FlowsTo, Update, FileSystemEvents, FileSystemEvents, NetworkManagementEvents, SystemManagementEvents, UserEvents, NonspecificEvents, DiscardedEvents)
     def go(eventType: EventType): Option[AbstractionOne] = abstractions.flatMap(_.doAbstraction(eventType)).headOption
     def go(eventType: String): Option[AbstractionOne] = abstractions.flatMap(_.doAbstraction(eventType)).headOption
   }
@@ -33,8 +33,7 @@ object PpmSummarizer {
   case object WriteEvents extends AbstractionOne {
     val events: Set[EventType] = Set(
       EVENT_WRITE,
-      EVENT_SENDTO, EVENT_SENDMSG,
-      EVENT_TRUNCATE
+      EVENT_SENDTO, EVENT_SENDMSG
 //        EVENT_MMAP
     )
   }
@@ -54,8 +53,8 @@ object PpmSummarizer {
   case object MemoryMap extends AbstractionOne {
     val events: Set[EventType] = Set(EVENT_MMAP)        // Needs further thought about the implications.)
   }
-  case object Unlink extends AbstractionOne {
-    val events: Set[EventType] = Set(EVENT_UNLINK)
+  case object DeleteEvents extends AbstractionOne {
+    val events: Set[EventType] = Set(EVENT_UNLINK, EVENT_TRUNCATE)
   }
   case object AddObjectAttribute extends AbstractionOne {
     val events: Set[EventType] = Set(EVENT_ADD_OBJECT_ATTRIBUTE)

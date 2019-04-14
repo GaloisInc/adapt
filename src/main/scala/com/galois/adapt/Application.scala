@@ -21,6 +21,8 @@ import com.galois.adapt.PpmFlowComponents.CompletedESO
 import com.typesafe.config.{Config, ConfigFactory}
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
+import com.galois.adapt.NoveltyDetection.{PpmEvent, PpmFileObject, PpmNetFlowObject, PpmSrcSinkObject, PpmSubject}
+import com.galois.adapt.PpmSummarizer.AbstractionOne
 import com.galois.adapt.cdm20._
 import scala.collection.mutable
 import scala.concurrent.duration._
@@ -434,6 +436,37 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
       implicit val graph: GraphService[AdmUUID] = actorSystemGraphService._2.get
       implicit val timeout = Timeout(30.4 seconds)
 
+
+
+      val readTypes = Set[EventType](EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG)
+      val execTypes = Set[EventType](EVENT_EXECUTE, EVENT_LOADLIBRARY, EVENT_MMAP, EVENT_STARTSERVICE)
+      val deleteTypes = Set[EventType](EVENT_UNLINK, EVENT_TRUNCATE)
+
+      def makeComplexObsEdge(subjectQid: Option[QuineId], objectQid: Option[QuineId], eventType: EventType): Future[Unit] = {
+        AbstractionOne.go(eventType)
+        val eventlabelOpt = eventType match {
+//        EVENT_ADD_OBJECT_ATTRIBUTE, EVENT_CHANGE_PRINCIPAL, EVENT_CLONE, EVENT_FORK, EVENT_MODIFY_FILE_ATTRIBUTES, EVENT_MODIFY_PROCESS, EVENT_MPROTECT, EVENT_READ_SOCKET_PARAMS, EVENT_SERVICEINSTALL, EVENT_SHM, EVENT_SIGNAL, EVENT_UMOUNT, EVENT_UNIT, EVENT_UPDATE, EVENT_WAIT, EVENT_WRITE_SOCKET_PARAMS
+//          case EVENT_ACCEPT | EVENT_CONNECT =>
+          case EVENT_READ | EVENT_RECVFROM | EVENT_RECVMSG                                       => Some("did_read")   // TODO: or: NoveltyDetection.readTypes contains
+          case EVENT_WRITE | EVENT_SENDTO | EVENT_SENDMSG | EVENT_CREATE_OBJECT | EVENT_FLOWS_TO => Some("did_write")  // TODO: etc.
+          case EVENT_EXECUTE | EVENT_LOADLIBRARY | EVENT_MMAP | EVENT_STARTSERVICE               => Some("did_execute")
+          case EVENT_UNLINK | EVENT_TRUNCATE                                                     => Some("did_delete")
+//          case EVENT_RENAME =>
+          case _ => None
+        }
+        val opt = for {
+          eLabel <- eventlabelOpt
+          sub <- subjectQid
+          obj <- objectQid
+        } yield {
+//          println(s"Wrote: $eLabel from: ${graph.idProvider.customIdFromQid(sub)}, to: ${graph.idProvider.customIdFromQid(obj)}")
+          graph.dumbOps.addEdge(sub, obj, eLabel).recoveryMessage("Failed to create edge: {} from: {} to: {}", eLabel, graph.idProvider.customIdFromQid(sub), graph.idProvider.customIdFromQid(obj))
+        }
+        opt.getOrElse(Future.successful(()))
+      }
+
+
+
       val sqidFile = StandingQueryId("standing-find_ESOFile-accumulator")
       val standingFetchFileActor = system.actorOf(
         Props(
@@ -441,6 +474,103 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
           implicitly[Queryable[ESOFileInstance]],
           (l: List[ESOFileInstance]) => l.foreach{ eso =>
             ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! eso)
+            makeComplexObsEdge(eso.subject.qid, eso.predicateObject.qid, eso.eventType)
+
+            // CommunicationPathThroughObject:  (write, then read)
+            if ((readTypes contains eso.eventType) && eso.predicateObject.qid.isDefined) {  // Test if this ESO matches the second half of the pattern
+              // Get any existing patterns with ObjectWriter which form the first half of the SEOES pattern (viz. SEO).
+              val objectQid = eso.predicateObject.qid.get
+              val objectCustomId = graph.idProvider.customIdFromQid(objectQid)
+              val objWritersFut = graph.getNodeComponents(objectQid, branchOf[ObjectWriter](), None).map { ncList =>
+                ncList.flatMap { nc => implicitly[Queryable[ObjectWriter]].fromNodeComponents(nc)
+                  .collect{ case ow if ow.did_write.target.qid != eso.subject.qid => // Ignore matches when the subject is the same on each side.
+
+                    // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
+                    val s1 = PpmSubject(ow.did_write.target.cid, ow.did_write.target.subjectTypes, graph.idProvider.customIdFromQid(ow.did_write.target.qid.get).get)
+                    val pn1 = ow.did_write.target.cmdLine
+
+                    val o = PpmFileObject(eso.predicateObject.fileObjectType, objectCustomId.get)
+                    val pno = eso.predicateObject.path
+
+                    val e = PpmEvent(eso.eventType, eso.earliestTimestampNanos, eso.latestTimestampNanos, graph.idProvider.customIdFromQid(eso.qid.get).get)
+
+                    val s2 = PpmSubject(eso.subject.cid, eso.subject.subjectTypes, graph.idProvider.customIdFromQid(eso.subject.qid.get).get)
+                    val pn2 = eso.subject.cmdLine
+
+                    type EventKind = String
+                    val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
+                      ((s1, pn1), "did_write", (e, (s2, pn2), (o, Some(pno))))
+
+                    println(s"CommunicationPathThroughObject: $seoes")  // TODO: Nichole: send to PPM observer.
+                  }
+                }
+              }.recoveryMessage("SEOES extraction for CommunicationPathThroughObject failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
+//              objWritersFut.map{ oList => if (oList.nonEmpty) println(s"FOUND ${oList.size}:\n${oList.mkString("\n")}") }
+            }
+
+            // FileExecuteDelete:  (execute, then delete)
+            if ((deleteTypes contains eso.eventType) && eso.predicateObject.qid.isDefined) {  // Test if this ESO matches the second half of the pattern
+              val objectQid = eso.predicateObject.qid.get
+              val objectCustomId = graph.idProvider.customIdFromQid(objectQid)
+              val objWritersFut = graph.getNodeComponents(objectQid, branchOf[ObjectExecutor](), None).map { ncList =>
+                ncList.flatMap { nc =>
+                  implicitly[Queryable[ObjectExecutor]].fromNodeComponents(nc)
+                    .collect { case ow if ow.did_execute.target.qid != eso.subject.qid => // Ignore matches when the subject is the same on each side.
+
+                      // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
+                      val s1 = PpmSubject(ow.did_execute.target.cid, ow.did_execute.target.subjectTypes, graph.idProvider.customIdFromQid(ow.did_execute.target.qid.get).get)
+                      val pn1 = ow.did_execute.target.cmdLine
+
+                      val o = PpmFileObject(eso.predicateObject.fileObjectType, objectCustomId.get)
+                      val pno = eso.predicateObject.path
+
+                      val e = PpmEvent(eso.eventType, eso.earliestTimestampNanos, eso.latestTimestampNanos, graph.idProvider.customIdFromQid(eso.qid.get).get)
+
+                      val s2 = PpmSubject(eso.subject.cid, eso.subject.subjectTypes, graph.idProvider.customIdFromQid(eso.subject.qid.get).get)
+                      val pn2 = eso.subject.cmdLine
+
+                      type EventKind = String
+                      val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
+                        ((s1, pn1), "did_execute", (e, (s2, pn2), (o, Some(pno))))
+
+                      println(s"FileExecuteDelete: $seoes")  // TODO: Nichole: send to PPM observer.
+                    }
+                }
+              }.recoveryMessage("SEOES extraction for DileExecuteDelete failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
+            }
+
+
+            // FilesWrittenThenExecuted:  (write, then execute)
+            if ((execTypes contains eso.eventType) && eso.predicateObject.qid.isDefined) {  // Test if this ESO matches the second half of the pattern
+              val objectQid = eso.predicateObject.qid.get
+              val objectCustomId = graph.idProvider.customIdFromQid(objectQid)
+              val objWritersFut = graph.getNodeComponents(objectQid, branchOf[ObjectWriter](), None).map { ncList =>
+                ncList.flatMap { nc =>
+                  implicitly[Queryable[ObjectWriter]].fromNodeComponents(nc)
+                    .collect { case ow if ow.did_write.target.qid != eso.subject.qid => // Ignore matches when the subject is the same on each side.
+
+                      // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
+                      val s1 = PpmSubject(ow.did_write.target.cid, ow.did_write.target.subjectTypes, graph.idProvider.customIdFromQid(ow.did_write.target.qid.get).get)
+                      val pn1 = ow.did_write.target.cmdLine
+
+                      val o = PpmFileObject(eso.predicateObject.fileObjectType, objectCustomId.get)
+                      val pno = eso.predicateObject.path
+
+                      val e = PpmEvent(eso.eventType, eso.earliestTimestampNanos, eso.latestTimestampNanos, graph.idProvider.customIdFromQid(eso.qid.get).get)
+
+                      val s2 = PpmSubject(eso.subject.cid, eso.subject.subjectTypes, graph.idProvider.customIdFromQid(eso.subject.qid.get).get)
+                      val pn2 = eso.subject.cmdLine
+
+                      type EventKind = String
+                      val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
+                        ((s1, pn1), "did_execute", (e, (s2, pn2), (o, Some(pno))))
+
+                      println(s"FilesWrittenThenExecuted: $seoes")  // TODO: Nichole: send to PPM observer.
+                    }
+                }
+              }.recoveryMessage("SEOES extraction for FilesWrittenThenExecuted failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
+            }
+
           }
         ), sqidFile.name
       )
@@ -451,7 +581,40 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
           classOf[StandingFetchActor[ESOSrcSnkInstance]],
           implicitly[Queryable[ESOSrcSnkInstance]],
           (l: List[ESOSrcSnkInstance]) => l.foreach{ eso =>
-              ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! eso)
+            ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! eso)
+            makeComplexObsEdge(eso.subject.qid, eso.predicateObject.qid, eso.eventType)
+
+            // CommunicationPathThroughObject:  (write, then read)
+            if ((readTypes contains eso.eventType) && eso.predicateObject.qid.isDefined) {  // Test if this ESO matches the second half of the pattern
+              // Get any existing patterns with ObjectWriter which form the first half of the SEOES pattern (viz. SEO).
+              val objectQid = eso.predicateObject.qid.get
+              val objectCustomId = graph.idProvider.customIdFromQid(objectQid)
+              val objWritersFut = graph.getNodeComponents(objectQid, branchOf[ObjectWriter](), None).map { ncList =>
+                ncList.flatMap { nc => implicitly[Queryable[ObjectWriter]].fromNodeComponents(nc)
+                  .collect{ case ow if ow.did_write.target.qid != eso.subject.qid => // Ignore matches when the subject is the same on each side.
+
+                    // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
+                    val s1 = PpmSubject(ow.did_write.target.cid, ow.did_write.target.subjectTypes, graph.idProvider.customIdFromQid(ow.did_write.target.qid.get).get)
+                    val pn1 = ow.did_write.target.cmdLine
+
+                    val o = PpmSrcSinkObject(eso.predicateObject.srcSinkType, objectCustomId.get)
+                    val pno = None
+
+                    val e = PpmEvent(eso.eventType, eso.earliestTimestampNanos, eso.latestTimestampNanos, graph.idProvider.customIdFromQid(eso.qid.get).get)
+
+                    val s2 = PpmSubject(eso.subject.cid, eso.subject.subjectTypes, graph.idProvider.customIdFromQid(eso.subject.qid.get).get)
+                    val pn2 = eso.subject.cmdLine
+
+                    type EventKind = String
+                    val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
+                      ((s1, pn1), "did_write", (e, (s2, pn2), (o, pno)))
+
+                    println(s"CommunicationPathThroughObject: $seoes")  // TODO: Nichole: send to PPM observer.
+                  }
+                }
+              }.recoveryMessage("SEOES extraction for CommunicationPathThroughObject failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
+            }
+
           }
         ), sqidSrcSnk.name
       )
@@ -463,13 +626,46 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
           implicitly[Queryable[ESONetworkInstance]],
           (l: List[ESONetworkInstance]) => l.foreach{ eso =>
             ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! eso)
+            makeComplexObsEdge(eso.subject.qid, eso.predicateObject.qid, eso.eventType)
+
+            // CommunicationPathThroughObject:  (write, then read)
+            if ((readTypes contains eso.eventType) && eso.predicateObject.qid.isDefined) {  // Test if this ESO matches the second half of the pattern
+              // Get any existing patterns with ObjectWriter which form the first half of the SEOES pattern (viz. SEO).
+              val objectQid = eso.predicateObject.qid.get
+              val objectCustomId = graph.idProvider.customIdFromQid(objectQid)
+              val objWritersFut = graph.getNodeComponents(objectQid, branchOf[ObjectWriter](), None).map { ncList =>
+                ncList.flatMap { nc => implicitly[Queryable[ObjectWriter]].fromNodeComponents(nc)
+                  .collect{ case ow if ow.did_write.target.qid != eso.subject.qid => // Ignore matches when the subject is the same on each side.
+
+                    // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
+                    val s1 = PpmSubject(ow.did_write.target.cid, ow.did_write.target.subjectTypes, graph.idProvider.customIdFromQid(ow.did_write.target.qid.get).get)
+                    val pn1 = ow.did_write.target.cmdLine
+
+                    val o = PpmNetFlowObject(eso.predicateObject.remotePort, eso.predicateObject.localPort, eso.predicateObject.remoteAddress, eso.predicateObject.localAddress, objectCustomId.get)
+                    val pno = None
+
+                    val e = PpmEvent(eso.eventType, eso.earliestTimestampNanos, eso.latestTimestampNanos, graph.idProvider.customIdFromQid(eso.qid.get).get)
+
+                    val s2 = PpmSubject(eso.subject.cid, eso.subject.subjectTypes, graph.idProvider.customIdFromQid(eso.subject.qid.get).get)
+                    val pn2 = eso.subject.cmdLine
+
+                    type EventKind = String
+                    val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
+                      ((s1, pn1), "did_write", (e, (s2, pn2), (o, pno)))
+
+                    println(s"CommunicationPathThroughObject: $seoes")  // TODO: Nichole: send to PPM observer.
+                  }
+                }
+              }.recoveryMessage("SEOES extraction for CommunicationPathThroughObject failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
+            }
+
           }
         ), sqidNetwork.name
       )
 
       graph.currentGraph.standingQueryActors = graph.currentGraph.standingQueryActors +
         (sqidFile -> standingFetchFileActor) +
-        (sqidSrcSnk -> standingFetchSrcSnkActor)+
+        (sqidSrcSnk -> standingFetchSrcSnkActor) +
         (sqidNetwork -> standingFetchNetworkActor)
 
 //      println(branchOf[ESOFileInstance]())
