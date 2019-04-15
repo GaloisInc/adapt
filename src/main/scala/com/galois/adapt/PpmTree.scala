@@ -841,7 +841,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val subUuid = subject.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
         val eventUuid = msg.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
         val e: Event = PpmEvent(eventType, earliestTimestampNanos, latestTimestampNanos, eventUuid)
-        val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), subject.cmdLine)
+        val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), Some(subject.cmdLine))
         val o: Object = (PpmFileObject(predicateObject.fileObjectType, objUuid), Some(predicateObject.path))
 
         val f = Future { esoTrees.foreach(ppm => ppm.observe((e, s, o))) }
@@ -855,7 +855,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val subUuid = subject.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
         val eventUuid = msg.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
         val e: Event = PpmEvent(eventType, earliestTimestampNanos, latestTimestampNanos, eventUuid)
-        val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), subject.cmdLine)
+        val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), Some(subject.cmdLine))
         val o: Object = (PpmNetFlowObject(predicateObject.remotePort, predicateObject.localPort, predicateObject.remoteAddress, predicateObject.localAddress, objUuid), None)
 
         val f = Future { esoTrees.foreach(ppm => ppm.observe((e, s, o))) }
@@ -869,7 +869,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val subUuid = subject.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
         val eventUuid = msg.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
         val e: Event = PpmEvent(eventType, earliestTimestampNanos, latestTimestampNanos, eventUuid)
-        val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), subject.cmdLine)
+        val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), Some(subject.cmdLine))
         val o: Object = (PpmSrcSinkObject(predicateObject.srcSinkType, objUuid), None)
 
 

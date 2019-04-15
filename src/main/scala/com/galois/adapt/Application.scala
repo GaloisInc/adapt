@@ -501,10 +501,10 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                     val pn2 = eso.subject.cmdLine
 
                     type EventKind = String
-                    val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
-                      ((s1, pn1), "did_write", (e, (s2, pn2), (o, Some(pno))))
+//                    val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
+//                      ((s1, pn1), "did_write", (e, (s2, pn2), (o, Some(pno))))
 
-                    val seoesInstance = SEOESInstance((s1, pn1), "did_write", ESOInstance(e, (s2, pn2), (o, Some(pno))))
+                    val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_write", ESOInstance(e, (s2, Some(pn2)), (o, Some(pno))))
 
                     // println(s"CommunicationPathThroughObject: $seoes")
                     ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
@@ -536,16 +536,16 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                       val pn2 = eso.subject.cmdLine
 
                       type EventKind = String
-                      val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
-                        ((s1, pn1), "did_execute", (e, (s2, pn2), (o, Some(pno))))
+//                      val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
+//                        ((s1, pn1), "did_execute", (e, (s2, pn2), (o, Some(pno))))
 
-                      val seoesInstance = SEOESInstance((s1, pn1), "did_execute", ESOInstance(e, (s2, pn2), (o, Some(pno))))
+                      val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_execute", ESOInstance(e, (s2, Some(pn2)), (o, Some(pno))))
 
                       // println(s"FileExecuteDelete: $seoes")
                       ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
                     }
                 }
-              }.recoveryMessage("SEOES extraction for DileExecuteDelete failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
+              }.recoveryMessage("SEOES extraction for FileExecuteDelete failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
             }
 
 
@@ -571,10 +571,10 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                       val pn2 = eso.subject.cmdLine
 
                       type EventKind = String
-                      val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
-                        ((s1, pn1), "did_write", (e, (s2, pn2), (o, Some(pno))))
+//                      val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
+//                        ((s1, pn1), "did_write", (e, (s2, pn2), (o, Some(pno))))
 
-                      val seoesInstance = SEOESInstance((s1, pn1), "did_write", ESOInstance(e, (s2, pn2), (o, Some(pno))))
+                      val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_write", ESOInstance(e, (s2, Some(pn2)), (o, Some(pno))))
 
                       // println(s"FilesWrittenThenExecuted: $seoes")
                       ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
@@ -602,10 +602,10 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                         val pnO = Some(eso.predicateObject.path)
 
                         type EventKind = String
-                        val oeseo: (NoveltyDetection.PpmNetFlowObject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, (NoveltyDetection.PpmFileObject, Option[AdmPathNode]))) =
-                          (n, "did_read", (e, (s, pnS), (o, pnO)))
+//                        val oeseo: (NoveltyDetection.PpmNetFlowObject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, (NoveltyDetection.PpmFileObject, Option[AdmPathNode]))) =
+//                          (n, "did_read", (e, (s, pnS), (o, pnO)))
 
-                        val oeseoInstance = OESEOInstance((n, None), "did_read", ESOInstance(e, (s, pnS), (o, pnO)))
+                        val oeseoInstance = OESEOInstance((n, None), "did_read", ESOInstance(e, (s, Some(pnS)), (o, pnO)))
 
                         // println(s"ProcessWritesFileSoonAfterNetflowRead: $oeseo")
                         ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! oeseoInstance)
@@ -650,10 +650,10 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                     val pn2 = eso.subject.cmdLine
 
                     type EventKind = String
-                    val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
-                      ((s1, pn1), "did_write", (e, (s2, pn2), (o, pno)))
+//                    val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
+//                      ((s1, pn1), "did_write", (e, (s2, pn2), (o, pno)))
 
-                    val seoesInstance = SEOESInstance((s1, pn1), "did_write", ESOInstance(e, (s2, pn2), (o, pno)))
+                    val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_write", ESOInstance(e, (s2, Some(pn2)), (o, pno)))
 
                     // println(s"CommunicationPathThroughObject: $seoes")
                     ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
@@ -697,10 +697,10 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                     val pn2 = eso.subject.cmdLine
 
                     type EventKind = String
-                    val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
-                      ((s1, pn1), "did_write", (e, (s2, pn2), (o, pno)))
+//                    val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
+//                      ((s1, pn1), "did_write", (e, (s2, pn2), (o, pno)))
 
-                    val seoesInstance = SEOESInstance((s1, pn1), "did_write", ESOInstance(e, (s2, pn2), (o, pno)))
+                    val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_write", ESOInstance(e, (s2, Some(pn2)), (o, pno)))
 
                     // println(s"CommunicationPathThroughObject: $seoes")
                     ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)

@@ -92,8 +92,7 @@ case class NetflowReadingProcess(cid: Int, cmdLine: AdmPathNode, latestNetflowRe
 case class ParentProcess(cid: Int, subjectTypes: Set[SubjectType], cmdLine: AdmPathNode) extends NoConstantsDomainNode
 case class ChildProcess(cid: Int, subjectTypes: Set[SubjectType], cmdLine: AdmPathNode, parentSubject: ParentProcess) extends NoConstantsDomainNode
 
-// TODO: Why was cmdLine type changed to Option[AdmPathNode]?
-case class ESOSubject(cid: Int, subjectTypes: Set[SubjectType], cmdLine: Option[AdmPathNode]) extends NoConstantsDomainNode
+case class ESOSubject(cid: Int, subjectTypes: Set[SubjectType], cmdLine: AdmPathNode) extends NoConstantsDomainNode
 case class ESOFileObject(fileObjectType: FileObjectType, path: AdmPathNode) extends NoConstantsDomainNode
 case class ESOSrcSinkObject(srcSinkType: SrcSinkType) extends NoConstantsDomainNode
 case class ESONetFlowObject(remoteAddress: Option[String], localAddress: Option[String], remotePort: Option[Int], localPort: Option[Int]) extends NoConstantsDomainNode
