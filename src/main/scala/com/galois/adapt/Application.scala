@@ -572,6 +572,35 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
               }.recoveryMessage("SEOES extraction for FilesWrittenThenExecuted failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
             }
 
+
+            // ProcessWritesFileSoonAfterNetflowRead: (alternate)  Part 2
+            if ((writeTypes contains eso.eventType) && eso.predicateObject.qid.isDefined) {  // Test if this ESO matches the second half of the pattern
+              val subjectQid = eso.subject.qid.get
+              val subjectCustomId = graph.idProvider.customIdFromQid(subjectQid)
+              val objWritersFut = graph.getNodeComponents(subjectQid, branchOf[NetflowReadingProcess](), None).map { ncList =>
+                ncList.foreach { nc =>
+                  implicitly[Queryable[NetflowReadingProcess]].fromNodeComponents(nc)
+                    .foreach{ nfrp =>
+                      val delta = eso.latestTimestampNanos - nfrp.latestNetflowRead.latestTimestampNanos
+                      if (delta >= 0 && delta <= 1e10.toLong) {
+                        val n = PpmNetFlowObject(nfrp.latestNetflowRead.remotePort, nfrp.latestNetflowRead.localPort, nfrp.latestNetflowRead.remoteAddress, nfrp.latestNetflowRead.localAddress, graph.idProvider.customIdFromQid(new QuineId(nfrp.latestNetflowRead.qid)).get)
+                        val e = PpmEvent(eso.eventType, eso.earliestTimestampNanos, eso.latestTimestampNanos, graph.idProvider.customIdFromQid(eso.qid.get).get)
+                        val s = PpmSubject(eso.subject.cid, eso.subject.subjectTypes, graph.idProvider.customIdFromQid(eso.subject.qid.get).get)
+                        val pnS = eso.subject.cmdLine
+                        val o = PpmFileObject(eso.predicateObject.fileObjectType, graph.idProvider.customIdFromQid(eso.predicateObject.qid.get).get)
+                        val pnO = Some(eso.predicateObject.path)
+
+                        type EventKind = String
+                        val oeseo: (NoveltyDetection.PpmNetFlowObject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, (NoveltyDetection.PpmFileObject, Option[AdmPathNode]))) =
+                          (n, "did_read", (e, (s, pnS), (o, pnO)))
+
+                        println(s"ProcessWritesFileSoonAfterNetflowRead: $oeseo")  // TODO: Nichole: send to PPM observer.
+                      }
+                    }
+                }
+              }
+            }
+
           }
         ), sqidFile.name
       )
@@ -686,11 +715,21 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                     println(s"ProcessWritesFileSoonAfterNetflowRead: $oeseo")  // TODO: Nichole: send to PPM observer.
                 }
               }
+            }
 
+            // ProcessWritesFileSoonAfterNetflowRead: (alternate)  Part 1
+            if (readTypes.contains(eso.eventType) && eso.subject.qid.isDefined) Try {  // Test if this ESO matches the FIRST half of the pattern
+              val subjectQid = eso.subject.qid.get
+              val n = eso.predicateObject
+              val data = LatestNetflowRead(n.remoteAddress, n.remotePort, n.localAddress, n.localPort, eso.latestTimestampNanos, n.qid.get.array)
+              graph.dumbOps.setProp(subjectQid, "latestNetflowRead", data)  // TODO: Consider: Reads from multiple netflows on the same process.
+//              println(s"Set 'latestNetflowRead' on ${graph.idProvider.customIdFromQid(subjectQid).get} to: $data on process: ${graph.idProvider.customIdFromQid(subjectQid).get}")
             }
           }
         ), sqidNetwork.name
       )
+
+
 
       val sqidParentProcess = StandingQueryId("standing-fetch_ProcessParentage")
       val standingFetchProcessParentageActor = system.actorOf(

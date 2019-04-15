@@ -85,6 +85,8 @@ object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
 case class ObjectWriter(did_write: <--[ESOSubject]) extends NoConstantsDomainNode
 case class ObjectExecutor(did_execute: <--[ESOSubject]) extends NoConstantsDomainNode
 
+case class LatestNetflowRead(remoteAddress: Option[String], remotePort: Option[Int], localAddress: Option[String], localPort: Option[Int], latestTimestampNanos: Long, qid: Array[Byte])
+case class NetflowReadingProcess(cid: Int, cmdLine: AdmPathNode, latestNetflowRead: LatestNetflowRead) extends NoConstantsDomainNode
 
 // TODO: More than just `cmdLine` on Subjects?!?
 case class ParentProcess(cid: Int, subjectTypes: Set[SubjectType], cmdLine: AdmPathNode) extends NoConstantsDomainNode
@@ -120,7 +122,11 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         "inputType" -> "Option[String]",
         "deviceType" -> "Option[String]",
         "subjectTypes" -> "Set[SubjectType]",
-        "srcSinkType" -> "SrcSinkType"
+        "srcSinkType" -> "SrcSinkType",
+        "localAddress" -> "Option[String]",
+        "localPort" -> "Option[Int]",
+        "remoteAddress" -> "Option[String]",
+        "remotePort" -> "Option[Int]"
       ),
       defaultTypeNames = Seq("Boolean", "Long", "Int", "List[Int]", "List[Long]", "String"),
       typeNameToPickleReader = Map(
@@ -133,6 +139,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         "FileObjectType"   -> PickleReader[FileObjectType],
         "EventType"        -> PickleReader[EventType],
         "Set[CdmUUID]"     -> PickleReader[Set[CdmUUID]],
+        "Option[Int]"      -> PickleReader[Option[Int]],
         "Option[Long]"     -> PickleReader[Option[Long]],
         "Option[String]"   -> PickleReader[Option[String]],
         "Set[SubjectType]" -> PickleReader[Set[SubjectType]],
