@@ -690,32 +690,32 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
             }
 
             // ProcessWritesFileSoonAfterNetflowRead
-            val it_is_a_good_idea_to_spend_RAM_in_this_way = false
-            if (it_is_a_good_idea_to_spend_RAM_in_this_way && readTypes.contains(eso.eventType) && eso.subject.qid.isDefined) {  // Test if this ESO matches the FIRST half of the pattern
-              val subjectQid = eso.subject.qid.get
-              val subjectCustomId = graph.idProvider.customIdFromQid(subjectQid)
-              val latestEsoNanos: Long = eso.latestTimestampNanos
-              // create standing fetch on the subject, looking for write event
-              graph.standingFetch[ESOFileInstance](subjectCustomId.get, None){ fileESOs =>  // TODO: WARNING: This will close over the initial ESO match for the (infinite) life of the standingFetch actor!!!!!!!!!!!!
-                fileESOs.foreach{
-                  case fileWriteEso if writeTypes.contains(fileWriteEso.eventType) &&
-                    fileWriteEso.earliestTimestampNanos - latestEsoNanos < 1e10.toLong => // Less than 10 seconds between latest network read and earliest file write.
-
-                    val n = PpmNetFlowObject(eso.predicateObject.remotePort, eso.predicateObject.localPort, eso.predicateObject.remoteAddress, eso.predicateObject.localAddress, graph.idProvider.customIdFromQid(eso.predicateObject.qid.get).get)
-                    val e = PpmEvent(fileWriteEso.eventType, fileWriteEso.earliestTimestampNanos, fileWriteEso.latestTimestampNanos, graph.idProvider.customIdFromQid(fileWriteEso.qid.get).get)
-                    val s = PpmSubject(fileWriteEso.subject.cid, fileWriteEso.subject.subjectTypes, graph.idProvider.customIdFromQid(fileWriteEso.subject.qid.get).get)
-                    val pnS = fileWriteEso.subject.cmdLine
-                    val o = PpmFileObject(fileWriteEso.predicateObject.fileObjectType, graph.idProvider.customIdFromQid(fileWriteEso.predicateObject.qid.get).get)
-                    val pnO = Some(fileWriteEso.predicateObject.path)
-
-                    type EventKind = String
-                    val oeseo: (NoveltyDetection.PpmNetFlowObject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, (NoveltyDetection.PpmFileObject, Option[AdmPathNode]))) =
-                      (n, "did_read", (e, (s, pnS), (o, pnO)))
-
-                    println(s"ProcessWritesFileSoonAfterNetflowRead: $oeseo")  // TODO: Nichole: send to PPM observer.
-                }
-              }
-            }
+//            val it_is_a_good_idea_to_spend_RAM_in_this_way = false
+//            if (it_is_a_good_idea_to_spend_RAM_in_this_way && readTypes.contains(eso.eventType) && eso.subject.qid.isDefined) {  // Test if this ESO matches the FIRST half of the pattern
+//              val subjectQid = eso.subject.qid.get
+//              val subjectCustomId = graph.idProvider.customIdFromQid(subjectQid)
+//              val latestEsoNanos: Long = eso.latestTimestampNanos
+//              // create standing fetch on the subject, looking for write event
+//              graph.standingFetch[ESOFileInstance](subjectCustomId.get, None){ fileESOs =>  // TODO: WARNING: This will close over the initial ESO match for the (infinite) life of the standingFetch actor!!!!!!!!!!!!
+//                fileESOs.foreach{
+//                  case fileWriteEso if writeTypes.contains(fileWriteEso.eventType) &&
+//                    fileWriteEso.earliestTimestampNanos - latestEsoNanos < 1e10.toLong => // Less than 10 seconds between latest network read and earliest file write.
+//
+//                    val n = PpmNetFlowObject(eso.predicateObject.remotePort, eso.predicateObject.localPort, eso.predicateObject.remoteAddress, eso.predicateObject.localAddress, graph.idProvider.customIdFromQid(eso.predicateObject.qid.get).get)
+//                    val e = PpmEvent(fileWriteEso.eventType, fileWriteEso.earliestTimestampNanos, fileWriteEso.latestTimestampNanos, graph.idProvider.customIdFromQid(fileWriteEso.qid.get).get)
+//                    val s = PpmSubject(fileWriteEso.subject.cid, fileWriteEso.subject.subjectTypes, graph.idProvider.customIdFromQid(fileWriteEso.subject.qid.get).get)
+//                    val pnS = fileWriteEso.subject.cmdLine
+//                    val o = PpmFileObject(fileWriteEso.predicateObject.fileObjectType, graph.idProvider.customIdFromQid(fileWriteEso.predicateObject.qid.get).get)
+//                    val pnO = Some(fileWriteEso.predicateObject.path)
+//
+//                    type EventKind = String
+//                    val oeseo: (NoveltyDetection.PpmNetFlowObject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, (NoveltyDetection.PpmFileObject, Option[AdmPathNode]))) =
+//                      (n, "did_read", (e, (s, pnS), (o, pnO)))
+//
+//                    println(s"ProcessWritesFileSoonAfterNetflowRead: $oeseo")  // TODO: Nichole: send to PPM observer.
+//                }
+//              }
+//            }
 
             // ProcessWritesFileSoonAfterNetflowRead: (alternate)  Part 1
             if (readTypes.contains(eso.eventType) && eso.subject.qid.isDefined) Try {  // Test if this ESO matches the FIRST half of the pattern
