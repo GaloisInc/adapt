@@ -863,7 +863,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
   def receive = {
 
-    case msg @ Novelty(treeName, probabilityData, collectedUuids: Set[NamespacedUuidDetails], timestamps: Set[Long]) =>
+    case msg @ Novelty(treeName, probabilityData, collectedUuids: Set[NamespacedUuidDetails @unchecked], timestamps) =>
       ppm(treeName).fold(
         log.warning(s"Could not find tree named: $treeName to record Alarm related to: $probabilityData with UUIDs: $collectedUuids, with dataTimestamps: $timestamps from: $sender")
       ){ tree =>

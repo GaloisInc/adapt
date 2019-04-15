@@ -467,7 +467,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 
 
 
-      val sqidFile = StandingQueryId("standing-find_ESOFile-accumulator")
+      val sqidFile = StandingQueryId("standing-fetch_ESOFile-accumulator")
       val standingFetchFileActor = system.actorOf(
         Props(
           classOf[StandingFetchActor[ESOFileInstance]],
@@ -575,7 +575,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         ), sqidFile.name
       )
 
-      val sqidSrcSnk = StandingQueryId("standing-find_ESOSrcSnk-accumulator")
+      val sqidSrcSnk = StandingQueryId("standing-fetch_ESOSrcSnk-accumulator")
       val standingFetchSrcSnkActor = system.actorOf(
         Props(
           classOf[StandingFetchActor[ESOSrcSnkInstance]],
@@ -619,7 +619,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         ), sqidSrcSnk.name
       )
 
-      val sqidNetwork = StandingQueryId("standing-find_ESONetwork-accumulator")
+      val sqidNetwork = StandingQueryId("standing-fetch_ESONetwork-accumulator")
       val standingFetchNetworkActor = system.actorOf(
         Props(
           classOf[StandingFetchActor[ESONetworkInstance]],
@@ -658,17 +658,31 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                 }
               }.recoveryMessage("SEOES extraction for CommunicationPathThroughObject failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
             }
-
           }
         ), sqidNetwork.name
       )
 
+      val sqidParentProcess = StandingQueryId("standing-fetch_ProcessParentage")
+      val standingFetchProcessParentageActor = system.actorOf(
+        Props(
+          classOf[StandingFetchActor[ChildProcess]],
+          implicitly[Queryable[ChildProcess]],
+          (l: List[ChildProcess]) => l.foreach { pp =>
+            val childParent = pp.cmdLine.path -> pp.parentSubject.cmdLine.path
+            println(s"ParentChildProcess: ${childParent._1} is the child of: ${childParent._2}")  // TODO: Nichole: send to PPM observer.
+          }
+        ), sqidParentProcess.name
+      )
+
+
+
       graph.currentGraph.standingQueryActors = graph.currentGraph.standingQueryActors +
         (sqidFile -> standingFetchFileActor) +
         (sqidSrcSnk -> standingFetchSrcSnkActor) +
-        (sqidNetwork -> standingFetchNetworkActor)
+        (sqidNetwork -> standingFetchNetworkActor) +
+        (sqidParentProcess -> standingFetchProcessParentageActor)
 
-//      println(branchOf[ESOFileInstance]())
+
 
       val parallelism = quineConfig.quineactorparallelism
       val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))

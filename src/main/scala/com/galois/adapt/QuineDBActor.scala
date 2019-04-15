@@ -87,6 +87,8 @@ case class ObjectExecutor(did_execute: <--[ESOSubject]) extends NoConstantsDomai
 
 
 // TODO: More than just `cmdLine` on Subjects?!?
+case class ParentProcess(cid: Int, subjectTypes: Set[SubjectType], cmdLine: AdmPathNode) extends NoConstantsDomainNode
+case class ChildProcess(cid: Int, subjectTypes: Set[SubjectType], cmdLine: AdmPathNode, parentSubject: ParentProcess) extends NoConstantsDomainNode
 
 case class ESOSubject(cid: Int, subjectTypes: Set[SubjectType], cmdLine: Option[AdmPathNode]) extends NoConstantsDomainNode
 case class ESOFileObject(fileObjectType: FileObjectType, path: AdmPathNode) extends NoConstantsDomainNode
@@ -150,13 +152,13 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   }
 
 
-  def DBNodeableTx(cdms: Seq[DBNodeable[_]]): Try[Unit] = ??? 
-  
+  def DBNodeableTx(cdms: Seq[DBNodeable[_]]): Try[Unit] = ???
+
   // TODO Make an async interface for this - the 'Await' is gross.
   def AdmTx(adms: Seq[Either[ADM,EdgeAdm2Adm]]): Try[Unit] = Try(Await.result(
     Future.sequence(adms.map {
       case Left(a: ADM) => writeAdm(a)
-      case Right(e: EdgeAdm2Adm) => writeAdmEdge(e) 
+      case Right(e: EdgeAdm2Adm) => writeAdmEdge(e)
     }),
     Duration.Inf
   ))
@@ -183,24 +185,28 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   implicit val admSynthesizedInstance: Queryable[AdmSynthesized] = cachedImplicit
 
   def writeAdm(a: ADM): Future[Unit] = (a match {
-    case anAdm: AdmEvent              =>
-      val f = anAdm.create(Some(anAdm.uuid))
-
-      graphService.standingFetch[ESOFileInstance](anAdm.uuid, Some(StandingQueryId("standing-find_ESOFile-accumulator")))( x => { })
-      graphService.standingFetch[ESOSrcSnkInstance](anAdm.uuid, Some(StandingQueryId("standing-find_ESOSrcSnk-accumulator")))( x => { })
-      graphService.standingFetch[ESONetworkInstance](anAdm.uuid, Some(StandingQueryId("standing-find_ESONetwork-accumulator")))( x => { })
-      f
-    case anAdm: AdmSubject            => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
-    case anAdm: AdmPrincipal          => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
-    case anAdm: AdmFileObject         => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
-    case anAdm: AdmNetFlowObject      => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
-    case anAdm: AdmPathNode           => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
-    case anAdm: AdmPort               => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
-    case anAdm: AdmAddress            => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
-    case anAdm: AdmSrcSinkObject      => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
-    case anAdm: AdmProvenanceTagNode  => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
-    case anAdm: AdmHost               => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
-    case anAdm: AdmSynthesized        => DomainNodeSetSingleton(anAdm).create(Some(anAdm.uuid))
+    case anAdm: AdmEvent =>
+      anAdm.create(Some(anAdm.uuid)).map { x =>
+        graphService.standingFetch[ESOFileInstance](anAdm.uuid, Some(StandingQueryId("standing-fetch_ESOFile-accumulator")))(x => {})
+        graphService.standingFetch[ESOSrcSnkInstance](anAdm.uuid, Some(StandingQueryId("standing-fetch_ESOSrcSnk-accumulator")))(x => {})
+        graphService.standingFetch[ESONetworkInstance](anAdm.uuid, Some(StandingQueryId("standing-fetch_ESONetwork-accumulator")))(x => {})
+        x
+      }
+    case anAdm: AdmSubject =>
+      anAdm.create(Some(anAdm.uuid)).map { x =>
+        graphService.standingFetch[ChildProcess](anAdm.uuid, Some(StandingQueryId("standing-fetch_ProcessParentage")))(_ => {})
+        x
+      }
+    case anAdm: AdmPrincipal          => anAdm.create(Some(anAdm.uuid))
+    case anAdm: AdmFileObject         => anAdm.create(Some(anAdm.uuid))
+    case anAdm: AdmNetFlowObject      => anAdm.create(Some(anAdm.uuid))
+    case anAdm: AdmPathNode           => anAdm.create(Some(anAdm.uuid))
+    case anAdm: AdmPort               => anAdm.create(Some(anAdm.uuid))
+    case anAdm: AdmAddress            => anAdm.create(Some(anAdm.uuid))
+    case anAdm: AdmSrcSinkObject      => anAdm.create(Some(anAdm.uuid))
+    case anAdm: AdmProvenanceTagNode  => anAdm.create(Some(anAdm.uuid))
+    case anAdm: AdmHost               => anAdm.create(Some(anAdm.uuid))
+    case anAdm: AdmSynthesized        => anAdm.create(Some(anAdm.uuid))
     case _                            => throw new Exception("Unexpected ADM")
   }).flatMap {
     case Success(_) => Future.successful(())
