@@ -37,7 +37,7 @@ lazy val adapt = (project in file(".")).settings(
 
     "org.lmdbjava" % "lmdbjava" % "0.6.3",
 
-    "com.typesafe.akka" %% "akka-stream-kafka" % "1.0.1", // "0.22",
+    "com.typesafe.akka" %% "akka-stream-kafka" % "0.22",  // "1.0.1",
     "com.github.alexandrnikitin" %% "bloom-filter" % "0.10.1",
     "org.mapdb" % "mapdb" % "3.0.7",
     "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.3.3",
