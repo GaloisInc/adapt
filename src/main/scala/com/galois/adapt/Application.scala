@@ -516,7 +516,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
               val objWritersFut = graph.getNodeComponents(objectQid, branchOf[ObjectExecutor](), None).map { ncList =>
                 ncList.flatMap { nc =>
                   implicitly[Queryable[ObjectExecutor]].fromNodeComponents(nc)
-                    .collect { case ow if ow.did_execute.target.qid != eso.subject.qid => // Ignore matches when the subject is the same on each side.
+                    .collect { case ow => // DONT'T ignore matches when the subject is the same on each side.
 
                       // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
                       val s1 = PpmSubject(ow.did_execute.target.cid, ow.did_execute.target.subjectTypes, graph.idProvider.customIdFromQid(ow.did_execute.target.qid.get).get)
@@ -548,7 +548,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
               val objWritersFut = graph.getNodeComponents(objectQid, branchOf[ObjectWriter](), None).map { ncList =>
                 ncList.flatMap { nc =>
                   implicitly[Queryable[ObjectWriter]].fromNodeComponents(nc)
-                    .collect { case ow if ow.did_write.target.qid != eso.subject.qid => // Ignore matches when the subject is the same on each side.
+                    .collect { case ow => // DON'T ignore matches when the subject is the same on each side.
 
                       // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
                       val s1 = PpmSubject(ow.did_write.target.cid, ow.did_write.target.subjectTypes, graph.idProvider.customIdFromQid(ow.did_write.target.qid.get).get)
@@ -564,7 +564,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 
                       type EventKind = String
                       val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
-                        ((s1, pn1), "did_execute", (e, (s2, pn2), (o, Some(pno))))
+                        ((s1, pn1), "did_write", (e, (s2, pn2), (o, Some(pno))))
 
                       println(s"FilesWrittenThenExecuted: $seoes")  // TODO: Nichole: send to PPM observer.
                     }
@@ -573,7 +573,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
             }
 
 
-            // ProcessWritesFileSoonAfterNetflowRead: (alternate)  Part 2
+            // ProcessWritesFileSoonAfterNetflowRead: (alternate) (read, then write)  Part 2
             if ((writeTypes contains eso.eventType) && eso.predicateObject.qid.isDefined) {  // Test if this ESO matches the second half of the pattern
               val subjectQid = eso.subject.qid.get
               val subjectCustomId = graph.idProvider.customIdFromQid(subjectQid)
