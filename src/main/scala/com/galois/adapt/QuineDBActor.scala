@@ -86,13 +86,14 @@ case class ObjectWriter(did_write: <--[ESOSubject]) extends NoConstantsDomainNod
 case class ObjectExecutor(did_execute: <--[ESOSubject]) extends NoConstantsDomainNode
 
 case class LatestNetflowRead(remoteAddress: Option[String], remotePort: Option[Int], localAddress: Option[String], localPort: Option[Int], latestTimestampNanos: Long, qid: Array[Byte])
-case class NetflowReadingProcess(cid: Int, cmdLine: AdmPathNode, latestNetflowRead: LatestNetflowRead) extends NoConstantsDomainNode
+case class NetflowReadingProcess(cid: Int, path: AdmPathNode, latestNetflowRead: LatestNetflowRead) extends NoConstantsDomainNode
 
 // TODO: More than just `cmdLine` on Subjects?!?
-case class ParentProcess(cid: Int, subjectTypes: Set[SubjectType], cmdLine: AdmPathNode) extends NoConstantsDomainNode
-case class ChildProcess(cid: Int, subjectTypes: Set[SubjectType], cmdLine: AdmPathNode, parentSubject: ParentProcess) extends NoConstantsDomainNode
+case class ParentProcess(cid: Int, subjectTypes: Set[SubjectType], path: AdmPathNode) extends NoConstantsDomainNode
+case class ChildProcess(cid: Int, subjectTypes: Set[SubjectType], path: AdmPathNode, parentSubject: ParentProcess) extends NoConstantsDomainNode
 
-case class ESOSubject(cid: Int, subjectTypes: Set[SubjectType], cmdLine: AdmPathNode) extends NoConstantsDomainNode
+case class ESOSubject(cid: Int, subjectTypes: Set[SubjectType], path: AdmPathNode) extends NoConstantsDomainNode
+
 case class ESOFileObject(fileObjectType: FileObjectType, path: AdmPathNode) extends NoConstantsDomainNode
 case class ESOSrcSinkObject(srcSinkType: SrcSinkType) extends NoConstantsDomainNode
 case class ESONetFlowObject(remoteAddress: Option[String], localAddress: Option[String], remotePort: Option[Int], localPort: Option[Int]) extends NoConstantsDomainNode

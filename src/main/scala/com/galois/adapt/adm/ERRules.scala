@@ -165,23 +165,21 @@ object ERRules {
 
         e.predicateObjectPath.flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).flatMap(pathNode => {
           e.predicateObject.map(predicateObject => {
-            val label = if (e.eventType == EVENT_EXECUTE || e.eventType == EVENT_FORK) { "(cmdLine)" } else { "(path)" }
-            (EdgeCdm2Adm(CdmUUID(predicateObject, provider), label, pathNode.uuid), pathNode)
+            (EdgeCdm2Adm(CdmUUID(predicateObject, provider), "path", pathNode.uuid), pathNode)
           })
         }),
         e.predicateObject2Path.flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).flatMap(pathNode => {
           e.predicateObject2.map(predicateObject2 => {
-            val label = if (e.eventType == EVENT_FORK) { "(cmdLine)" } else { "(path)" }
-            (EdgeCdm2Adm(CdmUUID(predicateObject2, provider), label, pathNode.uuid), pathNode)
+            (EdgeCdm2Adm(CdmUUID(predicateObject2, provider), "path", pathNode.uuid), pathNode)
           })
         }),
         e.properties.getOrElse(Map()).get("exec").flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).flatMap(pathNode => {
           e.subjectUuid.map(subj =>
-            (EdgeCdm2Adm(CdmUUID(subj, provider), "exec", pathNode.uuid), pathNode)
+            (EdgeCdm2Adm(CdmUUID(subj, provider), "path", pathNode.uuid), pathNode)
           )
         }),
         e.properties.getOrElse(Map()).get("exec").flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).map(pathNode => {
-          (EdgeCdm2Adm(CdmUUID(e.getUuid, provider), "eventExec", pathNode.uuid), pathNode)
+          (EdgeCdm2Adm(CdmUUID(e.getUuid, provider), "eventPath", pathNode.uuid), pathNode)
         })
       )
     }
@@ -221,7 +219,7 @@ object ERRules {
     if (s.subjectType != SUBJECT_PROCESS && s.parentSubject.isDefined) {
       Right((
         s.cmdLine.flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).map(pathNode => {
-          (EdgeCdm2Adm(CdmUUID(s.parentSubject.get, provider), "cmdLine", pathNode.uuid), pathNode)
+          (EdgeCdm2Adm(CdmUUID(s.parentSubject.get, provider), "path", pathNode.uuid), pathNode)
         }),
         UuidRemapper.CdmMerge(CdmUUID(s.getUuid, provider), CdmUUID(s.parentSubject.get, provider))
       ))
@@ -233,7 +231,7 @@ object ERRules {
         s.localPrincipal.map(principal => EdgeAdm2Cdm(newSubj.uuid, "localPrincipal", CdmUUID(principal, provider))),
         s.parentSubject.map(parent => EdgeAdm2Cdm(newSubj.uuid, "parentSubject", CdmUUID(parent, provider))),
         s.cmdLine.flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).map(pathNode => {
-          (EdgeAdm2Adm(newSubj.uuid, "cmdLine", pathNode.uuid), pathNode)
+          (EdgeAdm2Adm(newSubj.uuid, "path", pathNode.uuid), pathNode)
         })
       ))
     }
