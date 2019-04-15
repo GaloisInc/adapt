@@ -3,6 +3,7 @@ package com.galois.adapt
 import java.io._
 import java.nio.file.Paths
 import java.util.UUID
+
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.RouteResult._
@@ -21,9 +22,10 @@ import com.galois.adapt.PpmFlowComponents.CompletedESO
 import com.typesafe.config.{Config, ConfigFactory}
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
-import com.galois.adapt.NoveltyDetection.{PpmEvent, PpmFileObject, PpmNetFlowObject, PpmSrcSinkObject, PpmSubject}
+import com.galois.adapt.NoveltyDetection.{Event => _, _}
 import com.galois.adapt.PpmSummarizer.AbstractionOne
 import com.galois.adapt.cdm20._
+
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -502,7 +504,10 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                     val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
                       ((s1, pn1), "did_write", (e, (s2, pn2), (o, Some(pno))))
 
-                    println(s"CommunicationPathThroughObject: $seoes")  // TODO: Nichole: send to PPM observer.
+                    val seoesInstance = SEOESInstance((s1, pn1), "did_write", ESOInstance(e, (s2, pn2), (o, Some(pno))))
+
+                    // println(s"CommunicationPathThroughObject: $seoes")
+                    ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
                   }
                 }
               }.recoveryMessage("SEOES extraction for CommunicationPathThroughObject failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
@@ -534,7 +539,10 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                       val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
                         ((s1, pn1), "did_execute", (e, (s2, pn2), (o, Some(pno))))
 
-                      println(s"FileExecuteDelete: $seoes")  // TODO: Nichole: send to PPM observer.
+                      val seoesInstance = SEOESInstance((s1, pn1), "did_execute", ESOInstance(e, (s2, pn2), (o, Some(pno))))
+
+                      // println(s"FileExecuteDelete: $seoes")
+                      ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
                     }
                 }
               }.recoveryMessage("SEOES extraction for DileExecuteDelete failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
@@ -566,7 +574,10 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                       val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
                         ((s1, pn1), "did_write", (e, (s2, pn2), (o, Some(pno))))
 
-                      println(s"FilesWrittenThenExecuted: $seoes")  // TODO: Nichole: send to PPM observer.
+                      val seoesInstance = SEOESInstance((s1, pn1), "did_write", ESOInstance(e, (s2, pn2), (o, Some(pno))))
+
+                      // println(s"FilesWrittenThenExecuted: $seoes")
+                      ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
                     }
                 }
               }.recoveryMessage("SEOES extraction for FilesWrittenThenExecuted failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
@@ -594,7 +605,10 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                         val oeseo: (NoveltyDetection.PpmNetFlowObject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, (NoveltyDetection.PpmFileObject, Option[AdmPathNode]))) =
                           (n, "did_read", (e, (s, pnS), (o, pnO)))
 
-                        println(s"ProcessWritesFileSoonAfterNetflowRead: $oeseo")  // TODO: Nichole: send to PPM observer.
+                        val oeseoInstance = OESEOInstance((n, None), "did_read", ESOInstance(e, (s, pnS), (o, pnO)))
+
+                        // println(s"ProcessWritesFileSoonAfterNetflowRead: $oeseo")
+                        ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! oeseoInstance)
                       }
                     }
                 }
@@ -639,7 +653,10 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                     val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
                       ((s1, pn1), "did_write", (e, (s2, pn2), (o, pno)))
 
-                    println(s"CommunicationPathThroughObject: $seoes")  // TODO: Nichole: send to PPM observer.
+                    val seoesInstance = SEOESInstance((s1, pn1), "did_write", ESOInstance(e, (s2, pn2), (o, pno)))
+
+                    // println(s"CommunicationPathThroughObject: $seoes")
+                    ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
                   }
                 }
               }.recoveryMessage("SEOES extraction for CommunicationPathThroughObject failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
@@ -683,7 +700,10 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                     val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
                       ((s1, pn1), "did_write", (e, (s2, pn2), (o, pno)))
 
-                    println(s"CommunicationPathThroughObject: $seoes")  // TODO: Nichole: send to PPM observer.
+                    val seoesInstance = SEOESInstance((s1, pn1), "did_write", ESOInstance(e, (s2, pn2), (o, pno)))
+
+                    // println(s"CommunicationPathThroughObject: $seoes")
+                    ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
                   }
                 }
               }.recoveryMessage("SEOES extraction for CommunicationPathThroughObject failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
@@ -738,7 +758,14 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
           implicitly[Queryable[ChildProcess]],
           (l: List[ChildProcess]) => l.foreach { pp =>
             val childParent = pp.cmdLine.path -> pp.parentSubject.cmdLine.path
-            println(s"ParentChildProcess: ${childParent._1} is the child of: ${childParent._2}")  // TODO: Nichole: send to PPM observer.
+            // println(s"ParentChildProcess: ${childParent._1} is the child of: ${childParent._2}")
+            if (pp.parentSubject.qid.isDefined && pp.qid.isDefined) {
+              val parentSubject = PpmSubject(pp.parentSubject.cid, pp.parentSubject.subjectTypes, pp.parentSubject.qid.map(q => graph.idProvider.customIdFromQid(q)).flatMap(_.toOption).get)
+              val childSubject = PpmSubject(pp.cid, pp.subjectTypes, pp.qid.map(q => graph.idProvider.customIdFromQid(q)).flatMap(_.toOption).get)
+              val ssInstance = SSInstance((parentSubject, Some(pp.parentSubject.cmdLine)), (childSubject, Some(pp.cmdLine)))
+              val hostName = pp.parentSubject.qid.map(q => graph.idProvider.customIdFromQid(q)).flatMap(_.toOption).get.namespace // TODO: This needs to be fixed; how can we get HostName here?
+              ppmManagerActors.get(hostName).fold(log.error(s"No PPM Actor with hostname: ${hostName}"))(_ ! ssInstance)
+            }
           }
         ), sqidParentProcess.name
       )

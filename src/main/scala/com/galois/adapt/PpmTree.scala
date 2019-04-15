@@ -27,6 +27,7 @@ import AdaptConfig._
 import Application.hostNameForAllHosts
 import spray.json._
 import ApiJsonProtocol._
+import com.galois.adapt.PpmSummarizer.{DeleteEvents, WriteEvents}
 import com.rrwright.quine.language.QuineId
 import com.rrwright.quine.runtime.GraphService
 import com.rrwright.quine.runtime.Novelty
@@ -52,7 +53,17 @@ object NoveltyDetection {
   type Subject = (PpmSubject, Option[AdmPathNode])
   type Object = (PpmObject, Option[AdmPathNode])
 
-  type DataShape = (Event, Subject, Object)
+  // type DataShape = (Event, Subject, Object)
+  type EventKind = String
+  type ESO = (Event, Subject, Object)
+  type SEOES = (Subject, EventKind, ESO)
+  type OESEO = (Object, EventKind, ESO)
+  type SS = (Subject, Subject)
+
+  case class ESOInstance(event: Event, subject: Subject, obj: Object)
+  case class SEOESInstance(subject: Subject, eventKind: EventKind, eso: ESOInstance)
+  case class OESEOInstance(obj: Object, eventKind: EventKind, eso: ESOInstance)
+  case class SSInstance(parent: Subject, child: Subject)
 
   type ExtractedValue = String
   type Discriminator[DataShape] = DataShape => List[ExtractedValue]
@@ -281,9 +292,6 @@ case class PpmDefinition[DataShape](
         Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
       }
 
-      //if (this.isInstanceOf[PartialPpm[_]] && ppmConfig.shouldsaveppmpartialobservationaccumulators)
-      //  this.asInstanceOf[PartialPpm[_]].saveStateSync(hostName)
-
       treeWriteF.transform(
         _ => {
           lastSaveCompleteMillis.set(System.currentTimeMillis)
@@ -326,7 +334,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
   import NoveltyDetection._
 
   lazy val esoTrees = List(
-    PpmDefinition[DataShape]( "ProcessFileTouches", hostName,
+    PpmDefinition[ESO]( "ProcessFileTouches", hostName,
       d => readAndWriteTypes.contains(d._1.eventType) && d._3._1.isInstanceOf[PpmFileObject],
       List(
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
@@ -341,7 +349,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
       shouldApplyThreshold = true
     )(thisActor.context, context.self, graphService),
 
-    PpmDefinition[DataShape]( "FilesTouchedByProcesses", hostName,
+    PpmDefinition[ESO]( "FilesTouchedByProcesses", hostName,
       d => readAndWriteTypes.contains(d._1.eventType) && d._3._1.isInstanceOf[PpmFileObject],
       List(
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>")),
@@ -356,7 +364,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
       shouldApplyThreshold = true
     )(thisActor.context, context.self, graphService),
 
-    PpmDefinition[DataShape]( "FilesExecutedByProcesses", hostName,
+    PpmDefinition[ESO]( "FilesExecutedByProcesses", hostName,
       d => d._1.eventType == EVENT_EXECUTE && d._3._1.isInstanceOf[PpmFileObject],
       List(
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
@@ -371,7 +379,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
       shouldApplyThreshold = false
     )(thisActor.context, context.self, graphService),
 
-    PpmDefinition[DataShape]( "ProcessesWithNetworkActivity", hostName,
+    PpmDefinition[ESO]( "ProcessesWithNetworkActivity", hostName,
       d => d._3._1.isInstanceOf[PpmNetFlowObject],
       List(
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
@@ -389,7 +397,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
       shouldApplyThreshold = true
     )(thisActor.context, context.self, graphService),
 
-    PpmDefinition[DataShape]( "ProcessDirectoryReadWriteTouches", hostName,
+    PpmDefinition[ESO]( "ProcessDirectoryReadWriteTouches", hostName,
       d => d._3._1.isInstanceOf[PpmFileObject] && d._3._2.isDefined && readAndWriteTypes.contains(d._1.eventType),
       List(
         d => List(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),  // Process name or UUID
@@ -407,7 +415,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
       shouldApplyThreshold = true
     )(thisActor.context, context.self, graphService),
 
-    PpmDefinition[DataShape]( "ProcessesChangingPrincipal", hostName,
+    PpmDefinition[ESO]( "ProcessesChangingPrincipal", hostName,
       d => d._1.eventType == EVENT_CHANGE_PRINCIPAL,
       List(
         d => List(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)),  // Process name or UUID
@@ -422,7 +430,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
       shouldApplyThreshold = false
     )(thisActor.context, context.self, graphService),
 
-    PpmDefinition[DataShape]( "SudoIsAsSudoDoes", hostName,
+    PpmDefinition[ESO]( "SudoIsAsSudoDoes", hostName,
       d => d._2._2.exists(p => sudoOrPowershellComparison(p.path)),
       List(
         d => List(d._1.eventType.toString),
@@ -437,24 +445,6 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
       shouldApplyThreshold = true
     )(thisActor.context, context.self, graphService)
 
-
-//    PpmDefinition[DataShape]( "ParentChildProcesses", hostName,
-//      d => d._1.eventType == PSEUDO_EVENT_PARENT_SUBJECT && d._2._2.isDefined && d._3._2.isDefined,
-//      List(d => List(
-//        d._3._2.map(_.path).getOrElse("<no_path>"),  // Parent process first
-//        d._2._2.map(_.path).getOrElse("<no_path>")   // Child process second
-//      )),
-//      d => Set(NamespacedUuidDetails(d._1.uuid),
-//        NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.get.path), Some(d._2._1.cid)),
-//        NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.get.path), d._3._1 match {
-//                  case o: PpmSubject => Some(o.cid)
-//                  case _ => None
-//                })) ++
-//        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
-//        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-//      d => Set(d._1.latestTimestampNanos),
-//      shouldApplyThreshold = false
-//    )(thisActor.context, context.self, graphService),
 
 //    PpmDefinition[DataShape]("SummarizedProcessActivity", hostName,
 //      d => d._2._1.subjectTypes.contains(SUBJECT_PROCESS), // is a process
@@ -484,149 +474,120 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 //    )(thisActor.context, context.self, graphService)
   ).par
 
+  lazy val ssTrees = List(
+        PpmDefinition[SS]( "ParentChildProcesses", hostName,
+          d => true,
+          List(d => List(
+            d._1._2.map(_.path).getOrElse("<no_path>"),  // Parent process first
+            d._2._2.map(_.path).getOrElse("<no_path>")   // Child process second
+          )),
+          d => Set(NamespacedUuidDetails(d._1._1.uuid, d._1._2.map(_.path), Some(d._1._1.cid)),
+            NamespacedUuidDetails(d._2._1.uuid, d._2._2.map(_.path), Some(d._2._1.cid))),
+          d => Set(), // No event, no timestamp
+          shouldApplyThreshold = false
+        )(thisActor.context, context.self, graphService),
 
-//  lazy val seoesTrees = List(
-//    new PpmDefinition[DataShape]("FileExecuteDelete",
-//      d => d._3._1.isInstanceOf[AdmFileObject],
-//      List(
-//        d => List(
-//          d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered), // File name or UUID
-//          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Executing process name or UUID
-//        ),
-//        d => List(
-//          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Deleting process name or UUID
-//        )
-//      ),
-//      d => Set(NamespacedUuidDetails(d._1.uuid),
-//        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
-//        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
-//        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
-//        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-//      d => Set(d._1.latestTimestampNanos),
-//      shouldApplyThreshold = false
-//    )(thisActor.context, context.self, hostName, graphService) with PartialPpm[String] {
-//
-//      def getJoinCondition(observation: DataShape) =
-//        observation._3._2.map(_.path).orElse(Some(observation._3._1.uuid.rendered))  // File name or UUID
-//
-//      val partialFilters = (
-//        (d: DataShape) => d._1.eventType == EVENT_EXECUTE,
-//        (d: DataShape) => d._1.eventType == EVENT_UNLINK
-//      )
-//    },
-//
-//    new PpmDefinition[DataShape]("FilesWrittenThenExecuted",
-//      d => d._3._1.isInstanceOf[AdmFileObject],
-//      List(
-//        d => List(
-//          d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered), // File name or UUID
-//          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Writing process name or UUID
-//        ),
-//        d => List(
-//          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Executing process name or UUID
-//        )
-//      ),
-//      d => Set(NamespacedUuidDetails(d._1.uuid,Some(d._1.eventType.toString)),
-//        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
-//        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)))) ++
-//        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
-//        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-//      d => Set(d._1.latestTimestampNanos),
-//      shouldApplyThreshold = false
-//    )(thisActor.context, context.self, hostName, graphService) with PartialPpm[String] {
-//
-//      def getJoinCondition(observation: DataShape) =
-//        observation._3._2.map(_.path).orElse(Some(observation._3._1.uuid.rendered))  // File name or UUID
-//
-//      val partialFilters = (
-//        (d: DataShape) => writeTypes.contains(d._1.eventType),
-//        (d: DataShape) => d._1.eventType == EVENT_EXECUTE
-//      )
-//    },
-//
-//    new PpmDefinition[DataShape]("CommunicationPathThroughObject",
-//      d => readAndWriteTypes.contains(d._1.eventType) ||
-//        (d._3._1.isInstanceOf[AdmSrcSinkObject] && d._3._1.asInstanceOf[AdmSrcSinkObject].srcSinkType == MEMORY_SRCSINK),  // Any kind of event to a memory object.
-//      List(
-//        d => List(
-//          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)  // Writing subject name or UUID
-//        ),
-//        d => List(
-//          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered), // Reading subject name or UUID
-//          d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
-//            d._3._1 match {
-//              case o: AdmSrcSinkObject => s" : ${o.srcSinkType}"
-//              case o: AdmFileObject => s" : ${o.fileObjectType}"
-//              case o: AdmNetFlowObject => s"  NetFlow: ${o.remoteAddress}:${o.remotePort}"
-//              case _ => ""
-//            }
-//          )
-//        )
-//      ),
-//      d => Set(NamespacedUuidDetails(d._1.uuid),
-//        NamespacedUuidDetails(d._2._1.uuid,Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
-//        NamespacedUuidDetails(d._3._1.uuid,Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
-//          d._3._1 match {
-//            case o: AdmSrcSinkObject => s" : ${o.srcSinkType}"
-//            case o: AdmFileObject => s" : ${o.fileObjectType}"
-//            case o: AdmNetFlowObject => s"  NetFlow: ${o.remoteAddress}:${o.remotePort}"
-//            case _ => ""
-//          }
-//          )))) ++
-//        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
-//        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-//      d => Set(d._1.latestTimestampNanos),
-//      shouldApplyThreshold = true
-//    )(thisActor.context, context.self, hostName, graphService) with PartialPpm[AdmUUID] {
-//
-//      def getJoinCondition(observation: DataShape) = Some(observation._3._1.uuid)   // Object UUID
-//
-//      val partialFilters = (
-//        (d: DataShape) => writeTypes.contains(d._1.eventType) ||
-//          (d._3._1.isInstanceOf[AdmSrcSinkObject] && d._3._1.asInstanceOf[AdmSrcSinkObject].srcSinkType == MEMORY_SRCSINK),     // Any kind of event to a memory object.
-//        (d: DataShape) => (readTypes.contains(d._1.eventType) ||
-//          (d._3._1.isInstanceOf[AdmSrcSinkObject] && d._3._1.asInstanceOf[AdmSrcSinkObject].srcSinkType == MEMORY_SRCSINK)) &&  // Any kind of event to a memory object.
-//          (partialMap.contains(getJoinCondition(d).get) && d._2._2.exists(_.path != partialMap(getJoinCondition(d).get)._1.head))  // subject names are distinct
-//      )
-//    }
-//  ).par
+  ).par
+
+  lazy val seoesTrees = List(
+    new PpmDefinition[SEOES]("FileExecuteDelete", hostName,
+      d => d._3._3._1.isInstanceOf[PpmFileObject] && d._2 == "did_execute" &&  DeleteEvents.events.contains(d._3._1.eventType),
+      List(
+        d => List(
+          d._3._3._2.map(_.path).getOrElse(d._3._3._1.uuid.rendered), // File name or UUID
+          d._1._2.map(_.path).getOrElse(d._1._1.uuid.rendered)  // Executing process name or UUID
+        ),
+        d => List(
+          d._3._2._2.map(_.path).getOrElse(d._3._2._1.uuid.rendered)  // Deleting process name or UUID
+        )
+      ),
+      d => Set(NamespacedUuidDetails(d._3._3._1.uuid),
+        NamespacedUuidDetails(d._1._1.uuid, Some(d._1._2.map(_.path).getOrElse(d._1._1.uuid.rendered)), Some(d._1._1.cid)),
+        NamespacedUuidDetails(d._3._2._1.uuid, Some(d._3._2._2.map(_.path).getOrElse(d._3._2._1.uuid.rendered)), Some(d._3._2._1.cid)),
+        NamespacedUuidDetails(d._3._1.uuid)),
+      d => Set(d._3._1.earliestTimestampNanos,d._3._1.latestTimestampNanos),
+      shouldApplyThreshold = false
+    )(thisActor.context, context.self, graphService),
+
+    new PpmDefinition[SEOES]("FilesWrittenThenExecuted", hostName,
+      d => d._3._3._1.isInstanceOf[PpmFileObject] && d._2 == "did_execute" &&  WriteEvents.events.contains(d._3._1.eventType),
+      List(
+        d => List(
+          d._3._3._2.map(_.path).getOrElse(d._3._3._1.uuid.rendered), // File name or UUID
+          d._3._2._2.map(_.path).getOrElse(d._3._2._1.uuid.rendered)  // Writing process name or UUID
+        ),
+        d => List(
+          d._1._2.map(_.path).getOrElse(d._1._1.uuid.rendered)  // Executing process name or UUID
+        )
+      ),
+      d => Set(NamespacedUuidDetails(d._3._3._1.uuid, Some(d._3._3._2.map(_.path).getOrElse(d._3._3._1.uuid.rendered))),
+        NamespacedUuidDetails(d._1._1.uuid, Some(d._1._2.map(_.path).getOrElse(d._1._1.uuid.rendered)), Some(d._1._1.cid)),
+        NamespacedUuidDetails(d._3._2._1.uuid, Some(d._3._2._2.map(_.path).getOrElse(d._3._2._1.uuid.rendered)), Some(d._3._2._1.cid)),
+        NamespacedUuidDetails(d._3._1.uuid)),
+      d => Set(d._3._1.earliestTimestampNanos,d._3._1.latestTimestampNanos),
+      shouldApplyThreshold = false
+    )(thisActor.context, context.self, graphService),
+
+    new PpmDefinition[SEOES]("CommunicationPathThroughObject", hostName,
+      d => readTypes.contains(d._3._1.eventType) && d._2 == "did_write",
+        // (d._3._1.isInstanceOf[AdmSrcSinkObject] && d._3._1.asInstanceOf[AdmSrcSinkObject].srcSinkType == MEMORY_SRCSINK),  // Any kind of event to a memory object.
+      List(
+        d => List(
+          d._1._2.map(_.path).getOrElse(d._1._1.uuid.rendered)  // Writing subject name or UUID
+        ),
+        d => List(
+          d._3._2._2.map(_.path).getOrElse(d._3._2._1.uuid.rendered), // Reading subject name or UUID
+          d._3._2._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
+            d._3._3._1 match {
+              case o: PpmSrcSinkObject => s" : ${o.srcSinkType}"
+              case o: PpmFileObject => s" : ${o.fileObjectType}"
+              case o: PpmNetFlowObject => s"  NetFlow: ${o.remoteAddress.getOrElse("no_remote_address")}:${o.remotePort.getOrElse("no_remote_port")}"
+              case _ => ""
+            }
+          )
+        )
+      ),
+      d => Set(NamespacedUuidDetails(d._3._1.uuid),
+        NamespacedUuidDetails(d._1._1.uuid, Some(d._1._2.map(_.path).getOrElse(d._1._1.uuid.rendered)), Some(d._1._1.cid)),
+        NamespacedUuidDetails(d._3._2._1.uuid, Some(d._3._2._2.map(_.path).getOrElse(d._3._2._1.uuid.rendered)), Some(d._3._2._1.cid)),
+        NamespacedUuidDetails(d._3._3._1.uuid,Some(d._3._3._2.map(_.path).getOrElse(d._3._3._1.uuid.rendered) + (  // Object name or UUID and type
+          d._3._3._1 match {
+            case o: PpmSrcSinkObject => s" : ${o.srcSinkType}"
+            case o: PpmFileObject => s" : ${o.fileObjectType}"
+            case o: PpmNetFlowObject => s"  NetFlow: ${o.remoteAddress.getOrElse("no_remote_address")}:${o.remotePort.getOrElse("no_remote_port")}"
+            case _ => ""
+          }
+          )))),
+      d => Set(d._3._1.earliestTimestampNanos,d._3._1.latestTimestampNanos),
+      shouldApplyThreshold = true
+    )(thisActor.context, context.self, graphService)
+  ).par
 
 
-//  lazy val oeseoTrees = List(
-//    new PpmDefinition[DataShape]("ProcessWritesFileSoonAfterNetflowRead",
-//      d => readAndWriteTypes.contains(d._1.eventType),
-//      List(
-//        d => {
-//          val nf = d._3._1.asInstanceOf[AdmNetFlowObject]
-//          List(s"${nf.remoteAddress}:${nf.remotePort}")
-//        },
-//        d => List(
-//          d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered),
-//          d._3._2.map(_.path) match {
-//            case Some("") | None => d._3._1.uuid.rendered
-//            case Some(s) => s
-//          }
-//        )
-//      ),
-//      d => Set(NamespacedUuidDetails(d._1.uuid),
-//        NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
-//        NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path).getOrElse("AdmNetFlow")))) ++
-//        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
-//        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-//      d => Set(d._1.latestTimestampNanos),
-//      shouldApplyThreshold = true
-//    )(thisActor.context, context.self, hostName, graphService) with PartialPpm[AdmUUID] {
-//
-//      def getJoinCondition(observation: DataShape) = observation._2._2.map(_.uuid)   // TODO: shouldn't this include some time range comparison here?????????????????????????????????????????????????????????????????
-//
-//      override def arrangeExtracted(extracted: List[ExtractedValue]) = extracted.tail :+ extracted.head
-//
-//      val partialFilters = (
-//        (eso: DataShape) => eso._3._1.isInstanceOf[AdmNetFlowObject] && readTypes.contains(eso._1.eventType),
-//        (eso: DataShape) => eso._3._1.isInstanceOf[AdmFileObject] && writeTypes.contains(eso._1.eventType)
-//      )
-//    }
-//  ).par
+  lazy val oeseoTrees = List(
+    new PpmDefinition[OESEO]("ProcessWritesFileSoonAfterNetflowRead", hostName,
+      d => readAndWriteTypes.contains(d._3._1.eventType),
+      List(
+        d => {
+          val nf = d._1._1.asInstanceOf[PpmNetFlowObject]
+          List(s"${nf.remoteAddress.getOrElse("no_remote_address")}:${nf.remotePort.getOrElse("no_remote_port")}")
+        },
+        d => List(
+          d._3._2._2.map(_.path).getOrElse(d._3._2._1.uuid.rendered),
+          d._3._3._2.map(_.path) match {
+            case Some("") | None => d._3._3._1.uuid.rendered
+            case Some(s) => s
+          }
+        )
+      ),
+      d => Set(NamespacedUuidDetails(d._3._1.uuid),
+        NamespacedUuidDetails(d._3._2._1.uuid, Some(d._3._2._2.map(_.path).getOrElse(d._3._2._1.uuid.rendered)), Some(d._3._2._1.cid)),
+        NamespacedUuidDetails(d._3._3._1.uuid, Some(d._3._3._2.map(_.path).getOrElse(d._3._3._1.uuid.rendered))),
+        NamespacedUuidDetails(d._1._1.uuid, Some(d._1._2.map(_.path).getOrElse("AdmNetFlow")))),
+      d => Set(d._3._1.earliestTimestampNanos,d._3._1.latestTimestampNanos),
+      shouldApplyThreshold = true
+    )(thisActor.context, context.self, graphService)
+  ).par
 
 
   sealed trait SendingOrReceiving { def invert: SendingOrReceiving = this match { case Sending => Receiving; case Receiving => Sending } }
@@ -749,7 +710,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
   lazy val admPpmTrees =
     if (hostName == hostNameForAllHosts) Nil // crossHostTrees
-    else esoTrees // ++ seoesTrees ++ oeseoTrees
+    else esoTrees ++ seoesTrees ++ oeseoTrees ++ ssTrees
 
   val ppmList = admPpmTrees
 
@@ -875,17 +836,17 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
     case msg @ ESOFileInstance(eventType, earliestTimestampNanos, latestTimestampNanos, hostName, subject, predicateObject) =>
       Try {
-        val objUuid = predicateObject.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get // TODO: Fix these gets before engagement
+        val objUuid = predicateObject.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
         val subUuid = subject.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
         val eventUuid = msg.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
         val e: Event = PpmEvent(eventType, earliestTimestampNanos, latestTimestampNanos, eventUuid)
-        val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), subject.cmdLine) //TODO:  Some(subject.cmdLine))?
+        val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), subject.cmdLine)
         val o: Object = (PpmFileObject(predicateObject.fileObjectType, objUuid), Some(predicateObject.path))
 
-        val f = Future { admPpmTrees.foreach(ppm => ppm.observe((e, s, o))) }
+        val f = Future { esoTrees.foreach(ppm => ppm.observe((e, s, o))) }
 
         Await.result(f, 15 seconds)                                                               // TODO: Do not await!!!!
-      }.failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
+      }.failed.map(e => log.warning(s"Writing ESO trees failed: ${e.getMessage}"))
 
     case msg @ ESONetworkInstance(eventType, earliestTimestampNanos, latestTimestampNanos, hostName, subject, predicateObject) =>
       Try {
@@ -893,13 +854,13 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val subUuid = subject.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
         val eventUuid = msg.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
         val e: Event = PpmEvent(eventType, earliestTimestampNanos, latestTimestampNanos, eventUuid)
-        val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), subject.cmdLine) //TODO:  Some(subject.cmdLine))?
+        val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), subject.cmdLine)
         val o: Object = (PpmNetFlowObject(predicateObject.remotePort, predicateObject.localPort, predicateObject.remoteAddress, predicateObject.localAddress, objUuid), None)
 
-        val f = Future { admPpmTrees.foreach(ppm => ppm.observe((e, s, o))) }
+        val f = Future { esoTrees.foreach(ppm => ppm.observe((e, s, o))) }
 
         Await.result(f, 15 seconds)
-      }.failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
+      }.failed.map(e => log.warning(s"Writing ESO trees failed: ${e.getMessage}"))
 
     case msg @ ESOSrcSnkInstance(eventType, earliestTimestampNanos, latestTimestampNanos, hostName, subject, predicateObject) =>
       Try {
@@ -907,11 +868,11 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val subUuid = subject.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
         val eventUuid = msg.qid.map(q => graphService.idProvider.customIdFromQid(q)).flatMap(_.toOption).get
         val e: Event = PpmEvent(eventType, earliestTimestampNanos, latestTimestampNanos, eventUuid)
-        val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), subject.cmdLine) //TODO:  Some(subject.cmdLine))?
+        val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), subject.cmdLine)
         val o: Object = (PpmSrcSinkObject(predicateObject.srcSinkType, objUuid), None)
 
 
-        val f = Future { admPpmTrees.foreach(ppm => ppm.observe((e, s, o))) }
+        val f = Future { esoTrees.foreach(ppm => ppm.observe((e, s, o))) }
 
 //      val r = esoTrees.filter(_.name != "SummarizedProcessActivity").map(_.prettyString)
 //      r.foreach(tr => tr onComplete {
@@ -922,7 +883,33 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
 
         Await.result(f, 15 seconds)
-      }.failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
+      }.failed.map(e => log.warning(s"Writing ESO trees failed: ${e.getMessage}"))
+
+    case msg @ SEOESInstance(s1: Subject, eventKind: String, ESOInstance(e: Event, s2: Subject, o: Object))  =>
+
+      val f = Future { seoesTrees.foreach(ppm => ppm.observe((s1, eventKind, (e, s2, o)))) }
+
+      Try(
+        Await.result(f, 15 seconds)
+      ).failed.map(e => log.warning(s"Writing SEOES trees failed: ${e.getMessage}"))
+
+
+    case msg @ OESEOInstance(o1: Object, eventKind: String, ESOInstance(e: Event, s: Subject, o2: Object))  =>
+
+      val f = Future { oeseoTrees.foreach(ppm => ppm.observe((o1, eventKind, (e, s, o2)))) }
+
+      Try(
+        Await.result(f, 15 seconds)
+      ).failed.map(e => log.warning(s"Writing OESEO trees failed: ${e.getMessage}"))
+
+    case msg @ SSInstance(parent: Subject, child: Subject)  =>
+
+      val f = Future { ssTrees.foreach(ppm => ppm.observe((parent, child))) }
+
+      Try(
+        Await.result(f, 15 seconds)
+      ).failed.map(e => log.warning(s"Writing ParentChileProcess tree observation failed: ${e.getMessage}"))
+
 
     case PpmTreeAlarmQuery(treeName, queryPath, namespace, startAtTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
       val resultOpt = ppm(treeName).map( tree =>
