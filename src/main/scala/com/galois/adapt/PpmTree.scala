@@ -72,10 +72,12 @@ object NoveltyDetection {
   type Alarm = List[PpmTreeNodeAlarm]  // (Key, localProbability, globalProbability, count, siblingPop, parentCount, depthOfLocalProbabilityCalculation)
   case class PpmTreeNodeAlarm(key: String, localProb: Float, globalProb: Float, count: Int, siblingPop: Int, parentCount: Int, depthOfLocalProbabilityCalculation: Int)
 
-  val writeTypes = Set[EventType](EVENT_WRITE, EVENT_SENDMSG, EVENT_SENDTO)
+  val writeTypes = Set[EventType](EVENT_WRITE, EVENT_SENDMSG, EVENT_SENDTO, EVENT_CREATE_OBJECT, EVENT_FLOWS_TO)
   val readTypes = Set[EventType](EVENT_READ, EVENT_RECVMSG, EVENT_RECVFROM)
   val readAndWriteTypes = readTypes ++ writeTypes
   val netFlowTypes = readAndWriteTypes ++ Set(EVENT_CONNECT, EVENT_ACCEPT)
+  val execTypes = Set[EventType](EVENT_EXECUTE, EVENT_LOADLIBRARY, EVENT_MMAP, EVENT_STARTSERVICE)
+  val deleteTypes = Set[EventType](EVENT_UNLINK, EVENT_TRUNCATE)
   val execDeleteTypes = Set[EventType](EVENT_EXECUTE, EVENT_UNLINK)
   val march1Nanos = 1519862400000000L
 
@@ -365,7 +367,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
     )(thisActor.context, context.self, graphService),
 
     PpmDefinition[ESO]( "FilesExecutedByProcesses", hostName,
-      d => d._1.eventType == EVENT_EXECUTE && d._3._1.isInstanceOf[PpmFileObject],
+      d => execTypes.contains(d._1.eventType) && d._3._1.isInstanceOf[PpmFileObject],
       List(
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
