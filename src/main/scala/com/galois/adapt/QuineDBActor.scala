@@ -81,7 +81,7 @@ object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
 }
 
 
-case class ESOSubject(cid: Int, subjectTypes: Set[SubjectType], cmdLine: AdmPathNode) extends NoConstantsDomainNode
+case class ESOSubject(cid: Int, subjectTypes: Set[SubjectType], path: AdmPathNode) extends NoConstantsDomainNode
 case class ESOFileObject(fileObjectType: FileObjectType, path: AdmPathNode) extends NoConstantsDomainNode
 case class ESOSrcSinkObject(srcSinkType: SrcSinkType) extends NoConstantsDomainNode
 case class ESONetFlowObject(remoteAddress: Option[String], localAddress: Option[String], remotePort: Option[Int], localPort: Option[Int]) extends NoConstantsDomainNode

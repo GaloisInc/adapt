@@ -625,7 +625,7 @@ var predicates = [
     {
         name : "Path Names",
         is_relevant : function(n) {return n.db_label === "AdmSubject"},
-        floating_query : ".outE('cmdLine','exec','(cmdLine)').inV().hasLabel('AdmPathNode')",
+        floating_query : ".outE('path').inV().hasLabel('AdmPathNode')",
         is_default : true
     }, {
         name : "Parent Process",
@@ -646,7 +646,7 @@ var predicates = [
     },{
         name : "Affected File Names",
         is_relevant : function(n) {return n.db_label === "AdmSubject"},
-        floating_query : ".in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').hasLabel('AdmFileObject').out('path', '(path)').hasLabel('AdmPathNode')"
+        floating_query : ".in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').hasLabel('AdmFileObject').out('path').hasLabel('AdmPathNode')"
     },{
         name : "Affected Objects",
         is_relevant : function(n) {return n.db_label === "AdmSubject"},
@@ -654,7 +654,7 @@ var predicates = [
     },{
         name : "Affected Object Names",
         is_relevant : function(n) {return n.db_label === "AdmSubject"},
-        floating_query : ".in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').out('path', '(path)', 'cmdLine', '(cmdLine)', 'exec').hasLabel('AdmPathNode')"
+        floating_query : ".in('subject').hasLabel('AdmEvent').out('predicateObject','predicateObject2').out('path').hasLabel('AdmPathNode')"
     },{
         name : "Provenance",
         is_relevant : function(n) {return n.db_label === "AdmSubject"},
@@ -668,17 +668,17 @@ var predicates = [
     {
         name : "Processes",
         is_relevant : function(n) {return n.db_label === "AdmPathNode"},
-        floating_query : ".inE('cmdLine','exec','(cmdLine)').outV().hasLabel('AdmSubject')"
+        floating_query : ".inE('path').outV().hasLabel('AdmSubject')"
     }, {
         name : "Files",
         is_relevant : function(n) {return n.db_label === "AdmPathNode"},
-        floating_query : ".inE('path','(path)').outV().hasLabel('AdmFileObject')"
+        floating_query : ".inE('path').outV().hasLabel('AdmFileObject')"
     },
 // AdmFileObject
     {
         name : "Path Names",
         is_relevant : function(n) {return n.db_label === "AdmFileObject"},
-        floating_query : ".outE('path','(path)').inV().hasLabel('AdmPathNode')",
+        floating_query : ".outE('path').inV().hasLabel('AdmPathNode')",
         is_default : true
     }, {
         name : "Reading Processes",
@@ -691,11 +691,11 @@ var predicates = [
     }, {
         name : "Reading Processes Names",
         is_relevant : function(n) {return n.db_label === "AdmFileObject"},
-        floating_query : ".inE('predicateObject','predicateObject2').outV().hasLabel('AdmEvent').has('eventType','EVENT_READ').outE('subject').inV().hasLabel('AdmSubject').out('exec','cmdLine','(cmdLine)').hasLabel('AdmPathNode')"
+        floating_query : ".inE('predicateObject','predicateObject2').outV().hasLabel('AdmEvent').has('eventType','EVENT_READ').outE('subject').inV().hasLabel('AdmSubject').out('path').hasLabel('AdmPathNode')"
     }, {
         name : "Writing Processes Names",
         is_relevant : function(n) {return n.db_label === "AdmFileObject"},
-        floating_query : ".inE('predicateObject','predicateObject2').outV().hasLabel('AdmEvent').has('eventType','EVENT_WRITE').outE('subject').inV().hasLabel('AdmSubject').out('exec','cmdLine','(cmdLine)').hasLabel('AdmPathNode')"
+        floating_query : ".inE('predicateObject','predicateObject2').outV().hasLabel('AdmEvent').has('eventType','EVENT_WRITE').outE('subject').inV().hasLabel('AdmSubject').out('path').hasLabel('AdmPathNode')"
     },
 
  // AdmNetFlowObject
