@@ -264,8 +264,8 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
       edgeTypeTuple,
       "id" -> JsString(fromId + "-[" + e.label.name + "]->" + toId),
       "label" -> JsString(e.label.name),
-      "inV" -> anyToJson(fromId),
-      "outV" -> anyToJson(toId)
+      "inV" -> anyToJson(toId),
+      "outV" -> anyToJson(fromId)
     )
   }
 
