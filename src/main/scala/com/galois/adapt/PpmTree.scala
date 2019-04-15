@@ -27,7 +27,6 @@ import AdaptConfig._
 import Application.hostNameForAllHosts
 import spray.json._
 import ApiJsonProtocol._
-import com.galois.adapt.PpmSummarizer.{DeleteEvents, WriteEvents}
 import com.rrwright.quine.language.QuineId
 import com.rrwright.quine.runtime.GraphService
 import com.rrwright.quine.runtime.Novelty
@@ -493,7 +492,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
   lazy val seoesTrees = List(
     new PpmDefinition[SEOES]("FileExecuteDelete", hostName,
-      d => d._3._3._1.isInstanceOf[PpmFileObject] && d._2 == "did_execute" &&  DeleteEvents.events.contains(d._3._1.eventType),
+      d => d._3._3._1.isInstanceOf[PpmFileObject] && d._2 == "did_execute" &&  deleteTypes.contains(d._3._1.eventType),
       List(
         d => List(
           d._3._3._2.map(_.path).getOrElse(d._3._3._1.uuid.rendered), // File name or UUID
@@ -512,7 +511,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
     )(thisActor.context, context.self, graphService),
 
     new PpmDefinition[SEOES]("FilesWrittenThenExecuted", hostName,
-      d => d._3._3._1.isInstanceOf[PpmFileObject] && d._2 == "did_execute" &&  WriteEvents.events.contains(d._3._1.eventType),
+      d => d._3._3._1.isInstanceOf[PpmFileObject] && d._2 == "did_write" &&  execTypes.contains(d._3._1.eventType),
       List(
         d => List(
           d._3._3._2.map(_.path).getOrElse(d._3._3._1.uuid.rendered), // File name or UUID
