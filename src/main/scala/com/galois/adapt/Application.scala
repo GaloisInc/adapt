@@ -490,7 +490,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 
                     // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
                     val s1 = PpmSubject(ow.did_write.target.cid, ow.did_write.target.subjectTypes, graph.idProvider.customIdFromQid(ow.did_write.target.qid.get).get)
-                    val pn1 = ow.did_write.target.cmdLine
+                    val pn1 = ow.did_write.target.path
 
                     val o = PpmFileObject(eso.predicateObject.fileObjectType, objectCustomId.get)
                     val pno = eso.predicateObject.path
@@ -498,7 +498,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                     val e = PpmEvent(eso.eventType, eso.earliestTimestampNanos, eso.latestTimestampNanos, graph.idProvider.customIdFromQid(eso.qid.get).get)
 
                     val s2 = PpmSubject(eso.subject.cid, eso.subject.subjectTypes, graph.idProvider.customIdFromQid(eso.subject.qid.get).get)
-                    val pn2 = eso.subject.cmdLine
+                    val pn2 = eso.subject.path
 
                     type EventKind = String
 //                    val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
@@ -525,7 +525,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 
                       // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
                       val s1 = PpmSubject(ow.did_execute.target.cid, ow.did_execute.target.subjectTypes, graph.idProvider.customIdFromQid(ow.did_execute.target.qid.get).get)
-                      val pn1 = ow.did_execute.target.cmdLine
+                      val pn1 = ow.did_execute.target.path
 
                       val o = PpmFileObject(eso.predicateObject.fileObjectType, objectCustomId.get)
                       val pno = eso.predicateObject.path
@@ -533,7 +533,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                       val e = PpmEvent(eso.eventType, eso.earliestTimestampNanos, eso.latestTimestampNanos, graph.idProvider.customIdFromQid(eso.qid.get).get)
 
                       val s2 = PpmSubject(eso.subject.cid, eso.subject.subjectTypes, graph.idProvider.customIdFromQid(eso.subject.qid.get).get)
-                      val pn2 = eso.subject.cmdLine
+                      val pn2 = eso.subject.path
 
                       type EventKind = String
 //                      val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
@@ -560,7 +560,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 
                       // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
                       val s1 = PpmSubject(ow.did_write.target.cid, ow.did_write.target.subjectTypes, graph.idProvider.customIdFromQid(ow.did_write.target.qid.get).get)
-                      val pn1 = ow.did_write.target.cmdLine
+                      val pn1 = ow.did_write.target.path
 
                       val o = PpmFileObject(eso.predicateObject.fileObjectType, objectCustomId.get)
                       val pno = eso.predicateObject.path
@@ -568,7 +568,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                       val e = PpmEvent(eso.eventType, eso.earliestTimestampNanos, eso.latestTimestampNanos, graph.idProvider.customIdFromQid(eso.qid.get).get)
 
                       val s2 = PpmSubject(eso.subject.cid, eso.subject.subjectTypes, graph.idProvider.customIdFromQid(eso.subject.qid.get).get)
-                      val pn2 = eso.subject.cmdLine
+                      val pn2 = eso.subject.path
 
                       type EventKind = String
 //                      val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
@@ -597,7 +597,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                         val n = PpmNetFlowObject(nfrp.latestNetflowRead.remotePort, nfrp.latestNetflowRead.localPort, nfrp.latestNetflowRead.remoteAddress, nfrp.latestNetflowRead.localAddress, graph.idProvider.customIdFromQid(new QuineId(nfrp.latestNetflowRead.qid)).get)
                         val e = PpmEvent(eso.eventType, eso.earliestTimestampNanos, eso.latestTimestampNanos, graph.idProvider.customIdFromQid(eso.qid.get).get)
                         val s = PpmSubject(eso.subject.cid, eso.subject.subjectTypes, graph.idProvider.customIdFromQid(eso.subject.qid.get).get)
-                        val pnS = eso.subject.cmdLine
+                        val pnS = eso.subject.path
                         val o = PpmFileObject(eso.predicateObject.fileObjectType, graph.idProvider.customIdFromQid(eso.predicateObject.qid.get).get)
                         val pnO = Some(eso.predicateObject.path)
 
@@ -639,7 +639,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 
                     // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
                     val s1 = PpmSubject(ow.did_write.target.cid, ow.did_write.target.subjectTypes, graph.idProvider.customIdFromQid(ow.did_write.target.qid.get).get)
-                    val pn1 = ow.did_write.target.cmdLine
+                    val pn1 = ow.did_write.target.path
 
                     val o = PpmSrcSinkObject(eso.predicateObject.srcSinkType, objectCustomId.get)
                     val pno = None
@@ -647,7 +647,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                     val e = PpmEvent(eso.eventType, eso.earliestTimestampNanos, eso.latestTimestampNanos, graph.idProvider.customIdFromQid(eso.qid.get).get)
 
                     val s2 = PpmSubject(eso.subject.cid, eso.subject.subjectTypes, graph.idProvider.customIdFromQid(eso.subject.qid.get).get)
-                    val pn2 = eso.subject.cmdLine
+                    val pn2 = eso.subject.path
 
                     type EventKind = String
 //                    val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
@@ -686,7 +686,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 
                     // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
                     val s1 = PpmSubject(ow.did_write.target.cid, ow.did_write.target.subjectTypes, graph.idProvider.customIdFromQid(ow.did_write.target.qid.get).get)
-                    val pn1 = ow.did_write.target.cmdLine
+                    val pn1 = ow.did_write.target.path
 
                     val o = PpmNetFlowObject(eso.predicateObject.remotePort, eso.predicateObject.localPort, eso.predicateObject.remoteAddress, eso.predicateObject.localAddress, objectCustomId.get)
                     val pno = None
@@ -694,7 +694,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                     val e = PpmEvent(eso.eventType, eso.earliestTimestampNanos, eso.latestTimestampNanos, graph.idProvider.customIdFromQid(eso.qid.get).get)
 
                     val s2 = PpmSubject(eso.subject.cid, eso.subject.subjectTypes, graph.idProvider.customIdFromQid(eso.subject.qid.get).get)
-                    val pn2 = eso.subject.cmdLine
+                    val pn2 = eso.subject.path
 
                     type EventKind = String
 //                    val seoes: (NoveltyDetection.Subject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, NoveltyDetection.Object)) =
@@ -724,7 +724,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 //                    val n = PpmNetFlowObject(eso.predicateObject.remotePort, eso.predicateObject.localPort, eso.predicateObject.remoteAddress, eso.predicateObject.localAddress, graph.idProvider.customIdFromQid(eso.predicateObject.qid.get).get)
 //                    val e = PpmEvent(fileWriteEso.eventType, fileWriteEso.earliestTimestampNanos, fileWriteEso.latestTimestampNanos, graph.idProvider.customIdFromQid(fileWriteEso.qid.get).get)
 //                    val s = PpmSubject(fileWriteEso.subject.cid, fileWriteEso.subject.subjectTypes, graph.idProvider.customIdFromQid(fileWriteEso.subject.qid.get).get)
-//                    val pnS = fileWriteEso.subject.cmdLine
+//                    val pnS = fileWriteEso.subject.path
 //                    val o = PpmFileObject(fileWriteEso.predicateObject.fileObjectType, graph.idProvider.customIdFromQid(fileWriteEso.predicateObject.qid.get).get)
 //                    val pnO = Some(fileWriteEso.predicateObject.path)
 //
@@ -757,12 +757,12 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
           classOf[StandingFetchActor[ChildProcess]],
           implicitly[Queryable[ChildProcess]],
           (l: List[ChildProcess]) => l.foreach { pp =>
-            val childParent = pp.cmdLine.path -> pp.parentSubject.cmdLine.path
+            val childParent = pp.path.path -> pp.parentSubject.path.path
             // println(s"ParentChildProcess: ${childParent._1} is the child of: ${childParent._2}")
             if (pp.parentSubject.qid.isDefined && pp.qid.isDefined) {
               val parentSubject = PpmSubject(pp.parentSubject.cid, pp.parentSubject.subjectTypes, pp.parentSubject.qid.map(q => graph.idProvider.customIdFromQid(q)).flatMap(_.toOption).get)
               val childSubject = PpmSubject(pp.cid, pp.subjectTypes, pp.qid.map(q => graph.idProvider.customIdFromQid(q)).flatMap(_.toOption).get)
-              val ssInstance = SSInstance((parentSubject, Some(pp.parentSubject.cmdLine)), (childSubject, Some(pp.cmdLine)))
+              val ssInstance = SSInstance((parentSubject, Some(pp.parentSubject.path)), (childSubject, Some(pp.path)))
               val hostName = pp.parentSubject.qid.map(q => graph.idProvider.customIdFromQid(q)).flatMap(_.toOption).get.namespace // TODO: This needs to be fixed; how can we get HostName here?
               ppmManagerActors.get(hostName).fold(log.error(s"No PPM Actor with hostname: ${hostName}"))(_ ! ssInstance)
             }
