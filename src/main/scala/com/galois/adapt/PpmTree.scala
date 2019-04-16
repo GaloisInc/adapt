@@ -221,8 +221,10 @@ case class PpmDefinition[DataShape](
     }
   }
 
+  var observation_count: Long = 0
   def observe(observation: DataShape): Unit = if (incomingFilter(observation)) {
     implicit val timeout = Timeout(6.1 seconds)
+    observation_count += 1
     graphService.observe(treeRootQid, treeName, hostName, PpmTree.prepareObservation[DataShape](observation, discriminators), uuidCollector(observation), timestampExtractor(observation), alarmActor, noveltyFilter)
   }
 
@@ -275,7 +277,7 @@ case class PpmDefinition[DataShape](
     if ( ! isCurrentlySaving.get() && lastSaveCompleteMillis.get() + saveEveryAndNoMoreThan - expectedSaveCostMillis <= now ) {
       isCurrentlySaving.set(true)
 
-      implicit val timeout = Timeout(593 seconds)
+      implicit val timeout = Timeout(5930 seconds) //TODO: too small? too big?
       val treeWriteF = if (ppmConfig.shouldsaveppmtrees) {
         println("Trying to save ppm tree repr...")
         graphService.getTreeRepr(treeRootQid,treeName,List()).mapTo[com.rrwright.quine.runtime.PpmNodeActorGetTreeReprResult].map { quineReprResult =>
@@ -346,7 +348,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
                NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      d => Set(d._1.latestTimestampNanos),
+      d => Set(d._1.latestTimestampNanos,d._1.earliestTimestampNanos),
       shouldApplyThreshold = true
     )(thisActor.context, context.self, graphService),
 
@@ -361,7 +363,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      d => Set(d._1.latestTimestampNanos),
+      d => Set(d._1.latestTimestampNanos,d._1.earliestTimestampNanos),
       shouldApplyThreshold = true
     )(thisActor.context, context.self, graphService),
 
@@ -376,7 +378,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      d => Set(d._1.latestTimestampNanos),
+      d => Set(d._1.latestTimestampNanos,d._1.earliestTimestampNanos),
       shouldApplyThreshold = false
     )(thisActor.context, context.self, graphService),
 
@@ -394,7 +396,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         NamespacedUuidDetails(d._3._1.uuid, Some(d._3._1.asInstanceOf[PpmNetFlowObject].remoteAddress.getOrElse("no_address_from_CDM")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      d => Set(d._1.latestTimestampNanos),
+      d => Set(d._1.latestTimestampNanos,d._1.earliestTimestampNanos),
       shouldApplyThreshold = true
     )(thisActor.context, context.self, graphService),
 
@@ -412,7 +414,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      d => Set(d._1.latestTimestampNanos),
+      d => Set(d._1.latestTimestampNanos,d._1.earliestTimestampNanos),
       shouldApplyThreshold = true
     )(thisActor.context, context.self, graphService),
 
@@ -427,7 +429,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path + s" : ${d._3._1.getClass.getSimpleName}").getOrElse( s"${d._3._1.uuid.rendered} : ${d._3._1.getClass.getSimpleName}")))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      d => Set(d._1.latestTimestampNanos),
+      d => Set(d._1.latestTimestampNanos,d._1.earliestTimestampNanos),
       shouldApplyThreshold = false
     )(thisActor.context, context.self, graphService),
 
@@ -438,11 +440,11 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         d => List(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + " : " + d._3._1.getClass.getSimpleName)
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid, Some(d._1.eventType.toString)),
-        NamespacedUuidDetails(d._2._1.uuid),
+        NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + " : " + d._3._1.getClass.getSimpleName))) ++
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
-      d => Set(d._1.latestTimestampNanos),
+      d => Set(d._1.latestTimestampNanos,d._1.earliestTimestampNanos),
       shouldApplyThreshold = true
     )(thisActor.context, context.self, graphService)
 
@@ -538,7 +540,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         ),
         d => List(
           d._3._2._2.map(_.path).getOrElse(d._3._2._1.uuid.rendered), // Reading subject name or UUID
-          d._3._2._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
+          d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
             d._3._3._1 match {
               case o: PpmSrcSinkObject => s" : ${o.srcSinkType}"
               case o: PpmFileObject => s" : ${o.fileObjectType}"
@@ -718,21 +720,6 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
   def saveTrees(): Future[Unit] = {
     ppmList.toList.foldLeft(Future.successful(()))((acc, ppmTree) => acc.flatMap(_ => ppmTree.saveStateAsync()))
   }
-//
-//    println(s"Setting shutdown hook to save PPM trees for $hostName, shouldsave: ${ppmConfig.shouldsaveppmtrees}")
-//
-//  //  override def postStop(): Unit = {
-//      context.system.registerOnTermination{
-//        if ( ! didReceiveComplete && ppmConfig.shouldsaveppmtrees) {
-//          didReceiveComplete = true
-//          val ppmSaveFutures: Future[GenSeq[Unit]] = Future.sequence(ppmList.map(_.saveStateAsync()).seq)
-//          ppmSaveFutures onComplete {
-//              case Success(_) => println("The Trees were saved!")
-//              case Failure(t) => println("Why has an error has occurred? " + t.getMessage)
-//          }
-//        }
-//    //    super.postStop()
-//      }
 
   def ppm(name: String): Option[PpmDefinition[_]] = ppmList.find(_.treeName == name)
 
