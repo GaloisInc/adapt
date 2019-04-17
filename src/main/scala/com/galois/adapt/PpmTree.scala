@@ -750,8 +750,8 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
     val alarm = probabilityData.iterator.sliding(2).zipWithIndex.map {
       case (extractedPair, depth) =>
-        val (ev, parentCount, siblingCount) = extractedPair.head
-        val (_, count, _) = extractedPair(1)
+        val (ev, parentCount, siblingCount) = extractedPair.headOption.getOrElse(("", 1, 1))
+        val (_, count, _) = extractedPair.lift(1).getOrElse(("", 1, 1))
         if (depth == lastAlarmListIndex)
           PpmTreeNodeAlarm(ev, alarmLocalProbability, count.toFloat/treeObservationCount, count, siblingCount, parentCount, depth + 1)
         else
