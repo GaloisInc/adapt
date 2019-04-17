@@ -368,7 +368,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
     )(thisActor.context, context.self, graphService),
 
     PpmDefinition[ESO]( "FilesExecutedByProcesses", hostName,
-      d => execTypes.contains(d._1.eventType) && d._3._1.isInstanceOf[PpmFileObject],
+      d => d._1.eventType == EVENT_EXECUTE && d._3._1.isInstanceOf[PpmFileObject],
       List(
         d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
         d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
@@ -380,6 +380,21 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       d => Set(d._1.latestTimestampNanos,d._1.earliestTimestampNanos),
       shouldApplyThreshold = false
+    )(thisActor.context, context.self, graphService),
+
+    PpmDefinition[ESO]( "FilesExecutedIshByProcesses", hostName,
+      d => execTypes.contains(d._1.eventType) && d._3._1.isInstanceOf[PpmFileObject],
+      List(
+        d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
+        d => List(d._3._2.map(_.path).getOrElse("<no_file_path_node>"))
+      ),
+      d => Set(NamespacedUuidDetails(d._1.uuid),
+        NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")), Some(d._2._1.cid)),
+        NamespacedUuidDetails(d._3._1.uuid, Some(d._3._2.map(_.path).getOrElse("<no_file_path_node>")))) ++
+        d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
+        d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
+      d => Set(d._1.latestTimestampNanos,d._1.earliestTimestampNanos),
+      shouldApplyThreshold = true
     )(thisActor.context, context.self, graphService),
 
     PpmDefinition[ESO]( "ProcessesWithNetworkActivity", hostName,
