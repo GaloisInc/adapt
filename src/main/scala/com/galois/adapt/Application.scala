@@ -760,10 +760,10 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
             val childParent = pp.path.path -> pp.parentSubject.path.path
             // println(s"ParentChildProcess: ${childParent._1} is the child of: ${childParent._2}")
             if (pp.parentSubject.qid.isDefined && pp.qid.isDefined) {
-              val parentSubject = PpmSubject(pp.parentSubject.cid, pp.parentSubject.subjectTypes, pp.parentSubject.qid.map(q => graph.idProvider.customIdFromQid(q)).flatMap(_.toOption).get)
-              val childSubject = PpmSubject(pp.cid, pp.subjectTypes, pp.qid.map(q => graph.idProvider.customIdFromQid(q)).flatMap(_.toOption).get)
+              val parentSubject = PpmSubject(pp.parentSubject.cid, pp.parentSubject.subjectTypes, pp.parentSubject.qid.map(q => graph.idProvider.customIdFromQid(q)).flatMap(_.toOption).get, Some(pp.parentSubject.startTimestampNanos))
+              val childSubject = PpmSubject(pp.cid, pp.subjectTypes, pp.qid.map(q => graph.idProvider.customIdFromQid(q)).flatMap(_.toOption).get, Some(pp.startTimestampNanos))
               val ssInstance = SSInstance((parentSubject, Some(pp.parentSubject.path)), (childSubject, Some(pp.path)))
-              val hostName = pp.parentSubject.qid.map(q => graph.idProvider.customIdFromQid(q)).flatMap(_.toOption).get.namespace // TODO: This needs to be fixed; how can we get HostName here?
+              val hostName = pp.hostName
               ppmManagerActors.get(hostName).fold(log.error(s"No PPM Actor with hostname: ${hostName}"))(_ ! ssInstance)
             }
           }

@@ -89,8 +89,8 @@ case class LatestNetflowRead(remoteAddress: Option[String], remotePort: Option[I
 case class NetflowReadingProcess(cid: Int, path: AdmPathNode, latestNetflowRead: LatestNetflowRead) extends NoConstantsDomainNode
 
 // TODO: More than just `cmdLine` on Subjects?!?
-case class ParentProcess(cid: Int, subjectTypes: Set[SubjectType], path: AdmPathNode) extends NoConstantsDomainNode
-case class ChildProcess(cid: Int, subjectTypes: Set[SubjectType], path: AdmPathNode, parentSubject: ParentProcess) extends NoConstantsDomainNode
+case class ParentProcess(cid: Int, subjectTypes: Set[SubjectType], path: AdmPathNode, startTimestampNanos: Long, hostName: String) extends NoConstantsDomainNode
+case class ChildProcess(cid: Int, subjectTypes: Set[SubjectType], path: AdmPathNode, startTimestampNanos: Long, hostName: String, parentSubject: ParentProcess) extends NoConstantsDomainNode
 
 case class ESOSubject(cid: Int, subjectTypes: Set[SubjectType], path: AdmPathNode) extends NoConstantsDomainNode
 

@@ -38,7 +38,7 @@ case class AnAlarm(key:List[String], details:(Set[Long], Long, Alarm, Set[Namesp
 
 object NoveltyDetection {
   case class PpmEvent(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, uuid: NamespacedUuid)
-  case class PpmSubject(cid: Int, subjectTypes: Set[SubjectType], uuid: NamespacedUuid)
+  case class PpmSubject(cid: Int, subjectTypes: Set[SubjectType], uuid: NamespacedUuid, startTimestampNanos: Option[Long] = None)
 
   trait PpmObject {
     val uuid: NamespacedUuid
@@ -486,7 +486,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
           )),
           d => Set(NamespacedUuidDetails(d._1._1.uuid, d._1._2.map(_.path), Some(d._1._1.cid)),
             NamespacedUuidDetails(d._2._1.uuid, d._2._2.map(_.path), Some(d._2._1.cid))),
-          d => Set(), // No event, no timestamp
+          d => d._1._1.startTimestampNanos.toSet ++ d._2._1.startTimestampNanos.toSet,
           shouldApplyThreshold = false
         )(thisActor.context, context.self, graphService),
 
