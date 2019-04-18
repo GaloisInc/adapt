@@ -326,7 +326,7 @@ case class PpmNodeActorBeginGetTreeRepr(treeName: String, startingKey: List[Extr
 case object PpmNodeActorGetTopLevelCount
 case class PpmNodeActorGetTopLevelCountResult(count: Int) // We can just query the graph for properties on root node for this
 
-class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphService: GraphService[AdmUUID]) extends Actor with ActorLogging { thisActor =>
+class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphService: GraphService[AdmUUID]) /*extends Actor with ActorLogging*/ { thisActor =>
 
   implicit val ec = context.dispatcher
 
@@ -884,7 +884,6 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
     case msg @ SEOESInstance(s1: Subject, eventKind: String, ESOInstance(e: Event, s2: Subject, o: Object))  =>
       seoesTrees.foreach(ppm => ppm.observe((s1, eventKind, (e, s2, o))))
 
-
     case msg @ OESEOInstance(o1: Object, eventKind: String, ESOInstance(e: Event, s: Subject, o2: Object))  =>
       oeseoTrees.foreach(ppm => ppm.observe((o1, eventKind, (e, s, o2))))
 
@@ -910,10 +909,10 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
     case PpmNodeActorBeginGetTreeRepr(treeName, startingKey) =>
       implicit val timeout = Timeout(30 seconds)
-      val reprFut = ppm(treeName)
-        .map(d => graphService.getTreeRepr(d.treeRootQid, treeName, startingKey).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity))
-        .getOrElse(Future.failed(new NoSuchElementException(s"No tree found with name $treeName")))
-      sender() ! reprFut
+//      val reprFut = ppm(treeName)
+//        .map(d => graphService.getTreeRepr(d.treeRootQid, treeName, startingKey).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity))
+//        .getOrElse(Future.failed(new NoSuchElementException(s"No tree found with name $treeName")))
+      sender() ! beginGetTreeRepr(treeName, startingKey) // reprFut
 
     case SaveTrees(shouldConfirm) =>
       val s = sender()
@@ -936,6 +935,12 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
       log.error(s"PPM Actor received Unknown Message: $x")
       sender() ! Ack
   }
+
+  def beginGetTreeRepr(treeName: String, startingKey: List[ExtractedValue] = Nil)(implicit timeout: Timeout): Future[PpmNodeActorGetTreeReprResult] =
+    ppm(treeName)
+      .map(d => graphService.getTreeRepr(d.treeRootQid, treeName, startingKey).mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity))
+      .getOrElse(Future.failed(new NoSuchElementException(s"No tree found with name $treeName")))
+
 }
 
 case object ListPpmTrees

@@ -258,25 +258,27 @@ object Application extends App {
     )
   }
 
-  val ppmManagerActors: Map[HostName, ActorRef] = runFlow match {
+  val ppmManagerActors: Map[HostName, PpmManager] = runFlow match {
     case "quine" =>
       ingestConfig.hosts.map { host: IngestHost =>
-        val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows, actorSystemGraphService._2.get)
-        val ref = system.actorOf(props, s"ppm-actor-${host.hostName}")
-        host.hostName -> ref
-      }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false, actorSystemGraphService._2.get), s"ppm-actor-$hostNameForAllHosts"))
+//        val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows, actorSystemGraphService._2.get)
+//        val ref = system.actorOf(props, s"ppm-actor-${host.hostName}")
+//        host.hostName -> ref
+        host.hostName -> new PpmManager(host.hostName, host.simpleTa1Name, host.isWindows, actorSystemGraphService._2.get)
+      }.toMap
+      //  + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false, actorSystemGraphService._2.get), s"ppm-actor-$hostNameForAllHosts"))
         // TODO nichole:  what instrumentation source should I give to the `hostNameForAllHosts` PpmManager? This smells bad...
     case _ => Map.empty
   }
 
   // Produce a Sink which accepts any type of observation to distribute as an observation to PPM tree actors for every host.
-  def ppmObservationDistributorSink[T]: Sink[T, NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit b =>
-    import GraphDSL.Implicits._
-    val actorList: List[ActorRef] = ppmManagerActors.toList.map(_._2)
-    val broadcast = b.add(Broadcast[T](actorList.size))
-    actorList.foreach { ref => broadcast ~> Sink.actorRefWithAck[T](ref, InitMsg, Ack, CompleteMsg) }
-    SinkShape(broadcast.in)
-  })
+//  def ppmObservationDistributorSink[T]: Sink[T, NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit b =>
+//    import GraphDSL.Implicits._
+//    val actorList: List[ActorRef] = ppmManagerActors.toList.map(_._2)
+//    val broadcast = b.add(Broadcast[T](actorList.size))
+//    actorList.foreach { ref => broadcast ~> Sink.actorRefWithAck[T](ref, InitMsg, Ack, CompleteMsg) }
+//    SinkShape(broadcast.in)
+//  })
   
   def startWebServer(): Http.ServerBinding = {
     println(s"Starting the web server at: http://${runtimeConfig.webinterface}:${runtimeConfig.port}")
@@ -476,7 +478,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
           classOf[StandingFetchActor[ESOFileInstance]],
           implicitly[Queryable[ESOFileInstance]],
           (l: List[ESOFileInstance]) => l.foreach{ eso =>
-            ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! eso)
+            ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ receive eso)
             makeComplexObsEdge(eso.subject.qid, eso.predicateObject.qid, eso.eventType)
 
             // CommunicationPathThroughObject:  (write, then read)
@@ -507,7 +509,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                     val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_write", ESOInstance(e, (s2, Some(pn2)), (o, Some(pno))))
 
                     // println(s"CommunicationPathThroughObject: $seoes")
-                    ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
+                    ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ receive seoesInstance)
                   }
                 }
               }.recoveryMessage("SEOES extraction for CommunicationPathThroughObject failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
@@ -542,7 +544,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                       val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_execute", ESOInstance(e, (s2, Some(pn2)), (o, Some(pno))))
 
                       // println(s"FileExecuteDelete: $seoes")
-                      ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
+                      ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ receive seoesInstance)
                     }
                 }
               }.recoveryMessage("SEOES extraction for FileExecuteDelete failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
@@ -577,7 +579,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                       val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_write", ESOInstance(e, (s2, Some(pn2)), (o, Some(pno))))
 
                       // println(s"FilesWrittenThenExecuted: $seoes")
-                      ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
+                      ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ receive seoesInstance)
                     }
                 }
               }.recoveryMessage("SEOES extraction for FilesWrittenThenExecuted failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
@@ -608,7 +610,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                         val oeseoInstance = OESEOInstance((n, None), "did_read", ESOInstance(e, (s, Some(pnS)), (o, pnO)))
 
                         // println(s"ProcessWritesFileSoonAfterNetflowRead: $oeseo")
-                        ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! oeseoInstance)
+                        ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ receive oeseoInstance)
                       }
                     }
                 }
@@ -625,7 +627,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
           classOf[StandingFetchActor[ESOSrcSnkInstance]],
           implicitly[Queryable[ESOSrcSnkInstance]],
           (l: List[ESOSrcSnkInstance]) => l.foreach{ eso =>
-            ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! eso)
+            ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ receive eso)
             makeComplexObsEdge(eso.subject.qid, eso.predicateObject.qid, eso.eventType)
 
             // CommunicationPathThroughObject:  (write, then read)
@@ -656,7 +658,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                     val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_write", ESOInstance(e, (s2, Some(pn2)), (o, pno)))
 
                     // println(s"CommunicationPathThroughObject: $seoes")
-                    ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
+                    ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ receive seoesInstance)
                   }
                 }
               }.recoveryMessage("SEOES extraction for CommunicationPathThroughObject failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
@@ -672,7 +674,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
           classOf[StandingFetchActor[ESONetworkInstance]],
           implicitly[Queryable[ESONetworkInstance]],
           (l: List[ESONetworkInstance]) => l.foreach{ eso =>
-            ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! eso)
+            ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ receive eso)
             makeComplexObsEdge(eso.subject.qid, eso.predicateObject.qid, eso.eventType)
 
             // CommunicationPathThroughObject:  (write, then read)
@@ -703,7 +705,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
                     val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_write", ESOInstance(e, (s2, Some(pn2)), (o, pno)))
 
                     // println(s"CommunicationPathThroughObject: $seoes")
-                    ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
+                    ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ receive seoesInstance)
                   }
                 }
               }.recoveryMessage("SEOES extraction for CommunicationPathThroughObject failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
@@ -764,7 +766,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
               val childSubject = PpmSubject(pp.cid, pp.subjectTypes, pp.qid.map(q => graph.idProvider.customIdFromQid(q)).flatMap(_.toOption).get, Some(pp.startTimestampNanos))
               val ssInstance = SSInstance((parentSubject, Some(pp.parentSubject.path)), (childSubject, Some(pp.path)))
               val hostName = pp.hostName
-              ppmManagerActors.get(hostName).fold(log.error(s"No PPM Actor with hostname: ${hostName}"))(_ ! ssInstance)
+              ppmManagerActors.get(hostName).fold(log.error(s"No PPM Actor with hostname: ${hostName}"))(_ receive ssInstance)
             }
           }
         ), sqidParentProcess.name
@@ -853,7 +855,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
           val hostPpmActorRef = ppmManagerActors(host.hostName)
           (broadcast.out(0) via debug.debugBuffer(s"[${host.hostName}] 3 before PPM state accumulator")) ~>
             (PpmFlowComponents.ppmStateAccumulator via debug.debugBuffer(s"[${host.hostName}] 4 before PPM sink")) ~>
-            Sink.foreach[CompletedESO](hostPpmActorRef ! _)
+            Sink.foreach[CompletedESO](hostPpmActorRef receive _)
 //            Sink.actorRefWithAck[CompletedESO](ppmManagerActors(host.hostName), InitMsg, Ack, CompleteMsg)
             Sink.ignore
 
@@ -869,7 +871,7 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         val crossHostPpmActorRef = ppmManagerActors(hostNameForAllHosts)
         (broadcastAdm.out(0) via debug.debugBuffer(s"~ 3 before cross-host PPM state accumulator")) ~>
           (PpmFlowComponents.ppmStateAccumulator via debug.debugBuffer(s"~ 4 before cross-host PPM sink")) ~>
-          Sink.foreach[CompletedESO](crossHostPpmActorRef ! _)
+          Sink.foreach[CompletedESO](crossHostPpmActorRef receive _)
  //         Sink.actorRefWithAck[CompletedESO](ppmManagerActors(hostNameForAllHosts), InitMsg, Ack, CompleteMsg)
 
         if (needsDb) {
@@ -1048,21 +1050,21 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         }
       }.runWith(Sink.ignore)
 
-    case "novelty" | "novel" | "ppm" | "ppmonly" =>
-      println("Running Novelty Detection Flow")
-      statusActor ! InitMsg
-
-      assert(cdmSources.size == 1, "Cannot run novelty flow for more than once host at a time")
-      val (host, cdmSource) = cdmSources.head._2
-
-      assert(host.parallel.size == 1, "Cannot run novelty flow for more than one linear ingest stream")
-      val li = host.parallel.head
-
-      cdmSource
-        .via(printCounter("Novelty", statusActor, li.range.startInclusive))
-        .via(erMap(host.hostName))
-        .runWith(PpmFlowComponents.ppmSink)
-      startWebServer()
+//    case "novelty" | "novel" | "ppm" | "ppmonly" =>
+//      println("Running Novelty Detection Flow")
+//      statusActor ! InitMsg
+//
+//      assert(cdmSources.size == 1, "Cannot run novelty flow for more than once host at a time")
+//      val (host, cdmSource) = cdmSources.head._2
+//
+//      assert(host.parallel.size == 1, "Cannot run novelty flow for more than one linear ingest stream")
+//      val li = host.parallel.head
+//
+//      cdmSource
+//        .via(printCounter("Novelty", statusActor, li.range.startInclusive))
+//        .via(erMap(host.hostName))
+//        .runWith(PpmFlowComponents.ppmSink)
+//      startWebServer()
 
     case other =>
       println(s"Unknown runflow argument $other. Quitting.")
@@ -1079,9 +1081,9 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
 
       val saveF = if (ppmConfig.shouldsaveppmtrees) {
         println(s"Saving PPM trees to disk...")
-        ppmManagerActors.values.toList.foldLeft(Future.successful(Ack))((a, b) => a.flatMap(_ => (b ? SaveTrees(true)).mapTo[Ack.type]))
+        ppmManagerActors.values.toList.foldLeft(Future.successful(()))((a, b) => a.flatMap(_ => b.saveTrees() ))
       } else {
-        Future.successful( Ack )
+        Future.successful( () )
       }
 
       val shutdownF = saveF.flatMap { _ =>
