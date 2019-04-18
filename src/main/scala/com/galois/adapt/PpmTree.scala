@@ -18,11 +18,10 @@ import com.galois.adapt
 import com.typesafe.scalalogging.LazyLogging
 
 import scala.collection.JavaConverters._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.collection.{GenSeq, SortedMap, mutable}
 import scala.util.{Failure, Success, Try}
-import scala.concurrent.ExecutionContext.Implicits.global
 import AdaptConfig._
 import Application.hostNameForAllHosts
 import spray.json._
@@ -99,6 +98,8 @@ case class PpmDefinition[DataShape](
   alarmActor: ActorRef,
   graphService: GraphService[AdmUUID]
 ) extends LazyLogging {
+
+  implicit val ec = context.dispatcher
 
   val basePath: String = ppmConfig.basedir + treeName + "-" + hostName
 
@@ -315,6 +316,8 @@ case object PpmNodeActorGetTopLevelCount
 case class PpmNodeActorGetTopLevelCountResult(count: Int) // We can just query the graph for properties on root node for this
 
 class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphService: GraphService[AdmUUID]) extends Actor with ActorLogging { thisActor =>
+
+  implicit val ec = context.dispatcher
 
   val (pathDelimiterRegexPattern, pathDelimiterChar) = if (isWindows) ("""\\""", """\""") else ("""/""" ,   "/")
   val sudoOrPowershellComparison: String => Boolean = if (isWindows) {
@@ -880,10 +883,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val e: Event = PpmEvent(eventType, earliestTimestampNanos, latestTimestampNanos, eventUuid)
         val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), Some(subject.path))
         val o: Object = (PpmFileObject(predicateObject.fileObjectType, objUuid), Some(predicateObject.path))
-
-        val f = Future { admPpmTrees.foreach(ppm => ppm.observe((e, s, o))) }
-
-        Await.result(f, 15 seconds)                                                               // TODO: Do not await!!!!
+        admPpmTrees.foreach(ppm => ppm.observe((e, s, o)))
       }.failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
 
     case msg @ ESONetworkInstance(eventType, earliestTimestampNanos, latestTimestampNanos, hostName, subject, predicateObject) =>
@@ -894,10 +894,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val e: Event = PpmEvent(eventType, earliestTimestampNanos, latestTimestampNanos, eventUuid)
         val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), Some(subject.path))
         val o: Object = (PpmNetFlowObject(predicateObject.remotePort, predicateObject.localPort, predicateObject.remoteAddress, predicateObject.localAddress, objUuid), None)
-
-        val f = Future { admPpmTrees.foreach(ppm => ppm.observe((e, s, o))) }
-
-        Await.result(f, 15 seconds)
+        admPpmTrees.foreach(ppm => ppm.observe((e, s, o)))
       }.failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
 
     case msg @ ESOSrcSnkInstance(eventType, earliestTimestampNanos, latestTimestampNanos, hostName, subject, predicateObject) =>
@@ -908,9 +905,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val e: Event = PpmEvent(eventType, earliestTimestampNanos, latestTimestampNanos, eventUuid)
         val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), Some(subject.path))
         val o: Object = (PpmSrcSinkObject(predicateObject.srcSinkType, objUuid), None)
-
-
-        val f = Future { admPpmTrees.foreach(ppm => ppm.observe((e, s, o))) }
+        admPpmTrees.foreach(ppm => ppm.observe((e, s, o)))
 
 //      val r = esoTrees.filter(_.name != "SummarizedProcessActivity").map(_.prettyString)
 //      r.foreach(tr => tr onComplete {
@@ -919,8 +914,6 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 //        }
 //      )
 
-
-        Await.result(f, 15 seconds)
       }.failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
 
     case PpmTreeAlarmQuery(treeName, queryPath, namespace, startAtTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
