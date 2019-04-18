@@ -192,12 +192,16 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   implicit val admHostInstance: Queryable[AdmHost] = cachedImplicit
   implicit val admSynthesizedInstance: Queryable[AdmSynthesized] = cachedImplicit
 
+  val fileSquid = Some(StandingQueryId("standing-find_ESOFile-accumulator"))
+  val srcSinkSquid = Some(StandingQueryId("standing-find_ESOSrcSnk-accumulator"))
+  val netSquid = Some(StandingQueryId("standing-find_ESONetwork-accumulator"))
+
   def writeAdm(a: ADM): Future[Unit] = (a match {
     case anAdm: AdmEvent =>
       anAdm.create(Some(anAdm.uuid)).map { x =>
-        graphService.standingFetch[ESOFileInstance](anAdm.uuid, Some(StandingQueryId("standing-fetch_ESOFile-accumulator")))(x => {})
-        graphService.standingFetch[ESOSrcSnkInstance](anAdm.uuid, Some(StandingQueryId("standing-fetch_ESOSrcSnk-accumulator")))(x => {})
-        graphService.standingFetch[ESONetworkInstance](anAdm.uuid, Some(StandingQueryId("standing-fetch_ESONetwork-accumulator")))(x => {})
+        graphService.standingFetch[ESOFileInstance](anAdm.uuid, fileSquid)( x => { })
+        graphService.standingFetch[ESOSrcSnkInstance](anAdm.uuid, srcSinkSquid)( x => { })
+        graphService.standingFetch[ESONetworkInstance](anAdm.uuid, netSquid)( x => { })
         x
       }
     case anAdm: AdmSubject =>

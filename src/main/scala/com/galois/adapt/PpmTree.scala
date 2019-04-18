@@ -18,11 +18,10 @@ import com.galois.adapt
 import com.typesafe.scalalogging.LazyLogging
 
 import scala.collection.JavaConverters._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.collection.{GenSeq, SortedMap, mutable}
 import scala.util.{Failure, Success, Try}
-import scala.concurrent.ExecutionContext.Implicits.global
 import AdaptConfig._
 import Application.hostNameForAllHosts
 import spray.json._
@@ -111,6 +110,8 @@ case class PpmDefinition[DataShape](
   alarmActor: ActorRef,
   graphService: GraphService[AdmUUID]
 ) extends LazyLogging {
+
+  implicit val ec = context.dispatcher
 
   val basePath: String = ppmConfig.basedir + treeName + "-" + hostName
 
@@ -326,6 +327,8 @@ case object PpmNodeActorGetTopLevelCount
 case class PpmNodeActorGetTopLevelCountResult(count: Int) // We can just query the graph for properties on root node for this
 
 class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphService: GraphService[AdmUUID]) extends Actor with ActorLogging { thisActor =>
+
+  implicit val ec = context.dispatcher
 
   val (pathDelimiterRegexPattern, pathDelimiterChar) = if (isWindows) ("""\\""", """\""") else ("""/""" ,   "/")
   val sudoOrPowershellComparison: String => Boolean = if (isWindows) {
@@ -845,11 +848,8 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val e: Event = PpmEvent(eventType, earliestTimestampNanos, latestTimestampNanos, eventUuid)
         val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), Some(subject.path))
         val o: Object = (PpmFileObject(predicateObject.fileObjectType, objUuid), Some(predicateObject.path))
-
-        val f = Future { esoTrees.foreach(ppm => ppm.observe((e, s, o))) }
-
-        Await.result(f, 15 seconds)                                                               // TODO: Do not await!!!!
-      }.failed.map(e => log.warning(s"Writing ESO trees failed: ${e.getMessage}"))
+        esoTrees.foreach(ppm => ppm.observe((e, s, o)))
+      }.failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
 
     case msg @ ESONetworkInstance(eventType, earliestTimestampNanos, latestTimestampNanos, hostName, subject, predicateObject) =>
       Try {
@@ -859,11 +859,8 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val e: Event = PpmEvent(eventType, earliestTimestampNanos, latestTimestampNanos, eventUuid)
         val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), Some(subject.path))
         val o: Object = (PpmNetFlowObject(predicateObject.remotePort, predicateObject.localPort, predicateObject.remoteAddress, predicateObject.localAddress, objUuid), None)
-
-        val f = Future { esoTrees.foreach(ppm => ppm.observe((e, s, o))) }
-
-        Await.result(f, 15 seconds)
-      }.failed.map(e => log.warning(s"Writing ESO trees failed: ${e.getMessage}"))
+        esoTrees.foreach(ppm => ppm.observe((e, s, o)))
+      }.failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
 
     case msg @ ESOSrcSnkInstance(eventType, earliestTimestampNanos, latestTimestampNanos, hostName, subject, predicateObject) =>
       Try {
@@ -873,9 +870,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val e: Event = PpmEvent(eventType, earliestTimestampNanos, latestTimestampNanos, eventUuid)
         val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), Some(subject.path))
         val o: Object = (PpmSrcSinkObject(predicateObject.srcSinkType, objUuid), None)
-
-
-        val f = Future { esoTrees.foreach(ppm => ppm.observe((e, s, o))) }
+        esoTrees.foreach(ppm => ppm.observe((e, s, o)))
 
 //      val r = esoTrees.filter(_.name != "SummarizedProcessActivity").map(_.prettyString)
 //      r.foreach(tr => tr onComplete {
@@ -884,35 +879,17 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 //        }
 //      )
 
-
-        Await.result(f, 15 seconds)
       }.failed.map(e => log.warning(s"Writing ESO trees failed: ${e.getMessage}"))
 
     case msg @ SEOESInstance(s1: Subject, eventKind: String, ESOInstance(e: Event, s2: Subject, o: Object))  =>
-
-      val f = Future { seoesTrees.foreach(ppm => ppm.observe((s1, eventKind, (e, s2, o)))) }
-
-      Try(
-        Await.result(f, 15 seconds)
-      ).failed.map(e => log.warning(s"Writing SEOES trees failed: ${e.getMessage}"))
+      seoesTrees.foreach(ppm => ppm.observe((s1, eventKind, (e, s2, o))))
 
 
     case msg @ OESEOInstance(o1: Object, eventKind: String, ESOInstance(e: Event, s: Subject, o2: Object))  =>
-
-      val f = Future { oeseoTrees.foreach(ppm => ppm.observe((o1, eventKind, (e, s, o2)))) }
-
-      Try(
-        Await.result(f, 15 seconds)
-      ).failed.map(e => log.warning(s"Writing OESEO trees failed: ${e.getMessage}"))
+      oeseoTrees.foreach(ppm => ppm.observe((o1, eventKind, (e, s, o2))))
 
     case msg @ SSInstance(parent: Subject, child: Subject)  =>
-
-      val f = Future { ssTrees.foreach(ppm => ppm.observe((parent, child))) }
-
-      Try(
-        Await.result(f, 15 seconds)
-      ).failed.map(e => log.warning(s"Writing ParentChileProcess tree observation failed: ${e.getMessage}"))
-
+      ssTrees.foreach(ppm => ppm.observe((parent, child)))
 
     case PpmTreeAlarmQuery(treeName, queryPath, namespace, startAtTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
       val resultOpt = ppm(treeName).map( tree =>
