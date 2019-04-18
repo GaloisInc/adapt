@@ -261,7 +261,7 @@ object Application extends App {
   val ppmManagerActors: Map[HostName, ActorRef] = runFlow match {
     case "quine" =>
       ingestConfig.hosts.map { host: IngestHost =>
-        val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows, actorSystemGraphService._2.get)
+        val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows, actorSystemGraphService._2.get).withDispatcher("adapt.ppm.manager-dispatcher")
         val ref = system.actorOf(props, s"ppm-actor-${host.hostName}")
         host.hostName -> ref
       }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false, actorSystemGraphService._2.get), s"ppm-actor-$hostNameForAllHosts"))
