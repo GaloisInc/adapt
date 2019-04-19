@@ -49,14 +49,14 @@ fi
 
 # Get machines involved
 MACHINES_INVOLVED=()
-for FILE in $FOLDER/*.conf; do
-  MACHINES_INVOLVED+=($(basename $FILE | cut -d. -f1))
+for FILE in $FOLDER/*; do
+  MACHINES_INVOLVED+=( $(basename $FILE | cut -d. -f1) )
 done
 
 # Delete already running instances
 if [ "YES" = "$KILLALL" ]; then
   echo -n "Running 'killall java' on the BBN machines..."
-  for NODENUM in {1..6}; do # $MACHINES_INVOLVED; do
+  for NODENUM in ${MACHINES_INVOLVED[@]}; do
     ssh $BBN_AUTH gw.tc.bbn.com "ssh $NODENUM 'killall java; rm $DELETEME; true'" &> $OUTSTUFF
   done
   echo " Done."
@@ -70,7 +70,7 @@ if [ "NO" = "$SKIPASSEMBLY" ]; then
 fi
 
 # Deploy and run one each node
-for NODENUM in {1..6}; do # $MACHINES_INVOLVED; do
+for NODENUM in ${MACHINES_INVOLVED[@]}; do
   THIS_CONF="$FOLDER/$NODENUM.conf"
   if [ -f $THIS_CONF ]; then
     echo -n "Deploying to BBN $NODENUM (with $THIS_CONF)..."
