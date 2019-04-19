@@ -448,23 +448,23 @@ object AdaptConfig extends Utils {
             ConsumerSettings(kafkaConsumerJavaConfig, new ByteArrayDeserializer, new ByteArrayDeserializer),
             Subscriptions.assignmentWithOffset(new TopicPartition(topicName, 0), offset = 0)
           )
-          .map(cr => Lazy { (KafkaTopicIngestUnit.kafkaCdm19Parser(cr).flatMap(cdm19 => cdm19ascdm20(cdm19)), namespace) })
+          .map(cr => Lazy { (KafkaTopicIngestUnit.kafkaCdm20Parser(cr), namespace) })
       }
   }
   object KafkaTopicIngestUnit {
 
-    private val reader19 = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm19.TCCDMDatum])
+    private val reader20 = new SpecificDatumReader(classOf[com.bbn.tc.schema.avro.cdm20.TCCDMDatum])
 
     // Parse a `CDM20` from a kafka record
-    def kafkaCdm19Parser(msg: ConsumerRecord[Array[Byte], Array[Byte]]): Try[CDM19] = Try {
+    def kafkaCdm20Parser(msg: ConsumerRecord[Array[Byte], Array[Byte]]): Try[CDM20] = Try {
       import org.apache.avro.io.DecoderFactory
 
       val bais = new ByteArrayInputStream(msg.value()) // msg.record.value()
       val offset = msg.offset() // msg.record.offset()
       val decoder = DecoderFactory.get.binaryDecoder(bais, null)
-      val datum = reader19.read(null, decoder)
-      val cdm = new RawCDM19Type(datum.getDatum, Some(datum.getHostId))
-      CDM19.parse(cdm)
+      val datum = reader20.read(null, decoder)
+      val cdm = new RawCDM20Type(datum.getDatum, Some(datum.getHostId))
+      CDM20.parse(cdm)
     }.flatten
   }
 
