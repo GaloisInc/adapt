@@ -6,7 +6,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import akka.util.Timeout
 import com.galois.adapt.adm._
-import com.rrwright.quine.runtime.{GraphService, NameSpacedUuidProvider, QuineIdProvider, StandingFetchActor, StandingQueryId}
+import com.rrwright.quine.runtime.GraphService
 import java.util.UUID
 import com.galois.adapt.cdm20._
 import spray.json.{JsArray, JsNumber, JsObject, JsString, JsValue, RootJsonFormat}
@@ -14,7 +14,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import com.rrwright.quine.gremlin.{GremlinQueryRunner, TypeAnnotationFieldReader}
-import com.rrwright.quine.language.{DomainNode, DomainNodeSetSingleton, NoConstantsDomainNode, PickleReader, PickleScheme, Queryable, QuineId}
+import com.rrwright.quine.language.{DomainNodeSetSingleton, NoConstantsDomainNode, PickleReader, PickleScheme, Queryable, QuineId}
 import com.rrwright.quine.language.EdgeDirections._
 import com.rrwright.quine.runtime.{NameSpacedUuidProvider, QuineIdProvider}
 import com.rrwright.quine.language.BoopickleScheme._
@@ -181,7 +181,9 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   implicit val queryableEsoFileInstance: Queryable[ESOFileInstance] = cachedImplicit
   implicit val queryableEsoSrcSnkInstance: Queryable[ESOSrcSnkInstance] = cachedImplicit
   implicit val queryableEsoNetworkInstance: Queryable[ESONetworkInstance] = cachedImplicit
+  implicit val queryableChildProcess: Queryable[ChildProcess] = cachedImplicit
   implicit val admSubjectInstance: Queryable[AdmSubject] = cachedImplicit
+  implicit val admEventInstance: Queryable[AdmEvent] = cachedImplicit
   implicit val admPrincipalInstance: Queryable[AdmPrincipal] = cachedImplicit
   implicit val admFileObjectInstance: Queryable[AdmFileObject] = cachedImplicit
   implicit val admNetFlowObjectInstance: Queryable[AdmNetFlowObject] = cachedImplicit
@@ -193,24 +195,20 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   implicit val admHostInstance: Queryable[AdmHost] = cachedImplicit
   implicit val admSynthesizedInstance: Queryable[AdmSynthesized] = cachedImplicit
 
-  val sqidHostPrefix = AdaptConfig.quineConfig.thishost.replace(".", "-")
-  val fileSquid = Some(StandingQueryId(sqidHostPrefix + "_standing-find_ESOFile-accumulator"))
-  val srcSinkSquid = Some(StandingQueryId(sqidHostPrefix + "_standing-find_ESOSrcSnk-accumulator"))
-  val netSquid = Some(StandingQueryId(sqidHostPrefix + "_standing-find_ESONetwork-accumulator"))
-  val procSquid = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ProcessParentage"))
+  def wrongFunc(x: Any): Unit = println("This is not the function you are looking for.")
 
 
   def writeAdm(a: ADM): Future[Unit] = (a match {
     case anAdm: AdmEvent =>
       anAdm.create(Some(anAdm.uuid)).map { x =>
-        graphService.standingFetch[ESOFileInstance](anAdm.uuid, fileSquid)( x => { })
-        graphService.standingFetch[ESOSrcSnkInstance](anAdm.uuid, srcSinkSquid)( x => { })
-        graphService.standingFetch[ESONetworkInstance](anAdm.uuid, netSquid)( x => { })
+        graphService.standingFetch[ESOFileInstance](anAdm.uuid, Application.sqidFile)(wrongFunc)
+        graphService.standingFetch[ESOSrcSnkInstance](anAdm.uuid, Application.sqidSrcSnk)(wrongFunc)
+        graphService.standingFetch[ESONetworkInstance](anAdm.uuid, Application.sqidNetwork)(wrongFunc)
         x
       }
     case anAdm: AdmSubject =>
       anAdm.create(Some(anAdm.uuid)).map { x =>
-        graphService.standingFetch[ChildProcess](anAdm.uuid, procSquid)(_ => {})
+        graphService.standingFetch[ChildProcess](anAdm.uuid, Application.sqidParentProcess)(wrongFunc)
         x
       }
     case anAdm: AdmPrincipal          => anAdm.create(Some(anAdm.uuid))

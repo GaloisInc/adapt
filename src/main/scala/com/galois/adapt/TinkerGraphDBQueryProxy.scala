@@ -18,10 +18,8 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
   // In memory DB
   val graph: TinkerGraph = {
     val g = TinkerGraph.open()
-
     g.createIndex("uuid", classOf[Vertex])
     g.createIndex("pid", classOf[Vertex])
-
     g
   }
 
@@ -74,8 +72,7 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
     }
 
     cdmToNodeResults
-      .collect { case f@Failure(_) => f }
-      .headOption
+      .collectFirst { case f@Failure(_) => f }
       .getOrElse(Success(()))
   }
 
@@ -113,13 +110,17 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
     }
 
     admToNodeResults
-      .collect { case f@Failure(_) => f }
-      .headOption
+      .collectFirst { case f@Failure(_) => f }
       .getOrElse(Success(()))
   }
 
   var storedCdmDone: Boolean = false
   var storedAdmDone: Boolean = false
+
+
+  // Mutable state that gets updated during ingestion
+  var failedStatements: List[(Int, String)] = Nil
+
 
   override def receive: PartialFunction[Any,Unit] = super.receive orElse {
 
@@ -147,7 +148,7 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
       val instrumentationSource = AdaptConfig.ingestConfig.asSingleHost.simpleTa1Name
 
       org.scalatest.run(new General_TA1_Tests(
-        Application.failedStatements,
+        failedStatements,
         missingToUuid.toMap,
         graph,
         instrumentationSource,
@@ -163,7 +164,9 @@ class TinkerGraphDBQueryProxy extends DBQueryProxyActor {
         case "faros" => Some(new FAROS_Specific_Tests(graph, updateStatus))
         case "theia" => Some(new THEIA_Specific_Tests(graph, updateStatus))
         case "fivedirections" => Some(new FIVEDIRECTIONS_Specific_Tests(graph, updateStatus))
-        case s => { println(s"No tests for: $s"); None }
+        case s =>
+          println(s"No tests for: $s")
+          None
       }
       providerSpecificTests.foreach(org.scalatest.run(_))
 

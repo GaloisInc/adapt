@@ -3,13 +3,15 @@ package com.galois.adapt
 import java.nio.file.Paths
 import java.text.NumberFormat
 import java.util.UUID
+import akka.NotUsed
 import akka.stream.scaladsl._
 import scala.collection.mutable.{Map => MutableMap}
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.{FlowShape, OverflowStrategy}
 import akka.util.ByteString
 import scala.collection.mutable
 import com.galois.adapt.cdm20._
+import scala.concurrent.duration.FiniteDuration
 
 
 object FlowComponents {
@@ -122,3 +124,76 @@ trait ProcessingCommand extends CurrentCdm
 case class AdaptProcessingInstruction(id: Long) extends ProcessingCommand
 case object EmitCmd extends ProcessingCommand
 case object CleanUp extends ProcessingCommand
+
+
+
+
+/**
+  * Utility for debugging which components are bottlenecks in a backpressured stream system. Instantiate one of these
+  * per stream system, then place [[debugBuffer]] between stages to find out whether the bottleneck is upstream (in
+  * which case the buffer will end up empty) or downstream (in which case the buffer will end up full).
+  *
+  * @param prefix prompt with which to start status update lines
+  * @param printEvery how frequently to print out status updates
+  * @param reportEvery how frequently should the debug buffers report their status to the [[StreamDebugger]]
+  */
+class StreamDebugger(prefix: String, printEvery: FiniteDuration, reportEvery: FiniteDuration)
+  (implicit system: ActorSystem) {
+
+  implicit val ec = system.dispatchers.lookup("quine.actor.node-dispatcher")
+
+  import java.util.concurrent.ConcurrentHashMap
+  import java.util.concurrent.atomic.AtomicInteger
+  import java.util.function.BiConsumer
+
+  val bufferCounts: ConcurrentHashMap[String, Long] = new ConcurrentHashMap()
+
+  val scheduledStreamBuffersReport = system.scheduler.schedule(printEvery, printEvery, new Runnable {
+    override def run(): Unit = {
+      val listBuffer = mutable.ListBuffer.empty[(String, Long)]
+      bufferCounts.forEach(new BiConsumer[String, Long] {
+        override def accept(key: String, count: Long): Unit = listBuffer += (key -> count)
+      })
+      println(listBuffer
+        .sortBy(_._1)
+        .toList
+        .map { case (stage, count) => s"$prefix $stage: $count" }
+        .mkString(s"$prefix ==== START OF STREAM-BUFFERS REPORT ====\n", "\n", s"\n$prefix ==== END OF STREAM-BUFFERS REPORT ====")
+      )
+    }
+  })
+  system.registerOnTermination(scheduledStreamBuffersReport.cancel())
+
+  /**
+    * Create a new debug buffer flow. This is just like a (backpressured) buffer flow, but it keeps track of how many
+    * items are in the buffer (possibly plus one) and reports this number periodically to the object on which this
+    * method is called.
+    *
+    * @param name what label to associate with this debug buffer (should be unique per [[StreamDebugger]]
+    * @param bufferSize size of the buffer being created
+    * @tparam T type of thing flowing through the buffer
+    * @return a buffer flow which periodically reports stats about how full its buffer is
+    */
+  def debugBuffer[T](name: String, bufferSize: Int = 10000): Flow[T,T,NotUsed] =
+    Flow.fromGraph(GraphDSL.create() {
+      implicit graph =>
+
+        import GraphDSL.Implicits._
+
+        val bufferCount: AtomicInteger = new AtomicInteger(0)
+
+        // Write the count out to the buffer count map regularly
+        system.scheduler.schedule(reportEvery, reportEvery, new Runnable {
+          override def run(): Unit = bufferCounts.put(name, bufferCount.get())
+        })
+
+        // Increment the count when entering the buffer, decrement it when exiting
+        val incrementCount = graph.add(Flow.fromFunction[T,T](x => { bufferCount.incrementAndGet(); x }))
+        val buffer = graph.add(Flow[T].buffer(bufferSize, OverflowStrategy.backpressure))
+        val decrementCount = graph.add(Flow.fromFunction[T,T](x => { bufferCount.decrementAndGet(); x }))
+
+        incrementCount.out ~> buffer ~> decrementCount
+
+        FlowShape(incrementCount.in, decrementCount.out)
+    })
+}

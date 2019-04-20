@@ -72,7 +72,9 @@ object Routes {
        dbActor: ActorRef,
        statusActor: ActorRef,
        ppmActors: Map[HostName, ActorRef]
-   )(implicit ec: ExecutionContext, system: ActorSystem, materializer: Materializer) = {
+   )(implicit system: ActorSystem, materializer: Materializer) = {
+
+    implicit val ec = system.dispatchers.lookup("quine.actor.node-dispatcher")
 
     def setRatings(rating: Int, namespace: String, hostName: HostName, pathsPerTree: Map[String, List[String]]) = {
       val perTreeResultFutures = pathsPerTree.map {

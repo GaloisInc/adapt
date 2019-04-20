@@ -4,8 +4,9 @@ import java.io.{BufferedWriter, File, FileWriter}
 import java.nio.file.{Files, Paths}
 import java.util.function.Consumer
 import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Flow, Sink}
+import akka.actor.{ActorRef, ActorSystem}
+import akka.stream.SinkShape
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Sink}
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm20._
 import scala.collection.mutable
@@ -30,9 +31,19 @@ object PpmFlowComponents {
   type CompletedESO = (Event, ADM, Set[AdmPathNode], ADM, Set[AdmPathNode])
   type AdmUUIDReferencingPathNode = AdmUUID
 
+
+  // Produce a Sink which accepts any type of observation to distribute as an observation to PPM tree actors for every host.
+  def ppmObservationDistributorSink[T]: Sink[T, NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit b =>
+    import GraphDSL.Implicits._
+    val actorList: List[ActorRef] = Application.ppmManagerActors.toList.map(_._2)
+    val broadcast = b.add(Broadcast[T](actorList.size))
+    actorList.foreach { ref => broadcast ~> Sink.actorRefWithAck[T](ref, InitMsg, Ack, CompleteMsg) }
+    SinkShape(broadcast.in)
+  })
+
   def ppmSink(implicit system: ActorSystem, ec: ExecutionContext): Sink[Either[ADM, EdgeAdm2Adm], NotUsed] =
     ppmStateAccumulator.to(
-      Application.ppmObservationDistributorSink // [(Event, ADM, Set[AdmPathNode], ADM, Set[AdmPathNode])]
+      ppmObservationDistributorSink // [(Event, ADM, Set[AdmPathNode], ADM, Set[AdmPathNode])]
     )
 
   def ppmStateAccumulator(implicit system: ActorSystem, ec: ExecutionContext): Flow[Either[ADM, EdgeAdm2Adm], CompletedESO, NotUsed] = Flow[Either[ADM, EdgeAdm2Adm]].statefulMapConcat[CompletedESO]{ () =>
