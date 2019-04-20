@@ -323,79 +323,14 @@ object Application extends App {
         .recover{ case e: Throwable => e.printStackTrace(); ??? }
         .runWith(sink)
 
-
     case "database" | "db" | "ingest" =>
-      val completionMsg = if (ingestConfig.quitafteringest) {
-        println("Will terminate after ingest.")
-        KillJVM
-      } else CompleteMsg
-      val writeTimeout = Timeout(30.1 seconds)
+      println("Not supported since we started using Quine. Consider using the `quine` runflow instead.")
 
-      println(s"Running database flow to ${ingestConfig.produce} with UI.")
-      startWebServer()
-
-      ingestConfig.produce match {
-        case ProduceCdm =>
-          RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
-            import GraphDSL.Implicits._
-
-            val sources = cdmSources.values.toSeq
-            val merge = b.add(Merge[(Namespace,CDM20)](sources.size))
-
-            for (((host, source), i) <- sources.zipWithIndex) {
-              source.via(printCounter(host.hostName, statusActor, 0)) ~> merge.in(i)
-            }
-
-            merge.out ~> DBQueryProxyActor.graphActorCdm20WriteSink(dbActor, completionMsg)(writeTimeout)
-
-            ClosedShape
-          }).run()
-
-        case ProduceAdm =>
-          RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
-            import GraphDSL.Implicits._
-
-            val sources = cdmSources.values.toSeq
-            val merge = b.add(Merge[Either[ADM, EdgeAdm2Adm]](sources.size))
-
-
-            for (((host, source), i) <- sources.zipWithIndex) {
-              source.via(printCounter(host.hostName, statusActor, 0)) ~> erMap(host.hostName) ~> merge.in(i)
-            }
-
-            merge.out ~> betweenHostDedup ~> DBQueryProxyActor.graphActorAdmWriteSink(dbActor, completionMsg)
-
-            ClosedShape
-          }).run()
-
-        case ProduceCdmAndAdm =>
-          RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
-            import GraphDSL.Implicits._
-
-            val sources = cdmSources.values.toSeq
-            val mergeCdm = b.add(Merge[(Namespace, CurrentCdm)](sources.size))
-            val mergeAdm = b.add(Merge[Either[ADM, EdgeAdm2Adm]](sources.size))
-
-
-            for (((host, source), i) <- sources.zipWithIndex) {
-              val broadcast = b.add(Broadcast[(Namespace, CurrentCdm)](2))
-              source.via(printCounter(host.hostName, statusActor, 0)) ~> broadcast.in
-
-              broadcast.out(0)                         ~> mergeCdm.in(i)
-              broadcast.out(1) ~> erMap(host.hostName) ~> mergeAdm.in(i)
-            }
-
-            mergeCdm.out                     ~> DBQueryProxyActor.graphActorCdm20WriteSink(dbActor, completionMsg)(writeTimeout)
-            mergeAdm.out ~> betweenHostDedup ~> DBQueryProxyActor.graphActorAdmWriteSink(dbActor, completionMsg)
-
-            ClosedShape
-          }).run()
-      }
-
-    case "e3" | "e3-no-db" =>
+    case "e3" | "e3-no-db" |
+         "e4" | "e4-no-db" | "e4-no-ppm" =>
       println(
         raw"""
-Unknown runflow argument e3. Quitting. (Did you mean e4?)
+Unknown runflow argument. Quitting. (Did you mean quine?)
 
                 \
                  \
@@ -826,84 +761,6 @@ Unknown runflow argument e3. Quitting. (Did you mean e4?)
         for (((host, source), i) <- hostSources.zipWithIndex) {
           source.via(printCounter(host.hostName, statusActor)) ~> Sink.ignore
         }
-        ClosedShape
-      }).run()
-
-    case "e4" | "e4-no-db" =>
-      val needsDb: Boolean = runFlow == "e4"
-
-      startWebServer()
-      statusActor ! InitMsg
-
-      // Write out debug states
-      val debug = new StreamDebugger("stream-buffers|", 10 minutes, 10 seconds)
-
-      RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
-        import GraphDSL.Implicits._
-
-        val hostSources = cdmSources.values.toSeq
-        val mergeAdm = b.add(Merge[Either[ADM, EdgeAdm2Adm]](hostSources.size))
-
-        for (((host, source), i) <- hostSources.zipWithIndex) {
-          val broadcast = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](2))
-          (source.via(printCounter(host.hostName, statusActor)) via debug.debugBuffer(s"[${host.hostName}] 0 before ER")) ~>
-            (erMap(host.hostName) via debug.debugBuffer(s"[${host.hostName}] 1 after ER")) ~>
-            broadcast.in
-
-          val hostPpmActorRef = ppmManagerActors(host.hostName)
-          (broadcast.out(0) via debug.debugBuffer(s"[${host.hostName}] 3 before PPM state accumulator")) ~>
-            (PpmFlowComponents.ppmStateAccumulator via debug.debugBuffer(s"[${host.hostName}] 4 before PPM sink")) ~>
-            Sink.foreach[CompletedESO](hostPpmActorRef ! _)
-//            Sink.actorRefWithAck[CompletedESO](ppmManagerActors(host.hostName), InitMsg, Ack, CompleteMsg)
-            Sink.ignore
-
-          (broadcast.out(1) via debug.debugBuffer(s"[${host.hostName}] 2 before ADM merge")) ~>
-            mergeAdm.in(i)
-        }
-
-        val broadcastAdm = b.add(Broadcast[Either[ADM, EdgeAdm2Adm]](if (needsDb) { 2 } else { 1 }))
-        (mergeAdm.out via debug.debugBuffer(s"~ 0 after ADM merge")) ~>
-          (betweenHostDedup via debug.debugBuffer(s"~ 1 after cross-host deduplicate")) ~>
-          broadcastAdm.in
-
-        val crossHostPpmActorRef = ppmManagerActors(hostNameForAllHosts)
-        (broadcastAdm.out(0) via debug.debugBuffer(s"~ 3 before cross-host PPM state accumulator")) ~>
-          (PpmFlowComponents.ppmStateAccumulator via debug.debugBuffer(s"~ 4 before cross-host PPM sink")) ~>
-          Sink.foreach[CompletedESO](crossHostPpmActorRef ! _)
- //         Sink.actorRefWithAck[CompletedESO](ppmManagerActors(hostNameForAllHosts), InitMsg, Ack, CompleteMsg)
-
-        if (needsDb) {
-          (broadcastAdm.out(1) via debug.debugBuffer(s"~ 2 before DB sink")).via(printCounter("DB counter", statusActor)) ~>
-            DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
-        }
-
-        ClosedShape
-      }).run()
-
-    case "e4-no-ppm" =>
-
-      startWebServer()
-      statusActor ! InitMsg
-
-      // Write out debug states
-      val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
-
-      RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
-        import GraphDSL.Implicits._
-
-        val hostSources = cdmSources.values.toSeq
-        val mergeAdm = b.add(Merge[Either[ADM, EdgeAdm2Adm]](hostSources.size))
-
-        for (((host, source), i) <- hostSources.zipWithIndex) {
-          (source.via(printCounter(host.hostName, statusActor, 0)) via debug.debugBuffer(s"[${host.hostName}] 0 before ER")) ~>
-            (erMap(host.hostName) via debug.debugBuffer(s"[${host.hostName}] 1 after ER")) ~>
-            mergeAdm.in(i)
-        }
-
-        (mergeAdm.out via debug.debugBuffer(s"~ 0 after ADM merge")) ~>
-          (betweenHostDedup via debug.debugBuffer(s"~ 1 after cross-host deduplicate")) ~>
-          DBQueryProxyActor.graphActorAdmWriteSink(dbActor)
-
         ClosedShape
       }).run()
 
