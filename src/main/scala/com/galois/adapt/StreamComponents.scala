@@ -1,6 +1,7 @@
 package com.galois.adapt
 
 import java.nio.file.Paths
+import java.text.NumberFormat
 import java.util.UUID
 import akka.stream.scaladsl._
 import scala.collection.mutable.{Map => MutableMap}
@@ -19,6 +20,8 @@ object FlowComponents {
     var lastTimestampNanos = 0L
     val recentPopulationCounter = MutableMap.empty[String, Long]
     val totalPopulationCounter = MutableMap.empty[String, Long]
+
+    val numberFormatter = NumberFormat.getInstance()
 
     { item: T =>  // Type annotation T is a compilation hack! No runtime effect because it's generic.
       if (lastTimestampNanos == 0L) {
@@ -41,7 +44,7 @@ object FlowComponents {
         val nowNanos = System.nanoTime()
         val durationSeconds = (nowNanos - lastTimestampNanos) / 1e9
 
-        println(s"$counterName ingested: $counter   Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${(every / durationSeconds).toInt} items/second. At time: ${System.currentTimeMillis}") //  Rate since beginning: ${((counter - startingCount) / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.")
+        println(s"$counterName ingested: ${numberFormatter.format(counter)}   Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${numberFormatter.format((every / durationSeconds).toInt)} items/second. At time: ${System.currentTimeMillis}") //  Rate since beginning: ${((counter - startingCount) / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.")
 
         statusActor ! PopulationLog(
           counterName,

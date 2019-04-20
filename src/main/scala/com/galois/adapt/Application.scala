@@ -2,15 +2,15 @@ package com.galois.adapt
 
 import java.io._
 import java.nio.file.Paths
+import java.text.NumberFormat
 import java.util.UUID
-
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.RouteResult._
 import akka.pattern.ask
 import akka.stream.{ActorMaterializer, _}
 import akka.stream.scaladsl._
-import akka.util.{ByteString, Timeout}
+import akka.util.Timeout
 import com.galois.adapt.adm._
 import FlowComponents._
 import akka.NotUsed
@@ -18,14 +18,12 @@ import akka.event.{Logging, LoggingAdapter}
 import shapeless._
 import shapeless.syntax.singleton._
 import AdaptConfig._
-import com.galois.adapt.PpmFlowComponents.CompletedESO
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.ConfigFactory
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.NoveltyDetection.{Event => _, _}
 import com.galois.adapt.PpmSummarizer.AbstractionOne
 import com.galois.adapt.cdm20._
-
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -108,12 +106,12 @@ object Application extends App {
     case "quine" =>
       val hostConfigSrcs: List[String] = quineConfig.hosts
         .zipWithIndex  
-        .map { case (QuineHost(ip, _), idx) => 
+        .map { case (QuineHost(ip, shardCount, _), idx) =>
           s"""|  {
               |    hostname = $ip
               |    port = 2551
-              |    first-shard = ${idx * quineConfig.shardsperhost}
-              |    last-shard = ${(idx + 1) * quineConfig.shardsperhost - 1}
+              |    first-shard = ${ quineConfig.hosts.take(idx).map(_.shardcount).sum }
+              |    last-shard = ${  quineConfig.hosts.take(idx).map(_.shardcount).sum + shardCount - 1 }
               |  }
               |""".stripMargin
         }
@@ -130,14 +128,14 @@ object Application extends App {
         persistor = as => LMDBSnapshotPersistor(
           mapSizeBytes = {
             val size: Long = runtimeConfig.lmdbgigabytes * 1024L * 1024L * 1024L
-            println("LMDB size: " + size)
+            println("LMDB size: " + NumberFormat.getInstance().format(size))
             size
           }
         )(as), // EmptyPersistor()(as),
         idProvider = AdmUuidProvider,
         indexer = Indexer.currentIndex(EmptyIndex),
-        inMemorySoftNodeLimit = Some(10000),
-        inMemoryHardNodeLimit = Some(20000),
+        inMemorySoftNodeLimit = Some(quineConfig.inmemsoftlimit),
+        inMemoryHardNodeLimit = Some(quineConfig.inmemhardlimit),
         uiPort = None
       )
       (graphService.system, Some(graphService))
@@ -180,7 +178,7 @@ object Application extends App {
   implicit val materializer = ActorMaterializer(ActorMaterializerSettings(system).withSupervisionStrategy(streamErrorStrategy))
   implicit val executionContext = system.dispatcher
 
-  val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
+  lazy val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
 //  val logFile = config.getString("adapt.logfile")
 //  val scheduledLogging = system.scheduler.schedule(10.seconds, 10.seconds, statusActor, LogToDisk(logFile))
 //  system.registerOnTermination(scheduledLogging.cancel())
@@ -189,7 +187,7 @@ object Application extends App {
   if ( ! ppmBaseDirFile.exists()) ppmBaseDirFile.mkdir()
 
   // Start up the database
-  var dbActor: ActorRef = runFlow match {
+  val dbActor: ActorRef = runFlow match {
     case "accept" => system.actorOf(Props(classOf[TinkerGraphDBQueryProxy]))
     case "quine" => ActorRef.noSender
     case _ => ???
@@ -258,7 +256,7 @@ object Application extends App {
     )
   }
 
-  val ppmManagerActors: Map[HostName, ActorRef] = runFlow match {
+  lazy val ppmManagerActors: Map[HostName, ActorRef] = runFlow match {
     case "quine" =>
       ingestConfig.hosts.map { host: IngestHost =>
         val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows, actorSystemGraphService._2.get).withDispatcher("adapt.ppm.manager-dispatcher")
@@ -278,7 +276,7 @@ object Application extends App {
     SinkShape(broadcast.in)
   })
   
-  def startWebServer(): Http.ServerBinding = {
+  def startWebServer(dbActor: ActorRef): Http.ServerBinding = {
     println(s"Starting the web server at: http://${runtimeConfig.webinterface}:${runtimeConfig.port}")
     val route = Routes.mainRoute(dbActor, statusActor, ppmManagerActors)
     val httpServer = Http().bindAndHandle(route, runtimeConfig.webinterface, runtimeConfig.port)
@@ -304,7 +302,7 @@ object Application extends App {
         SinkShape(broadcast.in)
       })
 
-      startWebServer()
+      startWebServer(dbActor)
 
       val handler: ErrorHandler = new ErrorHandler {
         override def handleError(offset: Long, error: Throwable): Unit = {
@@ -323,11 +321,10 @@ object Application extends App {
         .recover{ case e: Throwable => e.printStackTrace(); ??? }
         .runWith(sink)
 
-    case "database" | "db" | "ingest" =>
-      println("Not supported since we started using Quine. Consider using the `quine` runflow instead.")
 
     case "e3" | "e3-no-db" |
-         "e4" | "e4-no-db" | "e4-no-ppm" =>
+         "e4" | "e4-no-db" | "e4-no-ppm" |
+         "database" | "db" | "ingest" =>
       println(
         raw"""
 Unknown runflow argument. Quitting. (Did you mean quine?)
@@ -375,6 +372,13 @@ Unknown runflow argument. Quitting. (Did you mean quine?)
 
 
 
+      val clusterStartupDeadline: Deadline = 300.seconds.fromNow
+      while ( ! graph.clusterIsReady) {
+        if (clusterStartupDeadline.isOverdue()) throw new RuntimeException(s"Timeout expired while waiting for cluster hosts to become active.")
+        Thread.sleep(1000)
+      }
+
+
       val readTypes = Set[EventType](EVENT_READ, EVENT_RECVFROM, EVENT_RECVMSG)
       val writeTypes = Set[EventType](EVENT_WRITE, EVENT_SENDTO, EVENT_SENDMSG, EVENT_CREATE_OBJECT, EVENT_FLOWS_TO)
       val execTypes = Set[EventType](EVENT_EXECUTE, EVENT_LOADLIBRARY, EVENT_MMAP, EVENT_STARTSERVICE)
@@ -404,8 +408,9 @@ Unknown runflow argument. Quitting. (Did you mean quine?)
       }
 
 
+      val sqidHostPrefix = quineConfig.thishost.replace(".", "-")
 
-      val sqidFile = StandingQueryId("standing-fetch_ESOFile-accumulator")
+      val sqidFile = StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOFile-accumulator")
       val standingFetchFileActor = system.actorOf(
         Props(
           classOf[StandingFetchActor[ESOFileInstance]],
@@ -441,7 +446,7 @@ Unknown runflow argument. Quitting. (Did you mean quine?)
 
                     val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_write", ESOInstance(e, (s2, Some(pn2)), (o, Some(pno))))
 
-                    // println(s"CommunicationPathThroughObject: $seoes")
+                     println(s"CommunicationPathThroughObject: $seoesInstance")
                     ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
                   }
                 }
@@ -476,7 +481,7 @@ Unknown runflow argument. Quitting. (Did you mean quine?)
 
                       val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_execute", ESOInstance(e, (s2, Some(pn2)), (o, Some(pno))))
 
-                      // println(s"FileExecuteDelete: $seoes")
+                       println(s"FileExecuteDelete: $seoesInstance")
                       ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
                     }
                 }
@@ -511,7 +516,7 @@ Unknown runflow argument. Quitting. (Did you mean quine?)
 
                       val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_write", ESOInstance(e, (s2, Some(pn2)), (o, Some(pno))))
 
-                      // println(s"FilesWrittenThenExecuted: $seoes")
+                       println(s"FilesWrittenThenExecuted: $seoesInstance")
                       ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
                     }
                 }
@@ -542,19 +547,18 @@ Unknown runflow argument. Quitting. (Did you mean quine?)
 
                         val oeseoInstance = OESEOInstance((n, None), "did_read", ESOInstance(e, (s, Some(pnS)), (o, pnO)))
 
-                        // println(s"ProcessWritesFileSoonAfterNetflowRead: $oeseo")
+                         println(s"ProcessWritesFileSoonAfterNetflowRead: $oeseoInstance")
                         ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! oeseoInstance)
                       }
                     }
                 }
               }
             }
-
           }
         ), sqidFile.name
       )
 
-      val sqidSrcSnk = StandingQueryId("standing-fetch_ESOSrcSnk-accumulator")
+      val sqidSrcSnk = StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOSrcSnk-accumulator")
       val standingFetchSrcSnkActor = system.actorOf(
         Props(
           classOf[StandingFetchActor[ESOSrcSnkInstance]],
@@ -590,7 +594,7 @@ Unknown runflow argument. Quitting. (Did you mean quine?)
 
                     val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_write", ESOInstance(e, (s2, Some(pn2)), (o, pno)))
 
-                    // println(s"CommunicationPathThroughObject: $seoes")
+                     println(s"CommunicationPathThroughObject: $seoesInstance")
                     ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
                   }
                 }
@@ -601,7 +605,7 @@ Unknown runflow argument. Quitting. (Did you mean quine?)
         ), sqidSrcSnk.name
       )
 
-      val sqidNetwork = StandingQueryId("standing-fetch_ESONetwork-accumulator")
+      val sqidNetwork = StandingQueryId(sqidHostPrefix + "_standing-fetch_ESONetwork-accumulator")
       val standingFetchNetworkActor = system.actorOf(
         Props(
           classOf[StandingFetchActor[ESONetworkInstance]],
@@ -637,40 +641,13 @@ Unknown runflow argument. Quitting. (Did you mean quine?)
 
                     val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_write", ESOInstance(e, (s2, Some(pn2)), (o, pno)))
 
-                    // println(s"CommunicationPathThroughObject: $seoes")
+                     println(s"CommunicationPathThroughObject: $seoesInstance")
                     ppmManagerActors.get(eso.hostName).fold(log.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
                   }
                 }
               }.recoveryMessage("SEOES extraction for CommunicationPathThroughObject failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
             }
 
-            // ProcessWritesFileSoonAfterNetflowRead
-//            val it_is_a_good_idea_to_spend_RAM_in_this_way = false
-//            if (it_is_a_good_idea_to_spend_RAM_in_this_way && readTypes.contains(eso.eventType) && eso.subject.qid.isDefined) {  // Test if this ESO matches the FIRST half of the pattern
-//              val subjectQid = eso.subject.qid.get
-//              val subjectCustomId = graph.idProvider.customIdFromQid(subjectQid)
-//              val latestEsoNanos: Long = eso.latestTimestampNanos
-//              // create standing fetch on the subject, looking for write event
-//              graph.standingFetch[ESOFileInstance](subjectCustomId.get, None){ fileESOs =>  // TODO: WARNING: This will close over the initial ESO match for the (infinite) life of the standingFetch actor!!!!!!!!!!!!
-//                fileESOs.foreach{
-//                  case fileWriteEso if writeTypes.contains(fileWriteEso.eventType) &&
-//                    fileWriteEso.earliestTimestampNanos - latestEsoNanos < 1e10.toLong => // Less than 10 seconds between latest network read and earliest file write.
-//
-//                    val n = PpmNetFlowObject(eso.predicateObject.remotePort, eso.predicateObject.localPort, eso.predicateObject.remoteAddress, eso.predicateObject.localAddress, graph.idProvider.customIdFromQid(eso.predicateObject.qid.get).get)
-//                    val e = PpmEvent(fileWriteEso.eventType, fileWriteEso.earliestTimestampNanos, fileWriteEso.latestTimestampNanos, graph.idProvider.customIdFromQid(fileWriteEso.qid.get).get)
-//                    val s = PpmSubject(fileWriteEso.subject.cid, fileWriteEso.subject.subjectTypes, graph.idProvider.customIdFromQid(fileWriteEso.subject.qid.get).get)
-//                    val pnS = fileWriteEso.subject.path
-//                    val o = PpmFileObject(fileWriteEso.predicateObject.fileObjectType, graph.idProvider.customIdFromQid(fileWriteEso.predicateObject.qid.get).get)
-//                    val pnO = Some(fileWriteEso.predicateObject.path)
-//
-//                    type EventKind = String
-//                    val oeseo: (NoveltyDetection.PpmNetFlowObject, EventKind, (NoveltyDetection.Event, NoveltyDetection.Subject, (NoveltyDetection.PpmFileObject, Option[AdmPathNode]))) =
-//                      (n, "did_read", (e, (s, pnS), (o, pnO)))
-//
-//                    println(s"ProcessWritesFileSoonAfterNetflowRead: $oeseo")  // TODO: Nichole: send to PPM observer.
-//                }
-//              }
-//            }
 
             // ProcessWritesFileSoonAfterNetflowRead: (alternate)  Part 1
             if (readTypes.contains(eso.eventType) && eso.subject.qid.isDefined) Try {  // Test if this ESO matches the FIRST half of the pattern
@@ -686,7 +663,7 @@ Unknown runflow argument. Quitting. (Did you mean quine?)
 
 
 
-      val sqidParentProcess = StandingQueryId("standing-fetch_ProcessParentage")
+      val sqidParentProcess = StandingQueryId(sqidHostPrefix + "_standing-fetch_ProcessParentage")
       val standingFetchProcessParentageActor = system.actorOf(
         Props(
           classOf[StandingFetchActor[ChildProcess]],
@@ -699,12 +676,11 @@ Unknown runflow argument. Quitting. (Did you mean quine?)
               val childSubject = PpmSubject(pp.cid, pp.subjectTypes, pp.qid.map(q => graph.idProvider.customIdFromQid(q)).flatMap(_.toOption).get, Some(pp.startTimestampNanos))
               val ssInstance = SSInstance((parentSubject, Some(pp.parentSubject.path)), (childSubject, Some(pp.path)))
               val hostName = pp.hostName
-              ppmManagerActors.get(hostName).fold(log.error(s"No PPM Actor with hostname: ${hostName}"))(_ ! ssInstance)
+              ppmManagerActors.get(hostName).fold(log.error(s"No PPM Actor with hostname: {}", hostName))(_ ! ssInstance)
             }
           }
         ), sqidParentProcess.name
       )
-
 
 
       graph.currentGraph.standingQueryActors = graph.currentGraph.standingQueryActors +
@@ -714,22 +690,18 @@ Unknown runflow argument. Quitting. (Did you mean quine?)
         (sqidParentProcess -> standingFetchProcessParentageActor)
 
 
+      println(s"standingQueryActors: ${graph.currentGraph.standingQueryActors}")
 
       val parallelism = quineConfig.quineactorparallelism
       val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
-      dbActor = quineRouter
+//      dbActor = quineRouter
 
-      startWebServer()
+      startWebServer(quineRouter)
       statusActor ! InitMsg
 
       // Write out debug states
       val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
 
-      val clusterStartupDeadline: Deadline = 60.seconds.fromNow
-      while ( ! graph.clusterIsReady) {
-        if (clusterStartupDeadline.isOverdue()) throw new RuntimeException(s"Timeout expired while waiting for cluster hosts to become active.")
-        Thread.sleep(1000)
-      }
 
       RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
         import GraphDSL.Implicits._
@@ -738,10 +710,11 @@ Unknown runflow argument. Quitting. (Did you mean quine?)
 
         for (((host, source), i) <- hostSources.zipWithIndex) {
           source
-            .via(printCounter(host.hostName, statusActor, 0))
+            .via(printCounter(host.hostName, statusActor))
             .via(debug.debugBuffer(s"[${host.hostName}] 0 before ER"))
             .via(erMap(host.hostName))
             .via(debug.debugBuffer(s"[${host.hostName}] 1 after ER / before DB"))
+            .via(printCounter(host.hostName+" ADM", statusActor))
             .mapAsyncUnordered(parallelism)(cdm => quineRouter ? cdm)
             .recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace()}
             .runWith(Sink.ignore)
@@ -750,39 +723,6 @@ Unknown runflow argument. Quitting. (Did you mean quine?)
         ClosedShape
       }).run()
 
-
-    case "pre-e4-test" =>
-      startWebServer()
-      statusActor ! InitMsg
-
-      RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
-        import GraphDSL.Implicits._
-        val hostSources = cdmSources.values.toSeq
-        for (((host, source), i) <- hostSources.zipWithIndex) {
-          source.via(printCounter(host.hostName, statusActor)) ~> Sink.ignore
-        }
-        ClosedShape
-      }).run()
-
-    case "e4-ignore" =>
-
-      startWebServer()
-      statusActor ! InitMsg
-
-      RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
-        import GraphDSL.Implicits._
-
-        val hostSources = cdmSources.values.toSeq
-        val mergeCdm = b.add(Merge[CDM20](hostSources.size))
-
-        for (((host, source), i) <- hostSources.zipWithIndex) {
-          source.map(_._2) ~> mergeCdm.in(i)
-        }
-
-        (mergeCdm.out via printCounter("e4-ignore", statusActor, 0)) ~> Sink.ignore
-
-        ClosedShape
-      }).run()
 
     case "print-cdm" =>
       var i = 0
@@ -805,13 +745,11 @@ Unknown runflow argument. Quitting. (Did you mean quine?)
         ClosedShape
       }).run()
 
-    case "event-matrix" =>
-      println("Producing event matrix CSVs is no longer supported")
 
     case "csvmaker" | "csv" =>
       val odir = pureconfig.loadConfig[String]("adapt.outdir").right.getOrElse(".")
 
-      startWebServer()
+//      startWebServer(dbActor)
       statusActor ! InitMsg
 
       ingestConfig.produce match {
@@ -829,7 +767,7 @@ Unknown runflow argument. Quitting. (Did you mean quine?)
             val li = host.parallel.head
 
             cdmSource
-              .via(printCounter("DB Writer", statusActor, li.range.startInclusive, 10000))
+              .via(printCounter("DB Writer", statusActor, li.range.startInclusive))
               .via(erMap(host.hostName))
               .via(Flow.fromFunction {
                 case Left(e) => e
@@ -852,7 +790,7 @@ Unknown runflow argument. Quitting. (Did you mean quine?)
 
     case "ui" | "uionly" =>
       println("Staring only the UI and doing nothing else.")
-      startWebServer()
+      startWebServer(dbActor)
 
     case "valuebytes" =>
       println("NOTE: this will run using CDM")
@@ -905,24 +843,8 @@ Unknown runflow argument. Quitting. (Did you mean quine?)
         }
       }.runWith(Sink.ignore)
 
-    case "novelty" | "novel" | "ppm" | "ppmonly" =>
-      println("Running Novelty Detection Flow")
-      statusActor ! InitMsg
-
-      assert(cdmSources.size == 1, "Cannot run novelty flow for more than once host at a time")
-      val (host, cdmSource) = cdmSources.head._2
-
-      assert(host.parallel.size == 1, "Cannot run novelty flow for more than one linear ingest stream")
-      val li = host.parallel.head
-
-      cdmSource
-        .via(printCounter("Novelty", statusActor, li.range.startInclusive))
-        .via(erMap(host.hostName))
-        .runWith(PpmFlowComponents.ppmSink)
-      startWebServer()
-
     case other =>
-      println(s"Unknown runflow argument $other. Quitting.")
+      println(s"Unknown runflow argument: $other. Quitting.")
       Runtime.getRuntime.halt(1)
   }
 

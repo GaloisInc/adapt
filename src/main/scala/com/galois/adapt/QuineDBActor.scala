@@ -28,7 +28,7 @@ object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
   // Given a namespace, get the host index
   private val namespaceIdx: Map[String, HostIdx] =
     AdaptConfig.quineConfig.hosts.zipWithIndex.flatMap {
-      case (AdaptConfig.QuineHost(_, namespaces), hostIdx) => namespaces.map(_ -> hostIdx)
+      case (AdaptConfig.QuineHost(_, _, namespaces), hostIdx) => namespaces.map(_ -> hostIdx)
     }.toMap
 
   println(s"AdmUuidProvider namespaceIdx:\n${namespaceIdx.mkString("\n")}")
@@ -163,13 +163,14 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   def DBNodeableTx(cdms: Seq[DBNodeable[_]]): Try[Unit] = ???
 
   // TODO Make an async interface for this - the 'Await' is gross.
-  def AdmTx(adms: Seq[Either[ADM,EdgeAdm2Adm]]): Try[Unit] = Try(Await.result(
-    Future.sequence(adms.map {
-      case Left(a: ADM) => writeAdm(a)
-      case Right(e: EdgeAdm2Adm) => writeAdmEdge(e)
-    }),
-    Duration.Inf
-  ))
+  def AdmTx(adms: Seq[Either[ADM,EdgeAdm2Adm]]): Try[Unit] = ???
+//    Try(Await.result(  // TODO WHAT?!?  don't await!  ackOnComplete
+//    Future.sequence(adms.map {
+//      case Left(a: ADM) => writeAdm(a)
+//      case Right(e: EdgeAdm2Adm) => writeAdmEdge(e)
+//    }),
+//    Duration.Inf
+//  ))
 
 
 
@@ -192,9 +193,12 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   implicit val admHostInstance: Queryable[AdmHost] = cachedImplicit
   implicit val admSynthesizedInstance: Queryable[AdmSynthesized] = cachedImplicit
 
-  val fileSquid = Some(StandingQueryId("standing-find_ESOFile-accumulator"))
-  val srcSinkSquid = Some(StandingQueryId("standing-find_ESOSrcSnk-accumulator"))
-  val netSquid = Some(StandingQueryId("standing-find_ESONetwork-accumulator"))
+  val sqidHostPrefix = AdaptConfig.quineConfig.thishost.replace(".", "-")
+  val fileSquid = Some(StandingQueryId(sqidHostPrefix + "_standing-find_ESOFile-accumulator"))
+  val srcSinkSquid = Some(StandingQueryId(sqidHostPrefix + "_standing-find_ESOSrcSnk-accumulator"))
+  val netSquid = Some(StandingQueryId(sqidHostPrefix + "_standing-find_ESONetwork-accumulator"))
+  val procSquid = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ProcessParentage"))
+
 
   def writeAdm(a: ADM): Future[Unit] = (a match {
     case anAdm: AdmEvent =>
@@ -206,7 +210,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       }
     case anAdm: AdmSubject =>
       anAdm.create(Some(anAdm.uuid)).map { x =>
-        graphService.standingFetch[ChildProcess](anAdm.uuid, Some(StandingQueryId("standing-fetch_ProcessParentage")))(_ => {})
+        graphService.standingFetch[ChildProcess](anAdm.uuid, procSquid)(_ => {})
         x
       }
     case anAdm: AdmPrincipal          => anAdm.create(Some(anAdm.uuid))

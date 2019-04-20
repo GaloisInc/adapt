@@ -91,13 +91,15 @@ object AdaptConfig extends Utils {
   type Ip = String
   case class QuineConfig(
     quineactorparallelism: Int,
-    shardsperhost: Int,
     thishost: Ip,
-    hosts: List[QuineHost]  // Order matters!
+    hosts: List[QuineHost],  // Order matters!
+    inmemsoftlimit: Int,
+    inmemhardlimit: Int
   )
   case class QuineHost(
     ip: Ip,
-    namespaces: List[String]
+    shardcount: Int,
+    namespaces: List[String],
   )
 
   case class AdmConfig(
