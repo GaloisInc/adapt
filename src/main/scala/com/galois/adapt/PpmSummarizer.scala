@@ -11,7 +11,7 @@ import cdm20._
 
 
 object PpmSummarizer {
-  import Application.system.dispatcher
+  implicit val ec = Application.system.dispatchers.lookup("quine.actor.node-dispatcher")
 
   sealed trait AbstractionOne {
     val events: Set[EventType]

@@ -16,9 +16,9 @@ import scala.util.{Failure, Success}
 import akka.actor.{Actor, ActorLogging, ActorRef, Cancellable, Props}
 import com.galois.adapt.NoveltyDetection.PpmTreeNodeAlarm
 import spray.json._
-import java.io.{File, PrintWriter, FileOutputStream}
+import java.io.{File, FileOutputStream, PrintWriter}
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 //import spray.json.DefaultJsonProtocol._
 
 import com.typesafe.scalalogging.LazyLogging
@@ -91,7 +91,7 @@ case class AlarmEvent(
 
 
 case object AlarmEvent {
-  implicit val executionContext: ExecutionContextExecutor = system.dispatcher
+  implicit val executionContext: ExecutionContext = Application.system.dispatchers.lookup("quine.actor.node-dispatcher")
 
   def fromRawAlarm(alarmDetails: AlarmDetails, runID: String, alarmID: Long): AlarmEvent = {
     //key
@@ -148,7 +148,7 @@ case object SendDetailedMessages
 case class LogAlarm(alarmEvents: List[AlarmEvent])
 
 class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: SplunkHecClient, alarmConfig: AdaptConfig.AlarmsConfig, logFilenamePrefix: String) extends Actor with ActorLogging {
-  implicit val executionContext: ExecutionContextExecutor = system.dispatcher
+  implicit val executionContext: ExecutionContext = Application.system.dispatchers.lookup("quine.actor.node-dispatcher")
 
 
   val pwAllAlarms: PrintWriter = new PrintWriter(new FileOutputStream(new File(logFilenamePrefix + "All"), true))
@@ -281,7 +281,7 @@ case class AlarmDetails(
 )
 
 object AlarmReporter extends LazyLogging {
-  implicit val executionContext: ExecutionContextExecutor = system.dispatcher
+  implicit val executionContext: ExecutionContext = Application.system.dispatchers.lookup("quine.actor.node-dispatcher")
 
   val runID: String = Application.randomIdentifier
   val alarmConfig: AdaptConfig.AlarmsConfig = AdaptConfig.alarmConfig

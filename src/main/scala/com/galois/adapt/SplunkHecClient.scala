@@ -72,7 +72,7 @@ case class EventMsg(eventData: JsValue, time:Long, host:String="localhost", sour
 */
 
 case class SplunkHecClient(token: String, host:String, port:Int) extends LazyLogging{
-  implicit val executionContext: ExecutionContextExecutor = Application.system.dispatcher
+  implicit val executionContext: ExecutionContextExecutor = Application.system.dispatchers.lookup("quine.actor.node-dispatcher")
   val homeUri: Uri =  Uri.from(scheme = "http", host=host, port=port, path = "/services/collector/event/1.0")
 
   def sendEvents(events:List[JsValue]): Unit = {

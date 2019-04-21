@@ -23,7 +23,7 @@ import com.galois.adapt.NoveltyDetection.{Event => _, _}
 import com.galois.adapt.cdm20._
 import scala.collection.mutable
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.language.postfixOps
 import scala.util.{Failure, Random, Success, Try}
 import sys.process._
@@ -296,16 +296,19 @@ object Application extends App {
     import GraphDSL.Implicits._
     val hostSources = cdmSources.values.toSeq
     val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
-    implicit val mapAsyncUnorderedTimeout = Timeout(5 seconds)
+    implicit val mapAsyncUnorderedTimeout = Timeout(0.58 seconds) // NOTE: A good choice here depends on the choice in QuineDBActor of how many retries and how long of a timeout in that use of `retryOnFailure`
+    implicit val mapAsyncUnorderedEc = system.dispatchers.lookup("quine.actor.node-dispatcher")
     for (((host, source), i) <- hostSources.zipWithIndex) {
       source
         .via(printCounter(host.hostName, statusActor))
-        .via(debug.debugBuffer(s"[${host.hostName}] 0.) before ER"))
+        .via(debug.debugBuffer(s"[${host.hostName}]  0.) before ER"))
         .via(erMap(host.hostName))
-        .via(debug.debugBuffer(s"[${host.hostName}] 1.) after ER / before DB"))
+        .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB"))
         .via(printCounter(host.hostName+" ADM", statusActor))
-        .mapAsyncUnordered(parallelism)(cdm => quineRouter ? cdm)                               // TODO: This is too much parallelism for multiple host sources!!!!!!!!!!!!!!!!!!!!!!!!
-        .recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace()}
+        .mapAsyncUnordered(parallelism)(adm =>      // TODO: This is too much parallelism for multiple host sources!!!!!!!!!!!!!!!!!!!!!!!!
+          retryOnFailure(3)(quineRouter ? adm)
+            .recover{ case ignore => () } // Silence unacknowledged futures after multiple deliveries
+        ).recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace() }
         .runWith(Sink.ignore)
     }
     ClosedShape
@@ -316,8 +319,7 @@ object Application extends App {
 
   Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
     override def run(): Unit = if  (!AdaptConfig.skipshutdown) {
-      val patienceLevel = 48 hours
-      implicit val timeout = Timeout(patienceLevel)
+      implicit val timeout = Timeout(48 hours)
 
       println(s"Stopping ammonite...")
       replServer.stopImmediately()
@@ -336,7 +338,7 @@ object Application extends App {
         system.terminate()
       }.flatMap(_ => Future { mapProxy.closeSync() })
 
-      Await.result(shutdownF, patienceLevel)
+      Await.result(shutdownF, timeout.duration)
     }
   }))
 

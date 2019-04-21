@@ -1,5 +1,6 @@
 package com.galois.adapt
 
+import java.io.{File, PrintWriter}
 import java.nio.ByteBuffer
 import shapeless.cachedImplicit
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
@@ -8,8 +9,10 @@ import akka.util.Timeout
 import com.galois.adapt.adm._
 import com.rrwright.quine.runtime.GraphService
 import java.util.UUID
+import java.util.concurrent.{ConcurrentLinkedDeque, ConcurrentLinkedQueue}
 import com.galois.adapt.cdm20._
 import spray.json.{JsArray, JsNumber, JsObject, JsString, JsValue, RootJsonFormat}
+import java.text.NumberFormat
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
@@ -104,9 +107,10 @@ case class ESONetworkInstance(eventType: EventType, earliestTimestampNanos: Long
 
 
 class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQueryProxyActor {
+  val nf = NumberFormat.getInstance()
 
   implicit val service = graphService
-  implicit val timeout = Timeout(21 seconds)
+//  implicit val timeout = Timeout(21 seconds)
   lazy val graph: org.apache.tinkerpop.gremlin.structure.Graph = ???
 
   val gremlin = GremlinQueryRunner(
@@ -148,14 +152,13 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       )
     ),
     labelKey = "type_of"
-  )
+  )(implicitly, Timeout(21.23456 seconds))
 
-//  log.info(s"QuineDB actor init")
 
   implicit class FutureAckOnComplete(f: Future[_]) extends AnyRef {
     def ackOnComplete(ackTo: ActorRef, successF: => Unit = ()): Unit = f.onComplete{
       case Success(_) => ackTo ! Ack
-      case Failure(ex) => ex.printStackTrace(); ackTo ! Ack
+      case Failure(e) => /*e.printStackTrace();*/ ackTo ! Ack
     }
   }
 
@@ -198,42 +201,80 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   def wrongFunc(x: Any): Unit = println("This is not the function you are looking for.")
 
 
-  def writeAdm(a: ADM): Future[Unit] = (a match {
-    case anAdm: AdmEvent =>
-      anAdm.create(Some(anAdm.uuid)).map { x =>
-        graphService.standingFetch[ESOFileInstance](anAdm.uuid, Application.sqidFile)(wrongFunc)
-        graphService.standingFetch[ESOSrcSnkInstance](anAdm.uuid, Application.sqidSrcSnk)(wrongFunc)
-        graphService.standingFetch[ESONetworkInstance](anAdm.uuid, Application.sqidNetwork)(wrongFunc)
-        x
-      }
-    case anAdm: AdmSubject =>
-      anAdm.create(Some(anAdm.uuid)).map { x =>
-        graphService.standingFetch[ChildProcess](anAdm.uuid, Application.sqidParentProcess)(wrongFunc)
-        x
-      }
-    case anAdm: AdmPrincipal          => anAdm.create(Some(anAdm.uuid))
-    case anAdm: AdmFileObject         => anAdm.create(Some(anAdm.uuid))
-    case anAdm: AdmNetFlowObject      => anAdm.create(Some(anAdm.uuid))
-    case anAdm: AdmPathNode           => anAdm.create(Some(anAdm.uuid))
-    case anAdm: AdmPort               => anAdm.create(Some(anAdm.uuid))
-    case anAdm: AdmAddress            => anAdm.create(Some(anAdm.uuid))
-    case anAdm: AdmSrcSinkObject      => anAdm.create(Some(anAdm.uuid))
-    case anAdm: AdmProvenanceTagNode  => anAdm.create(Some(anAdm.uuid))
-    case anAdm: AdmHost               => anAdm.create(Some(anAdm.uuid))
-    case anAdm: AdmSynthesized        => anAdm.create(Some(anAdm.uuid))
-    case _                            => throw new Exception("Unexpected ADM")
-  }).flatMap {
-    case Success(_) => Future.successful(())
-    case Failure(f) => Future.failed(f)
+  def writeAdm(a: ADM, timeout: Timeout): Future[Long] = {
+    implicit val t = timeout
+    val startNanos = System.nanoTime()
+    (a match {
+      case anAdm: AdmEvent =>
+        anAdm.create(Some(anAdm.uuid)).map { x =>
+          graphService.standingFetch[ESOFileInstance](anAdm.uuid, Application.sqidFile)(wrongFunc)
+          graphService.standingFetch[ESOSrcSnkInstance](anAdm.uuid, Application.sqidSrcSnk)(wrongFunc)
+          graphService.standingFetch[ESONetworkInstance](anAdm.uuid, Application.sqidNetwork)(wrongFunc)
+          x
+        }
+      case anAdm: AdmSubject =>
+        anAdm.create(Some(anAdm.uuid)).map { x =>
+          graphService.standingFetch[ChildProcess](anAdm.uuid, Application.sqidParentProcess)(wrongFunc)
+          x
+        }
+      case anAdm: AdmPrincipal          => anAdm.create(Some(anAdm.uuid))
+      case anAdm: AdmFileObject         => anAdm.create(Some(anAdm.uuid))
+      case anAdm: AdmNetFlowObject      => anAdm.create(Some(anAdm.uuid))
+      case anAdm: AdmPathNode           => anAdm.create(Some(anAdm.uuid))
+      case anAdm: AdmPort               => anAdm.create(Some(anAdm.uuid))
+      case anAdm: AdmAddress            => anAdm.create(Some(anAdm.uuid))
+      case anAdm: AdmSrcSinkObject      => anAdm.create(Some(anAdm.uuid))
+      case anAdm: AdmProvenanceTagNode  => anAdm.create(Some(anAdm.uuid))
+      case anAdm: AdmHost               => anAdm.create(Some(anAdm.uuid))
+      case anAdm: AdmSynthesized        => anAdm.create(Some(anAdm.uuid))
+      case _                            => throw new Exception("Unexpected ADM")
+    }).flatMap {
+      case Success(t) => Future.successful(System.nanoTime() - startNanos)
+      case Failure(f) => Future.failed(f)
+    }
   }
 
-  def writeAdmEdge(e: EdgeAdm2Adm): Future[Unit] = graphService.dumbOps.addEdge(
-    AdmUuidProvider.customIdToQid(e.src),
-    AdmUuidProvider.customIdToQid(e.tgt),
-    e.label
-  )
+  def writeAdmEdge(e: EdgeAdm2Adm, timeout: Timeout): Future[Long] = {
+    implicit val t = timeout
+    val startNanos = System.nanoTime()
+    graphService.dumbOps.addEdge(
+      AdmUuidProvider.customIdToQid(e.src),
+      AdmUuidProvider.customIdToQid(e.tgt),
+      e.label
+    ).map(_ => System.nanoTime() - startNanos)
+  }
 
   def FutureTx[T](body: => T)(implicit ec: ExecutionContext): Future[T] = Future(body)
+
+  import scala.collection.JavaConverters._
+  val nodeTimes = new ConcurrentLinkedQueue[Long]()
+  val edgeTimes = new ConcurrentLinkedQueue[Long]()
+
+//  new java.util.LinkedHashMap[Long, None.type](10000, 1F, true) {
+//    override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
+//  }
+
+  if (false) context.system.scheduler.schedule(10 seconds, 30 seconds){
+    Future{
+      val nodeWriter = new PrintWriter(new File(s"stats/$idx-nodes.csv"))
+      nodeWriter.write(nodeTimes.asScala.mkString("", ",", "\n"))
+      nodeWriter.close()
+
+      val edgeWriter = new PrintWriter(new File(s"stats/$idx-edges.csv"))
+      edgeWriter.write(edgeTimes.asScala.mkString("", ",", "\n"))
+      edgeWriter.close()
+
+      val (ntotal, ncount, nmax) = nodeTimes.asScala.foldLeft((0L, 0L, 0L)){
+        case ((total, count, max), next) => (total + next, count + 1, if (next > max) next else max)
+      }
+      val (etotal, ecount, emax) = edgeTimes.asScala.foldLeft((0L, 0L, 0L)){
+        case ((total, count, max), next) => (total + next, count + 1, if (next > max) next else max)
+      }
+      println(s"QuineDB: $idx - Average write time for ${nf.format(ncount)} nodes: ${nf.format((ntotal.toDouble / ncount).toInt)} nanoseconds.  Max: ${nf.format(nmax.toInt)}")
+      println(s"QuineDB: $idx - Average write time for ${nf.format(ecount)} edges: ${nf.format((etotal.toDouble / ecount).toInt)} nanoseconds.  Max: ${nf.format(emax.toInt)}")
+    }
+  }
+
 
   override def receive = {
 
@@ -285,8 +326,19 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       }
 
 
-    case WithSender(s: ActorRef, Left(a: ADM))          => writeAdm(a).ackOnComplete(s)
-    case WithSender(s: ActorRef, Right(e: EdgeAdm2Adm)) => writeAdmEdge(e).ackOnComplete(s)
+    case WithSender(s: ActorRef, Left(a: ADM)) =>
+      retryOnFailure(3)(
+        writeAdm(a, Timeout(0.01 seconds))
+      )(Timeout(1 second), implicitly)
+//        .map(nodeTimes.add)
+        .ackOnComplete(s)
+
+    case WithSender(s: ActorRef, Right(e: EdgeAdm2Adm)) =>
+      retryOnFailure(3)(
+        writeAdmEdge(e, Timeout(0.15 seconds))
+      )(Timeout(1 second), implicitly)
+//        .map(edgeTimes.add)
+        .ackOnComplete(s)
 
     case InitMsg => sender() ! Ack
 

@@ -1,6 +1,8 @@
 package com.galois
 
 import java.util.UUID
+import akka.util.Timeout
+import scala.concurrent.{ExecutionContext, Future}
 
 
 package object adapt {
@@ -75,4 +77,11 @@ package object adapt {
     printf(s"$name elapsed: %.6f sec\n",(System.nanoTime-t0)*1e-9)
     ans
   }
+
+  import com.rrwright.quine.runtime.FutureRecoverWith
+  def retryOnFailure[T](maxRetries: Int)(action: => Future[T], originalMax: Int = maxRetries)(implicit timeout: Timeout, ec: ExecutionContext): Future[T] =
+    if (maxRetries > 0) {
+      val nextTimeout = if (maxRetries < 5) timeout.duration + (timeout.duration / 2) else timeout.duration
+      action.recoverWith{ case e => retryOnFailure(maxRetries - 1)(action, originalMax)(nextTimeout, ec) }
+    } else action.recoveryMessage(s"retryOnFailure failed after $originalMax attempts.")
 }
