@@ -507,7 +507,6 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
           d => d._1._1.startTimestampNanos.toSet ++ d._2._1.startTimestampNanos.toSet,
           shouldApplyThreshold = false
         )(thisActor.context, context.self, graphService),
-
   ).par
 
   lazy val seoesTrees = List(
@@ -871,20 +870,11 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), Some(subject.path))
         val o: Object = (PpmSrcSinkObject(predicateObject.srcSinkType, objUuid), None)
         esoTrees.foreach(ppm => ppm.observe((e, s, o)))
-
-//      val r = esoTrees.filter(_.name != "SummarizedProcessActivity").map(_.prettyString)
-//      r.foreach(tr => tr onComplete {
-//        case Success(repr) => println(repr)
-//        case Failure(t) => println("Why has an error has occurred? " + t.getMessage)
-//        }
-//      )
-
       }.failed.map(e => log.warning(s"Writing ESO trees failed: ${e.getMessage}"))
 
     case msg @ SEOESInstance(s1: Subject, eventKind: String, ESOInstance(e: Event, s2: Subject, o: Object))  =>
       seoesTrees.foreach(ppm => ppm.observe((s1, eventKind, (e, s2, o))))
-
-
+<<<<
     case msg @ OESEOInstance(o1: Object, eventKind: String, ESOInstance(e: Event, s: Subject, o2: Object))  =>
       oeseoTrees.foreach(ppm => ppm.observe((o1, eventKind, (e, s, o2))))
 

@@ -2,24 +2,24 @@ package com.galois.adapt
 
 import java.io.{File, PrintWriter}
 import java.nio.ByteBuffer
+import java.text.NumberFormat
+import java.util.UUID
+import java.util.concurrent.ConcurrentLinkedQueue
 import shapeless.cachedImplicit
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import akka.util.Timeout
 import com.galois.adapt.adm._
-import com.rrwright.quine.runtime.GraphService
-import java.util.UUID
-import java.util.concurrent.{ConcurrentLinkedDeque, ConcurrentLinkedQueue}
 import com.galois.adapt.cdm20._
 import spray.json.{JsArray, JsNumber, JsObject, JsString, JsValue, RootJsonFormat}
-import java.text.NumberFormat
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
+import com.rrwright.quine.runtime.GraphService
 import com.rrwright.quine.gremlin.{GremlinQueryRunner, TypeAnnotationFieldReader}
+import com.rrwright.quine.runtime.QuineIdProvider
 import com.rrwright.quine.language.{DomainNodeSetSingleton, NoConstantsDomainNode, PickleReader, PickleScheme, Queryable, QuineId}
 import com.rrwright.quine.language.EdgeDirections._
-import com.rrwright.quine.runtime.{NameSpacedUuidProvider, QuineIdProvider}
 import com.rrwright.quine.language.BoopickleScheme._
 //import com.rrwright.quine.language.JavaObjectSerializationScheme._
 
@@ -246,15 +246,21 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 
   def FutureTx[T](body: => T)(implicit ec: ExecutionContext): Future[T] = Future(body)
 
-  import scala.collection.JavaConverters._
-  val nodeTimes = new ConcurrentLinkedQueue[Long]()
-  val edgeTimes = new ConcurrentLinkedQueue[Long]()
+  val nodeTimes =  // Not exactly correct because it is a set instead of a list, but close enough:
+    new java.util.LinkedHashMap[Long, None.type](10000, 1F, true) {
+      override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
+    }
+//    new ConcurrentLinkedQueue[Long]()
 
-//  new java.util.LinkedHashMap[Long, None.type](10000, 1F, true) {
-//    override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
-//  }
+  val edgeTimes =  // Not exactly correct because it is a set instead of a list, but close enough:
+    new java.util.LinkedHashMap[Long, None.type](10000, 1F, true) {
+      override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
+    }
+//    new ConcurrentLinkedQueue[Long]()
 
-  if (false) context.system.scheduler.schedule(10 seconds, 30 seconds){
+  val shouldRecordDBWriteTimes = true
+  if (shouldRecordDBWriteTimes) context.system.scheduler.schedule(10 seconds, 30 seconds){
+    import scala.collection.JavaConverters._
     Future{
       val nodeWriter = new PrintWriter(new File(s"stats/$idx-nodes.csv"))
       nodeWriter.write(nodeTimes.asScala.mkString("", ",", "\n"))
@@ -264,12 +270,13 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       edgeWriter.write(edgeTimes.asScala.mkString("", ",", "\n"))
       edgeWriter.close()
 
-      val (ntotal, ncount, nmax) = nodeTimes.asScala.foldLeft((0L, 0L, 0L)){
+      val (ntotal, ncount, nmax) = nodeTimes.keySet().asScala.foldLeft((0L, 0L, 0L)){
         case ((total, count, max), next) => (total + next, count + 1, if (next > max) next else max)
       }
-      val (etotal, ecount, emax) = edgeTimes.asScala.foldLeft((0L, 0L, 0L)){
+      val (etotal, ecount, emax) = edgeTimes.keySet().asScala.foldLeft((0L, 0L, 0L)){
         case ((total, count, max), next) => (total + next, count + 1, if (next > max) next else max)
       }
+
       println(s"QuineDB: $idx - Average write time for ${nf.format(ncount)} nodes: ${nf.format((ntotal.toDouble / ncount).toInt)} nanoseconds.  Max: ${nf.format(nmax.toInt)}")
       println(s"QuineDB: $idx - Average write time for ${nf.format(ecount)} edges: ${nf.format((etotal.toDouble / ecount).toInt)} nanoseconds.  Max: ${nf.format(emax.toInt)}")
     }
@@ -327,16 +334,20 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 
 
     case WithSender(s: ActorRef, Left(a: ADM)) =>
+//      sender() ! Ack
       retryOnFailure(3)(
         writeAdm(a, Timeout(0.01 seconds))
       )(Timeout(1 second), implicitly)
-//        .map(nodeTimes.add)
+        .map(t => if (shouldRecordDBWriteTimes) nodeTimes.put(t, None) else t)
+//        .map(edgeTimes.add)
         .ackOnComplete(s)
 
     case WithSender(s: ActorRef, Right(e: EdgeAdm2Adm)) =>
+//      sender() ! Ack
       retryOnFailure(3)(
         writeAdmEdge(e, Timeout(0.15 seconds))
       )(Timeout(1 second), implicitly)
+        .map(t => if (shouldRecordDBWriteTimes) edgeTimes.put(t, None) else t)
 //        .map(edgeTimes.add)
         .ackOnComplete(s)
 
