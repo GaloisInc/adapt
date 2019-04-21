@@ -728,7 +728,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 //*/
 
 
-  lazy val admPpmTrees =
+  val admPpmTrees =
     if (hostName == hostNameForAllHosts) Nil // crossHostTrees
     else esoTrees ++ seoesTrees ++ oeseoTrees ++ ssTrees
 
@@ -874,7 +874,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
     case msg @ SEOESInstance(s1: Subject, eventKind: String, ESOInstance(e: Event, s2: Subject, o: Object))  =>
       seoesTrees.foreach(ppm => ppm.observe((s1, eventKind, (e, s2, o))))
-<<<<
+
     case msg @ OESEOInstance(o1: Object, eventKind: String, ESOInstance(e: Event, s: Subject, o2: Object))  =>
       oeseoTrees.foreach(ppm => ppm.observe((o1, eventKind, (e, s, o2))))
 
