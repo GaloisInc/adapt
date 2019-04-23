@@ -28,7 +28,7 @@ import Application.system
 import ApiJsonProtocol._
 import com.galois.adapt.AdaptConfig.HostName
 
-case class ProcessDetails(processName: String, pid: Option[Int], hostName: HostName)
+case class ProcessDetails(processName: String, pid: Option[Int], hostName: HostName, dataTimestamps: Set[Long])
 
 case class AlarmEventMetaData(runID: String, alarmCategory: String)
 
@@ -36,14 +36,16 @@ trait AlarmEventData {
   def toJson: JsValue
 }
 
-case class DetailedAlarmEvent(processName: String, pid: String, hostName: HostName, details: String, alarmIDs: Set[Long]) extends AlarmEventData {
+case class DetailedAlarmEvent(processName: String, pid: String, hostName: HostName, details: String, alarmIDs: Set[Long], dataTimestamps: Set[Long]) extends AlarmEventData {
   def toJson: JsValue = {
     JsObject(
       "processName" -> JsString(processName),
       "pid" -> JsString(pid),
       "hostName" -> JsString(hostName),
       "referencedRawAlarms" -> JsArray(alarmIDs.map(JsNumber(_)).toVector),
-      "details" -> JsString(details)
+      "details" -> JsString(details),
+      "alarmIDs" -> JsArray(alarmIDs.toList.map(x => JsNumber(x)).toVector),
+      "dataTimestamps" -> JsArray(dataTimestamps.toList.map(x => JsNumber(x)).toVector)
     )
   }
 }
@@ -108,7 +110,7 @@ case object AlarmEvent {
   def fromBatchedAlarm(alarmCategory: AlarmCategory, pd: ProcessDetails, details: String, alarmIDs: Set[Long], runID: String): AlarmEvent = {
 
     AlarmEvent(
-      DetailedAlarmEvent(pd.processName, pd.pid.getOrElse("None").toString, pd.hostName, details, alarmIDs),
+      DetailedAlarmEvent(pd.processName, pd.pid.getOrElse("None").toString, pd.hostName, details, alarmIDs, pd.dataTimestamps),
       AlarmEventMetaData(runID, alarmCategory.toString))
   }
 
