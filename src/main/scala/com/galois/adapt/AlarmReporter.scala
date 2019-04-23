@@ -177,7 +177,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
 
   // TODO: Initialize processInstanceCounter with training data; add new function to receive.
   var processInstanceCounter = scala.collection.mutable.Map[ProcessDetails, Int]().withDefaultValue(0)
-  var totalProcessInstanceCount = processInstanceCounter.values.sum
+  var distinctProcessInstanceCount = processInstanceCounter.keys.size
 
   def genAlarmID(): Long = {
     alarmCounter += 1
@@ -208,7 +208,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
 
   def generateSummaryAndSend(lastMessage: Boolean): Unit = {
 
-    val numProcessInstancesToTake = math.round(totalProcessInstanceCount * AlarmReporter.percentProcessInstancesToTake)
+    val numProcessInstancesToTake = math.round(distinctProcessInstanceCount * AlarmReporter.percentProcessInstancesToTake)
     val minProcessInstanceCount = processInstanceCounter.toList.sortBy(-_._2).take(numProcessInstancesToTake).lastOption.map(_._2).getOrElse(0)
 
     val batchedMessages: List[Future[Option[AlarmEvent]]] = processRefSet.view.map { case (pd, alarmIDs) =>
