@@ -120,13 +120,17 @@ object Application extends App {
 
   implicit val graph = GraphService.clustered(
     config = ConfigFactory.parseString(clusterConfigSrc),
-    persistor = as => LMDBSnapshotPersistor(
-      mapSizeBytes = {
-        val size: Long = runtimeConfig.lmdbgigabytes * 1024L * 1024L * 1024L
-        println("LMDB size: " + NumberFormat.getInstance().format(size))
-        size
-      }
-    )(as), // EmptyPersistor()(as),
+    persistor = as =>
+//      LMDBSnapshotPersistor(
+//        mapSizeBytes = {
+//          val size: Long = runtimeConfig.lmdbgigabytes * 1024L * 1024L * 1024L
+//          println("LMDB size: " + NumberFormat.getInstance().format(size))
+//          size
+//        }
+//      )(as),
+      TimelessMapDBMultimap()(as),
+//    MapDBMultimap()(as),
+//    EmptyPersistor()(as),
     idProvider = AdmUuidProvider,
     indexer = Indexer.currentIndex(EmptyIndex),
     inMemorySoftNodeLimit = Some(quineConfig.inmemsoftlimit),
@@ -137,7 +141,7 @@ object Application extends App {
 
   // Wait for all members of the cluster to be ready:
   val clusterStartupDeadline: Deadline = 300.seconds.fromNow
-  while ( ! graph.clusterIsReady) {
+  while ( ! graph.graphIsReady) {
     if (clusterStartupDeadline.isOverdue()) throw new RuntimeException(s"Timeout expired while waiting for cluster hosts to become active.")
     Thread.sleep(1000)
   }
@@ -208,8 +212,7 @@ object Application extends App {
     val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows, graph).withDispatcher("adapt.ppm.manager-dispatcher")
     val ref = system.actorOf(props, s"ppm-actor-${host.hostName}")
     host.hostName -> ref
-  }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false, graph), s"ppm-actor-$hostNameForAllHosts"))
-  // TODO nichole:  what instrumentation source should I give to the `hostNameForAllHosts` PpmManager? This smells bad...
+  }.toMap // + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false, graph), s"ppm-actor-$hostNameForAllHosts"))
 
 
   val sqidHostPrefix = quineConfig.thishost.replace(".", "-")
@@ -258,7 +261,9 @@ object Application extends App {
 
 
   val parallelism = quineConfig.quineactorparallelism
-  val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
+  val quineRouter =
+    system.actorOf(Props(classOf[QuineDBActor], graph, -1), s"QuineDB-UI")
+//    system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
 
   AlarmReporter  // instantiate AlarmReporter (LazyInit) and corresponding actor
 
@@ -291,13 +296,19 @@ object Application extends App {
   }.toMap
 
 
-  println("Running Quine ingest.")
-  RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
+  val quineSink: Sink[Either[ADM, EdgeAdm2Adm], NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit q: GraphDSL.Builder[NotUsed]  =>
     import GraphDSL.Implicits._
+    val balance = q.add(Balance[Either[ADM, EdgeAdm2Adm]](parallelism))
+    (0 until parallelism).foreach { idx =>
+      val quineDBRef = system.actorOf(Props(classOf[QuineDBActor], graph, idx), s"QuineDB-$idx")
+      balance.out(idx) ~> Sink.actorRefWithAck(quineDBRef, InitMsg, Ack, CompleteMsg, println).async
+    }
+    SinkShape(balance.in)
+  })
+
+  println("Running Quine ingest.")
     val hostSources = cdmSources.values.toSeq
     val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
-    implicit val mapAsyncUnorderedTimeout = Timeout(0.58 seconds) // NOTE: A good choice here depends on the choice in QuineDBActor of how many retries and how long of a timeout in that use of `retryOnFailure`
-    implicit val mapAsyncUnorderedEc = system.dispatchers.lookup("quine.actor.node-dispatcher")
     for (((host, source), i) <- hostSources.zipWithIndex) {
       source
         .via(printCounter(host.hostName, statusActor))
@@ -305,14 +316,9 @@ object Application extends App {
         .via(erMap(host.hostName))
         .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB"))
         .via(printCounter(host.hostName+" ADM", statusActor))
-        .mapAsyncUnordered(parallelism)(adm =>      // TODO: This is too much parallelism for multiple host sources!!!!!!!!!!!!!!!!!!!!!!!!
-          retryOnFailure(3)(quineRouter ? adm)
-            .recover{ case ignore => () } // Silence unacknowledged futures after multiple deliveries
-        ).recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace() }
-        .runWith(Sink.ignore)
+        .runWith(quineSink)
+//        .runWith(Sink.actorRefWithAck(quineRouter, InitMsg, Ack, CompleteMsg, println))
     }
-    ClosedShape
-  }).run()
 
 
 

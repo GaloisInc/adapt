@@ -76,7 +76,7 @@ object AdaptConfig extends Utils {
     systemname: String,
     quitonerror: Boolean,
     logfile: String,
-    lmdbgigabytes: Long = 4
+    lmdbgigabytes: Int = 4
   )
 
   case class EnvironmentConfig(

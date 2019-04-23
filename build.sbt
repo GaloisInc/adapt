@@ -23,7 +23,7 @@ lazy val adapt = (project in file(".")).settings(
     "com.github.pureconfig" %% "pureconfig" % "0.9.2",
     "org.scalatest" %% "scalatest" % "3.0.0",
     "org.apache.avro" % "avro" % "1.8.2",
-    "com.typesafe.scala-logging" %% "scala-logging" % "3.7.2",
+    "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0",
 
     "com.typesafe.akka" %% "akka-actor"           % akkaV,
     "com.typesafe.akka" %% "akka-stream"          % akkaV,

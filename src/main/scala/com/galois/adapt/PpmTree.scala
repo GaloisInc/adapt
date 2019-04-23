@@ -222,11 +222,8 @@ case class PpmDefinition[DataShape](
     }
   }
 
-  var observation_count: Long = 0
-  def observe(observation: DataShape): Unit = if (incomingFilter(observation)) {
-    implicit val timeout = Timeout(6.1 seconds)
-    observation_count += 1
-    graphService.observe(treeRootQid, treeName, hostName, PpmTree.prepareObservation[DataShape](observation, discriminators), uuidCollector(observation), timestampExtractor(observation), alarmActor, noveltyFilter)
+  def observe(observation: DataShape, reportTo: ActorRef = alarmActor): Unit = if (incomingFilter(observation)) {
+    graphService.observe(treeRootQid, treeName, hostName, PpmTree.prepareObservation[DataShape](observation, discriminators), uuidCollector(observation), timestampExtractor(observation), reportTo, noveltyFilter)
   }
 
   //process name and pid/uuid
@@ -278,22 +275,25 @@ case class PpmDefinition[DataShape](
     if ( ! isCurrentlySaving.get() && lastSaveCompleteMillis.get() + saveEveryAndNoMoreThan - expectedSaveCostMillis <= now ) {
       isCurrentlySaving.set(true)
 
-      implicit val timeout = Timeout(5930 seconds) //TODO: too small? too big?
+      implicit val timeout = Timeout(2 hours) //TODO: too small? too big?
       val treeWriteF = if (ppmConfig.shouldsaveppmtrees) {
-        println("Trying to save ppm tree repr...")
+        println(s"Started saving TreeRepr for: $treeName ...")
         graphService.getTreeRepr(treeRootQid,treeName,List()).mapTo[com.rrwright.quine.runtime.PpmNodeActorGetTreeReprResult].map { quineReprResult =>
           if (ppmConfig.shouldsaveppmtrees) {
             val reprResult = PpmNodeActorGetTreeReprResult(TreeRepr.fromQuine(quineReprResult.repr))
             reprResult.repr.writeToFile(outputFilePath)
+            println(s"Finished saving TreeRepr for: $treeName")
           }
         }
       } else Future.successful( () )
 
       if (ppmConfig.shouldsavealarms) {
+        println(s"Started saving Alarms for: $treeName ...")
         val content = alarms.toList.toJson.prettyPrint
         val outputFile = new File(outputAlarmFilePath)
         if ( ! outputFile.exists) outputFile.createNewFile()
         Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
+        println(s"Finished saving Alarms for: $treeName")
       }
 
       treeWriteF.transform(
@@ -302,7 +302,7 @@ case class PpmDefinition[DataShape](
           isCurrentlySaving.set(false)
         },
         e => {
-          println(s"Error writing to file for $treeName tree: ${e.getMessage}")
+          println(s"Error writing to file for tree: $treeName with message: ${e.getMessage}")
           isCurrentlySaving.set(false)
           e
         }
@@ -311,7 +311,7 @@ case class PpmDefinition[DataShape](
   }
 
   def prettyString: Future[String] = {
-    implicit val timeout = Timeout(593 seconds)
+    implicit val timeout = Timeout(10.1 minutes)
     graphService.getTreeRepr(treeRootQid,treeName,List()).map(_.repr.toString())
   }
 }
@@ -339,7 +339,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
   import NoveltyDetection._
 
-  lazy val esoTrees = List(
+  val esoTrees = List(
     PpmDefinition[ESO]( "ProcessFileTouches", hostName,
       d => readAndWriteTypes.contains(d._1.eventType) && d._3._1.isInstanceOf[PpmFileObject],
       List(
@@ -493,9 +493,9 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 //      shouldApplyThreshold = false,
 //      noveltyFilter = _ => false
 //    )(thisActor.context, context.self, graphService)
-  ).par
+  ) //.par
 
-  lazy val ssTrees = List(
+  val ssTrees = List(
         PpmDefinition[SS]( "ParentChildProcesses", hostName,
           d => true,
           List(d => List(
@@ -507,9 +507,9 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
           d => d._1._1.startTimestampNanos.toSet ++ d._2._1.startTimestampNanos.toSet,
           shouldApplyThreshold = false
         )(thisActor.context, context.self, graphService),
-  ).par
+  ) //.par
 
-  lazy val seoesTrees = List(
+  val seoesTrees = List(
     new PpmDefinition[SEOES]("FileExecuteDelete", hostName,
       d => d._3._3._1.isInstanceOf[PpmFileObject] && d._2 == "did_execute" &&  deleteTypes.contains(d._3._1.eventType),
       List(
@@ -581,10 +581,10 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
       d => Set(d._3._1.earliestTimestampNanos,d._3._1.latestTimestampNanos),
       shouldApplyThreshold = true
     )(thisActor.context, context.self, graphService)
-  ).par
+  ) //.par
 
 
-  lazy val oeseoTrees = List(
+  val oeseoTrees = List(
     new PpmDefinition[OESEO]("ProcessWritesFileSoonAfterNetflowRead", hostName,
       d => readAndWriteTypes.contains(d._3._1.eventType),
       List(
@@ -607,7 +607,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
       d => Set(d._3._1.earliestTimestampNanos,d._3._1.latestTimestampNanos),
       shouldApplyThreshold = true
     )(thisActor.context, context.self, graphService)
-  ).par
+  ) //.par
 
 
   sealed trait SendingOrReceiving { def invert: SendingOrReceiving = this match { case Sending => Receiving; case Receiving => Sending } }
@@ -734,6 +734,14 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
   val ppmList = admPpmTrees
 
+
+  val esoChildren: Map[String, ActorRef] = esoTrees.map(t => t.treeName -> context.actorOf(Props(classOf[PpmDefActor[ESO]], t), t.treeName)).toMap
+  val seoesChildren: Map[String, ActorRef] = seoesTrees.map(t => t.treeName -> context.actorOf(Props(classOf[PpmDefActor[SEOES]], t), t.treeName)).toMap
+  val oeseoChildren: Map[String, ActorRef] = oeseoTrees.map(t => t.treeName -> context.actorOf(Props(classOf[PpmDefActor[OESEO]], t), t.treeName)).toMap
+  val ssChildren: Map[String, ActorRef] = ssTrees.map(t => t.treeName -> context.actorOf(Props(classOf[PpmDefActor[SS]], t), t.treeName)).toMap
+
+
+
   def saveTrees(): Future[Unit] = {
     ppmList.toList.foldLeft(Future.successful(()))((acc, ppmTree) => acc.flatMap(_ => ppmTree.saveStateAsync()))
   }
@@ -744,7 +752,6 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
   var didReceiveComplete = false
 
   def alarmFromProbabilityData(probabilityData: List[(ExtractedValue, Int, Int)]): Alarm = {
-    // println(probabilityData)
     val (_, parentCount, siblingCount) = probabilityData.takeWhile(_._2 > 1).lastOption.getOrElse("", 1, 1) // First novel node with default for first observation
     val alarmLocalProbability = siblingCount.toFloat / (parentCount + siblingCount) // Alarm local prob is a function of the first novel node
     val treeObservationCount = probabilityData.headOption.map(_._2).getOrElse(1) //
@@ -759,7 +766,6 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         else
           PpmTreeNodeAlarm(ev, count.toFloat/parentCount.toFloat, count.toFloat/treeObservationCount, count, siblingCount, parentCount, depth + 1)
     }.toList
-
     // println(alarm)
     alarm
   }
@@ -830,13 +836,13 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
   def receive = {
 
     case msg @ Novelty(treeName, probabilityData, collectedUuids: Set[NamespacedUuidDetails @unchecked], timestamps) =>
+      println("Should get NO NOVELTIES here.")
       ppm(treeName).fold(
         log.warning(s"Could not find tree named: $treeName to record Alarm related to: $probabilityData with UUIDs: $collectedUuids, with dataTimestamps: $timestamps from: $sender")
       ){ tree =>
         val alarmOpt = if (tree.noveltyFilter(msg)) Some((alarmFromProbabilityData(probabilityData), collectedUuids, timestamps)) else None
         tree.recordAlarm(alarmOpt)
         tree.insertIntoLocalProbAccumulator(alarmOpt)
-        // if (tree.alarms.size % 10 == 0) tree.saveStateAsync()
       }
 
     case msg @ ESOFileInstance(eventType, earliestTimestampNanos, latestTimestampNanos, hostName, subject, predicateObject) =>
@@ -847,8 +853,9 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val e: Event = PpmEvent(eventType, earliestTimestampNanos, latestTimestampNanos, eventUuid)
         val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), Some(subject.path))
         val o: Object = (PpmFileObject(predicateObject.fileObjectType, objUuid), Some(predicateObject.path))
-        esoTrees.foreach(ppm => ppm.observe((e, s, o)))
-      }.failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
+//        esoTrees.foreach(ppm => ppm.observe((e, s, o)))
+        esoChildren.foreach{ case(_,ref) => ref ! MakeObservation[ESO]( (e,s,o) )}
+      }.failed.map(e => log.warning(s"Preparing ESOFileInstance observation failed: ${e.getMessage}"))
 
     case msg @ ESONetworkInstance(eventType, earliestTimestampNanos, latestTimestampNanos, hostName, subject, predicateObject) =>
       Try {
@@ -858,8 +865,9 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val e: Event = PpmEvent(eventType, earliestTimestampNanos, latestTimestampNanos, eventUuid)
         val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), Some(subject.path))
         val o: Object = (PpmNetFlowObject(predicateObject.remotePort, predicateObject.localPort, predicateObject.remoteAddress, predicateObject.localAddress, objUuid), None)
-        esoTrees.foreach(ppm => ppm.observe((e, s, o)))
-      }.failed.map(e => log.warning(s"Writing batch trees failed: ${e.getMessage}"))
+//        esoTrees.foreach(ppm => ppm.observe((e, s, o)))
+        esoChildren.foreach{ case(_,ref) => ref ! MakeObservation[ESO]( (e,s,o) )}
+      }.failed.map(e => log.warning(s"Preparing ESONetworkInstance observation failed: ${e.getMessage}"))
 
     case msg @ ESOSrcSnkInstance(eventType, earliestTimestampNanos, latestTimestampNanos, hostName, subject, predicateObject) =>
       Try {
@@ -869,17 +877,21 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val e: Event = PpmEvent(eventType, earliestTimestampNanos, latestTimestampNanos, eventUuid)
         val s: Subject = (PpmSubject(subject.cid, subject.subjectTypes, subUuid), Some(subject.path))
         val o: Object = (PpmSrcSinkObject(predicateObject.srcSinkType, objUuid), None)
-        esoTrees.foreach(ppm => ppm.observe((e, s, o)))
-      }.failed.map(e => log.warning(s"Writing ESO trees failed: ${e.getMessage}"))
+//        esoTrees.foreach(ppm => ppm.observe((e, s, o)))
+        esoChildren.foreach{ case(_,ref) => ref ! MakeObservation[ESO]( (e,s,o) )}
+      }.failed.map(e => log.warning(s"Preparing ESOSrcSnkInstance observation failed: ${e.getMessage}"))
 
     case msg @ SEOESInstance(s1: Subject, eventKind: String, ESOInstance(e: Event, s2: Subject, o: Object))  =>
-      seoesTrees.foreach(ppm => ppm.observe((s1, eventKind, (e, s2, o))))
+//      seoesTrees.foreach(ppm => ppm.observe((s1, eventKind, (e, s2, o))))
+      seoesChildren.foreach{ case (_, ref) => ref ! MakeObservation[SEOES]((s1, eventKind, (e, s2, o))) }
 
     case msg @ OESEOInstance(o1: Object, eventKind: String, ESOInstance(e: Event, s: Subject, o2: Object))  =>
-      oeseoTrees.foreach(ppm => ppm.observe((o1, eventKind, (e, s, o2))))
+//      oeseoTrees.foreach(ppm => ppm.observe((o1, eventKind, (e, s, o2))))
+      seoesChildren.foreach{ case (_, ref) => ref ! MakeObservation[OESEO]((o1, eventKind, (e, s, o2))) }
 
     case msg @ SSInstance(parent: Subject, child: Subject)  =>
-      ssTrees.foreach(ppm => ppm.observe((parent, child)))
+//      ssTrees.foreach(ppm => ppm.observe((parent, child)))
+      ssChildren.foreach{ case (_, ref) => ref ! MakeObservation[SS]((parent, child)) }
 
     case PpmTreeAlarmQuery(treeName, queryPath, namespace, startAtTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
       val resultOpt = ppm(treeName).map( tree =>
@@ -1192,4 +1204,45 @@ case object TreeRepr {
 
   def fromQuine(q: com.rrwright.quine.runtime.TreeRepr): TreeRepr =
     TreeRepr(q.depth,q.key,q.localProb,q.globalProb,q.count,q.children.map(c => fromQuine(c)))
+}
+
+
+
+
+case class MakeObservation[DataType](data: DataType)
+
+
+class PpmDefActor[DataShape](tree: PpmDefinition[DataShape]) extends Actor with ActorLogging {
+
+  def alarmFromProbabilityData(probabilityData: List[(ExtractedValue, Int, Int)]): Alarm = {
+    val (_, parentCount, siblingCount) = probabilityData.takeWhile(_._2 > 1).lastOption.getOrElse("", 1, 1) // First novel node with default for first observation
+    val alarmLocalProbability = siblingCount.toFloat / (parentCount + siblingCount) // Alarm local prob is a function of the first novel node
+    val treeObservationCount = probabilityData.headOption.map(_._2).getOrElse(1) //
+    val lastAlarmListIndex = if (probabilityData.size < 2) 0 else  probabilityData.size - 2
+
+    val alarm = probabilityData.iterator.sliding(2).zipWithIndex.map {
+      case (extractedPair, depth) =>
+        val (ev, parentCount, siblingCount) = extractedPair.headOption.getOrElse(("", 1, 1))
+        val (_, count, _) = extractedPair.lift(1).getOrElse(("", 1, 1))
+        if (depth == lastAlarmListIndex)
+          PpmTreeNodeAlarm(ev, alarmLocalProbability, count.toFloat/treeObservationCount, count, siblingCount, parentCount, depth + 1)
+        else
+          PpmTreeNodeAlarm(ev, count.toFloat/parentCount.toFloat, count.toFloat/treeObservationCount, count, siblingCount, parentCount, depth + 1)
+    }.toList
+    // println(alarm)
+    alarm
+  }
+
+
+  def receive: Receive = {
+    case msg @ Novelty(treeName, probabilityData, collectedUuids: Set[NamespacedUuidDetails @unchecked], timestamps) =>
+      if (treeName != tree.treeName) log.warning(s"Could not find tree named: $treeName to record Alarm related to: $probabilityData with UUIDs: $collectedUuids, with dataTimestamps: $timestamps from: $sender")
+      else {
+        val alarmOpt = if (tree.noveltyFilter(msg)) Some((alarmFromProbabilityData(probabilityData), collectedUuids, timestamps)) else None
+        tree.recordAlarm(alarmOpt)
+        tree.insertIntoLocalProbAccumulator(alarmOpt)
+      }
+
+    case MakeObservation(data: DataShape @unchecked) => tree.observe(data, context.self)
+  }
 }
