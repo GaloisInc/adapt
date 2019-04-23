@@ -122,13 +122,14 @@ object Application extends App {
     config = ConfigFactory.parseString(clusterConfigSrc),
     persistor = as =>
 //      LMDBSnapshotPersistor(
+//        "data/persistence-lmdb.db",
 //        mapSizeBytes = {
 //          val size: Long = runtimeConfig.lmdbgigabytes * 1024L * 1024L * 1024L
 //          println("LMDB size: " + NumberFormat.getInstance().format(size))
 //          size
 //        }
 //      )(as),
-      TimelessMapDBMultimap()(as),
+      TimelessMapDBMultimap("data/persistence-multimap_by_event.db")(as),
 //    MapDBMultimap()(as),
 //    EmptyPersistor()(as),
     idProvider = AdmUuidProvider,
@@ -296,6 +297,64 @@ object Application extends App {
   }.toMap
 
 
+  val lruDedup = Flow[Either[ADM, EdgeAdm2Adm]].statefulMapConcat{ () =>
+    // This is meant only to decrease the number of duplicates, not perfectly eliminate dupes. Viz. meant to help performance, not correctness.
+    // Some duplication isn't so bad--it results in a no-op on the graph, and a duplicate standing fetch.
+    val seenPaths = new java.util.LinkedHashMap[AdmPathNode, None.type](200, 1F, true) {
+      override def removeEldestEntry(eldest: java.util.Map.Entry[AdmPathNode, None.type]) = this.size() >= 200
+    }
+    val seenSubjects = new java.util.LinkedHashMap[AdmSubject, None.type](200, 1F, true) {
+      override def removeEldestEntry(eldest: java.util.Map.Entry[AdmSubject, None.type]) = this.size() >= 200
+    }
+    val seenPorts = new java.util.LinkedHashMap[AdmPort, None.type](200, 1F, true) {
+      override def removeEldestEntry(eldest: java.util.Map.Entry[AdmPort, None.type]) = this.size() >= 200
+    }
+    val seenAddresses = new java.util.LinkedHashMap[AdmAddress, None.type](200, 1F, true) {
+      override def removeEldestEntry(eldest: java.util.Map.Entry[AdmAddress, None.type]) = this.size() >= 200
+    }
+    val seenNetflows = new java.util.LinkedHashMap[AdmNetFlowObject, None.type](200, 1F, true) {
+      override def removeEldestEntry(eldest: java.util.Map.Entry[AdmNetFlowObject, None.type]) = this.size() >= 200
+    }
+    val seenEdges = new java.util.LinkedHashMap[EdgeAdm2Adm, None.type](10000, 1F, true) {
+      override def removeEldestEntry(eldest: java.util.Map.Entry[EdgeAdm2Adm, None.type]) = this.size() >= 10000
+    }
+
+    {
+      case a @ Left(adm: AdmPathNode) =>
+        val result = if (seenPaths.containsKey(adm)) Nil else List(a)
+        seenPaths.put(adm, None)
+        result
+
+      case a @ Left(adm: AdmSubject) =>
+        val result = if (seenSubjects.containsKey(adm)) Nil else List(a)
+        seenSubjects.put(adm, None)
+        result
+
+      case a @ Left(adm: AdmPort) =>
+        val result = if (seenPorts.containsKey(adm)) Nil else List(a)
+        seenPorts.put(adm, None)
+        result
+
+      case a @ Left(adm: AdmAddress) =>
+        val result = if (seenAddresses.containsKey(adm)) Nil else List(a)
+        seenAddresses.put(adm, None)
+        result
+
+      case a @ Left(adm: AdmNetFlowObject) =>
+        val result = if (seenNetflows.containsKey(adm)) Nil else List(a)
+        seenNetflows.put(adm, None)
+        result
+
+      case a @ Right(edge) =>
+        val result = if (seenEdges.containsKey(edge)) Nil else List(a)
+        seenEdges.put(edge, None)
+        result
+
+      case a => List(a)
+    }
+  }
+
+
   val quineSink: Sink[Either[ADM, EdgeAdm2Adm], NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit q: GraphDSL.Builder[NotUsed]  =>
     import GraphDSL.Implicits._
     val balance = q.add(Balance[Either[ADM, EdgeAdm2Adm]](parallelism))
@@ -306,6 +365,7 @@ object Application extends App {
     SinkShape(balance.in)
   })
 
+
   println("Running Quine ingest.")
     val hostSources = cdmSources.values.toSeq
     val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
@@ -315,9 +375,9 @@ object Application extends App {
         .via(debug.debugBuffer(s"[${host.hostName}]  0.) before ER"))
         .via(erMap(host.hostName))
         .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB"))
+        .via(lruDedup)
         .via(printCounter(host.hostName+" ADM", statusActor))
         .runWith(quineSink)
-//        .runWith(Sink.actorRefWithAck(quineRouter, InitMsg, Ack, CompleteMsg, println))
     }
 
 
@@ -330,7 +390,7 @@ object Application extends App {
       println(s"Stopping ammonite...")
       replServer.stopImmediately()
 
-      implicit val executionContext = system.dispatcher
+      implicit val executionContext = system.dispatchers.lookup("quine.actor.node-dispatcher")
 
       val saveF = if (ppmConfig.shouldsaveppmtrees) {
         println(s"Saving PPM trees to disk...")

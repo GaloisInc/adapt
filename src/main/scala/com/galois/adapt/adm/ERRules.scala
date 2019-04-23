@@ -178,9 +178,10 @@ object ERRules {
             (EdgeCdm2Adm(CdmUUID(subj, provider), "path", pathNode.uuid), pathNode)
           )
         }),
-        e.properties.getOrElse(Map()).get("exec").flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).map(pathNode => {
-          (EdgeCdm2Adm(CdmUUID(e.getUuid, provider), "eventPath", pathNode.uuid), pathNode)
-        })
+//        e.properties.getOrElse(Map()).get("exec").flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).map(pathNode => {
+//          (EdgeCdm2Adm(CdmUUID(e.getUuid, provider), "eventPath", pathNode.uuid), pathNode)
+//        })
+        None  // Choosing not to create "eventPath" edges.
       )
     }
 

@@ -4,7 +4,6 @@ import java.io.{File, PrintWriter}
 import java.nio.ByteBuffer
 import java.text.NumberFormat
 import java.util.UUID
-import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicLong
 import shapeless.cachedImplicit
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
@@ -113,6 +112,9 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   val nf = NumberFormat.getInstance()
 
   implicit val service = graphService
+
+//  implicit val ec = service.system.dispatchers.lookup("quine.actor.node-dispatcher")
+
 //  implicit val timeout = Timeout(21 seconds)
   lazy val graph: org.apache.tinkerpop.gremlin.structure.Graph = ???
 
@@ -160,9 +162,13 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 
   implicit class FutureAckOnComplete(f: Future[_]) extends AnyRef {
     def ackOnComplete(ackTo: ActorRef, successF: => Unit = ()): Unit = f.onComplete{
-//      _ => ackTo ! Ack; stopWork()
-      case Success(_) => ackTo ! Ack; stopWork()
-      case Failure(e) => e.printStackTrace(); ackTo ! Ack; stopWork()
+      case Success(_) =>
+        ackTo ! Ack
+        stopWork()
+      case Failure(e) =>
+//        e.printStackTrace()
+        ackTo ! Ack
+        stopWork()
     }
   }
 
@@ -216,21 +222,33 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
           graphService.standingFetch[ESONetworkInstance](anAdm.uuid, Application.sqidNetwork)(wrongFunc)
           x
         }
+
       case anAdm: AdmSubject =>
         anAdm.create(Some(anAdm.uuid)).map { x =>
-          graphService.standingFetch[ChildProcess](anAdm.uuid, Application.sqidParentProcess)(wrongFunc)
+            graphService.standingFetch[ChildProcess](anAdm.uuid, Application.sqidParentProcess)(wrongFunc)
           x
         }
+
       case anAdm: AdmPrincipal          => anAdm.create(Some(anAdm.uuid))
+
       case anAdm: AdmFileObject         => anAdm.create(Some(anAdm.uuid))
+
       case anAdm: AdmNetFlowObject      => anAdm.create(Some(anAdm.uuid))
+
       case anAdm: AdmPathNode           => anAdm.create(Some(anAdm.uuid))
+
       case anAdm: AdmPort               => anAdm.create(Some(anAdm.uuid))
+
       case anAdm: AdmAddress            => anAdm.create(Some(anAdm.uuid))
+
       case anAdm: AdmSrcSinkObject      => anAdm.create(Some(anAdm.uuid))
+
       case anAdm: AdmProvenanceTagNode  => anAdm.create(Some(anAdm.uuid))
+
       case anAdm: AdmHost               => anAdm.create(Some(anAdm.uuid))
+
       case anAdm: AdmSynthesized        => anAdm.create(Some(anAdm.uuid))
+
       case _                            => throw new Exception("Unexpected ADM")
     }).flatMap {
       case Success(s) => Future.successful(System.nanoTime() - startNanos)
@@ -253,13 +271,11 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
     new java.util.LinkedHashMap[Long, None.type](10000, 1F, true) {
       override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
     }
-//    new ConcurrentLinkedQueue[Long]()
 
   val edgeTimes =  // Not exactly correct because it is a set instead of a list, but close enough:
     new java.util.LinkedHashMap[Long, None.type](10000, 1F, true) {
       override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
     }
-//    new ConcurrentLinkedQueue[Long]()
 
   val shouldRecordDBWriteTimes = true
   if (shouldRecordDBWriteTimes && idx >= 0) context.system.scheduler.schedule(30 seconds, 300 seconds){
@@ -373,7 +389,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 //      retryOnFailure(3)(
 //        writeAdm(a, Timeout(0.01 seconds))
 //      )(Timeout(1 second), implicitly)
-      writeAdm(a, Timeout(5 seconds))
+      writeAdm(a, Timeout(0.3 seconds))
         .map(t => if (shouldRecordDBWriteTimes) nodeTimes.put(t, None) else t)
 //        .map(edgeTimes.add)
         .recoveryMessage("Writing NODE failed at ID: {} for ADM Node: {}", a.uuid, a)
@@ -386,7 +402,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 //      retryOnFailure(3)(
 //        writeAdmEdge(e, Timeout(0.15 seconds))
 //      )(Timeout(1 second), implicitly)
-      writeAdmEdge(e, Timeout(5 seconds))
+      writeAdmEdge(e, Timeout(0.5 seconds))
         .map(t => if (shouldRecordDBWriteTimes) edgeTimes.put(t, None) else t)
 //        .map(edgeTimes.add)
         .recoveryMessage("Writing EDGE failed at IDs: {} and: {} with label: {}", e.src, e.tgt, e.label)
