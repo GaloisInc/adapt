@@ -172,7 +172,8 @@ object AdaptConfig extends Utils {
     port:Int,
     maxbufferlength:Long,
     realtimeReportingPeriodSeconds:Int,
-    detailedReportingPeriodSeconds:Int)
+    detailedReportingPeriodSeconds:Int,
+    percentProcessInstancesToTake:Float)
   case class AlarmsConfig(
     splunk: SplunkConfig,
     logging: LogConfig,

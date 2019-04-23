@@ -111,6 +111,10 @@ case object AlarmEvent {
       DetailedAlarmEvent(pd.processName, pd.pid.getOrElse("None").toString, pd.hostName, details, alarmIDs),
       AlarmEventMetaData(runID, alarmCategory.toString))
   }
+
+  def changeCategory(alarmEvent: AlarmEvent, alarmCategory: AlarmCategory): AlarmEvent = {
+    AlarmEvent(alarmEvent.data, AlarmEventMetaData(alarmEvent.metadata.runID,alarmCategory.toString))
+  }
 }
 
 sealed trait AlarmCategory
@@ -127,6 +131,9 @@ case object TopTwenty extends AlarmCategory {
   override def toString = "topTwenty"
 }
 
+case object ProcessFiltered extends AlarmCategory {
+  override def toString = "processFiltered"
+}
 /*
 * Valid Messages for the AlarmReporterActor
 *
@@ -166,8 +173,12 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
   var processRefSet: Map[ProcessDetails, Set[Long]] = Map.empty
   var alarmCounter: Long = 0
 
+  // TODO: Initialize processInstanceCounter with training data; add new function to receive.
+  var processInstanceCounter = scala.collection.mutable.Map[ProcessDetails, Int]().withDefaultValue(0)
+  var totalProcessInstanceCount = processInstanceCounter.values.sum
+
   def genAlarmID(): Long = {
-    alarmCounter += 1;
+    alarmCounter += 1
     alarmCounter
   }
 
@@ -195,12 +206,23 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
 
   def generateSummaryAndSend(lastMessage: Boolean): Unit = {
 
+    val numProcessInstancesToTake = math.round(totalProcessInstanceCount * AlarmReporter.percentProcessInstancesToTake)
+    val minProcessInstanceCount = processInstanceCounter.toList.sortBy(-_._2).take(numProcessInstancesToTake).lastOption.map(_._2).getOrElse(0)
+
     val batchedMessages: List[Future[Option[AlarmEvent]]] = processRefSet.view.map { case (pd, alarmIDs) =>
+
       //Suppress empty summaries
       val summaries: Future[Option[AlarmEvent]] = PpmSummarizer.summarize(pd.processName, Some(pd.hostName), pd.pid).map { s =>
         if (s == TreeRepr.empty) None
         else Some(AlarmEvent.fromBatchedAlarm(ProcessSummary, pd, s.readableString, alarmIDs, runID))
       }.recoverWith{ case e => log.error(s"Summarizing: $pd failed with error: ${e.getMessage}"); Future.failed(e)}
+
+      // Filter out process instance summaries that don't have a lot of activity
+      val filteredSummary: Future[Option[AlarmEvent]] = processInstanceCounter.getOrElse(pd, 0) match {
+        case cnt if cnt >= minProcessInstanceCount =>
+          summaries.map(_.map(x => AlarmEvent.changeCategory(x,ProcessFiltered)))
+        case _ => Future{None}
+      }
 
       //it is OK to have empty process Activities
       val completeTreeRepr: Future[Option[AlarmEvent]] = PpmSummarizer.fullTree(pd.processName, Some(pd.hostName), pd.pid).map { a =>
@@ -213,8 +235,8 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
         else Some(AlarmEvent.fromBatchedAlarm(TopTwenty, pd, mn.mkString("\n"), alarmIDs, runID))
       }.recoverWith{ case e => log.error(s"Getting Top 20 for: $pd failed with error: ${e.getMessage}"); Future.failed(e)}
 
-      (summaries, completeTreeRepr, mostNovel)
-    }.toList.flatMap(x => List(x._1, x._2, x._3))
+      (summaries, filteredSummary, completeTreeRepr, mostNovel)
+    }.toList.flatMap(x => List(x._1, x._2, x._3, x._4))
 
     Future.sequence(batchedMessages).map(m => handleMessage(m.flatten, lastMessage)).onFailure {
       case res => log.error(s"AlarmReporter: failed with $res.")
@@ -241,6 +263,8 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
 
     alarmDetails.processDetailsSet.foreach { pd =>
       processRefSet += (pd -> (processRefSet.getOrElse(pd, Set.empty[Long]) + alarmID))
+      processInstanceCounter(pd) += 1
+      totalProcessInstanceCount += 1
     }
 
     // is this a cleaner solution?
@@ -293,6 +317,8 @@ object AlarmReporter extends LazyLogging {
 
   //Assumes ppmConfig.basedir is already created
   val logFilenamePrefix: String = AdaptConfig.ppmConfig.basedir + alarmConfig.logging.fileprefix
+
+  val percentProcessInstancesToTake = splunkConfig.percentProcessInstancesToTake
 
   val alarmReporterActor: ActorRef = system.actorOf(Props(classOf[AlarmReporterActor], runID, splunkConfig.maxbufferlength, splunkHecClient, alarmConfig, logFilenamePrefix), "alarmReporter")
 
