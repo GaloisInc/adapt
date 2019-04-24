@@ -4,14 +4,14 @@ import akka.util.Timeout
 import akka.pattern.ask
 import com.galois.adapt.AdaptConfig.HostName
 import com.galois.adapt.NoveltyDetection.ExtractedValue
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 import scala.concurrent.duration._
 import cdm20._
 
 
 object PpmSummarizer {
-  implicit val ec = Application.system.dispatchers.lookup("quine.actor.node-dispatcher")
+  implicit val ec: ExecutionContext = Application.system.dispatchers.lookup("quine.actor.node-dispatcher")
 
   sealed trait AbstractionOne {
     val events: Set[EventType]

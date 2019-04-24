@@ -16,6 +16,7 @@ import akka.event.Logging
 import shapeless._
 import shapeless.syntax.singleton._
 import AdaptConfig._
+import akka.routing.RoundRobinPool
 import com.typesafe.config.ConfigFactory
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
@@ -220,39 +221,43 @@ object Application extends App {
 
   val sqidFile = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOFile-accumulator"))
   val standingFetchFileActor = system.actorOf(
-    Props(
-      classOf[StandingFetchActor[ESOFileInstance]],
-      implicitly[Queryable[ESOFileInstance]],
-      StandingFetches.onESOFileMatch _
-    ), sqidFile.get.name
-  )
+    RoundRobinPool(15).props(
+      Props(
+        classOf[StandingFetchActor[ESOFileInstance]],
+        implicitly[Queryable[ESOFileInstance]],
+        StandingFetches.onESOFileMatch _
+      ).withDispatcher("quine.actor.standing-fetch-dispatcher")
+    ), name = sqidFile.get.name)
 
   val sqidSrcSnk = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOSrcSnk-accumulator"))
   val standingFetchSrcSnkActor = system.actorOf(
-    Props(
-      classOf[StandingFetchActor[ESOSrcSnkInstance]],
-      implicitly[Queryable[ESOSrcSnkInstance]],
-      StandingFetches.onESOSrcSinkMatch _
-    ), sqidSrcSnk.get.name
-  )
+    RoundRobinPool(5).props(
+      Props(
+        classOf[StandingFetchActor[ESOSrcSnkInstance]],
+        implicitly[Queryable[ESOSrcSnkInstance]],
+        StandingFetches.onESOSrcSinkMatch _
+      ).withDispatcher("quine.actor.standing-fetch-dispatcher")
+    ), name = sqidSrcSnk.get.name)
 
   val sqidNetwork = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESONetwork-accumulator"))
   val standingFetchNetworkActor = system.actorOf(
-    Props(
-      classOf[StandingFetchActor[ESONetworkInstance]],
-      implicitly[Queryable[ESONetworkInstance]],
-      StandingFetches.onESONetworkMatch _
-    ), sqidNetwork.get.name
-  )
+    RoundRobinPool(5).props(
+      Props(
+        classOf[StandingFetchActor[ESONetworkInstance]],
+        implicitly[Queryable[ESONetworkInstance]],
+        StandingFetches.onESONetworkMatch _
+      ).withDispatcher("quine.actor.standing-fetch-dispatcher")
+    ), name = sqidNetwork.get.name)
 
   val sqidParentProcess = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ProcessParentage"))
   val standingFetchProcessParentageActor = system.actorOf(
-    Props(
-      classOf[StandingFetchActor[ChildProcess]],
-      implicitly[Queryable[ChildProcess]],
-      StandingFetches.onESOProcessMatch _
-    ), sqidParentProcess.get.name
-  )
+    RoundRobinPool(5).props(
+      Props(
+        classOf[StandingFetchActor[ChildProcess]],
+        implicitly[Queryable[ChildProcess]],
+        StandingFetches.onESOProcessMatch _
+      ).withDispatcher("quine.actor.standing-fetch-dispatcher")
+    ), name = sqidParentProcess.get.name)
 
   graph.currentGraph.standingQueryActors = graph.currentGraph.standingQueryActors +
     (sqidFile.get -> standingFetchFileActor) +
@@ -262,8 +267,7 @@ object Application extends App {
 
 
   val parallelism = quineConfig.quineactorparallelism
-  val quineRouter =
-    system.actorOf(Props(classOf[QuineDBActor], graph, -1), s"QuineDB-UI")
+  val uiDBInterface = system.actorOf(Props(classOf[QuineDBActor], graph, -1), s"QuineDB-UI")
 //    system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
 
   AlarmReporter  // instantiate AlarmReporter (LazyInit) and corresponding actor
@@ -278,7 +282,11 @@ object Application extends App {
     if (runtimeConfig.quitonerror) Runtime.getRuntime.halt(1)
     Supervision.Resume
   }
-  implicit val materializer = ActorMaterializer(ActorMaterializerSettings(system).withSupervisionStrategy(streamErrorStrategy))
+  implicit val materializer = ActorMaterializer(
+    ActorMaterializerSettings(system)
+      .withSupervisionStrategy(streamErrorStrategy)
+      .withDispatcher("stream-dispatcher")
+  )
 
 
   def startWebServer(dbActor: ActorRef): Http.ServerBinding = {
@@ -288,7 +296,7 @@ object Application extends App {
     Await.result(httpServer, 10 seconds)
   }
 
-  startWebServer(quineRouter)
+  startWebServer(uiDBInterface)
   statusActor ! InitMsg
 
 
@@ -300,8 +308,8 @@ object Application extends App {
   val lruDedup = Flow[Either[ADM, EdgeAdm2Adm]].statefulMapConcat{ () =>
     // This is meant only to decrease the number of duplicates, not perfectly eliminate dupes. Viz. meant to help performance, not correctness.
     // Some duplication isn't so bad--it results in a no-op on the graph, and a duplicate standing fetch.
-    val seenPaths = new java.util.LinkedHashMap[AdmPathNode, None.type](200, 1F, true) {
-      override def removeEldestEntry(eldest: java.util.Map.Entry[AdmPathNode, None.type]) = this.size() >= 200
+    val seenPaths = new java.util.LinkedHashMap[AdmPathNode, None.type](500, 1F, true) {
+      override def removeEldestEntry(eldest: java.util.Map.Entry[AdmPathNode, None.type]) = this.size() >= 500
     }
     val seenSubjects = new java.util.LinkedHashMap[AdmSubject, None.type](200, 1F, true) {
       override def removeEldestEntry(eldest: java.util.Map.Entry[AdmSubject, None.type]) = this.size() >= 200
@@ -390,7 +398,7 @@ object Application extends App {
       println(s"Stopping ammonite...")
       replServer.stopImmediately()
 
-      implicit val executionContext = system.dispatchers.lookup("quine.actor.node-dispatcher")
+      implicit val executionContext: ExecutionContext = system.dispatchers.lookup("quine.actor.node-dispatcher")
 
       val saveF = if (ppmConfig.shouldsaveppmtrees) {
         println(s"Saving PPM trees to disk...")
@@ -412,7 +420,7 @@ object Application extends App {
   def wrongRunFlow(): Unit = {
     println(
       raw"""
-Unknown runflow argument. Quitting. (Did you mean quine?)
+Unknown runflow argument. Quitting. (Did you mean: quine?)
 
                 \
                  \

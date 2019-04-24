@@ -11,6 +11,7 @@ import akka.stream.{FlowShape, OverflowStrategy}
 import akka.util.ByteString
 import scala.collection.mutable
 import com.galois.adapt.cdm20._
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
 
@@ -140,7 +141,7 @@ case object CleanUp extends ProcessingCommand
 class StreamDebugger(prefix: String, printEvery: FiniteDuration, reportEvery: FiniteDuration)
   (implicit system: ActorSystem) {
 
-  implicit val ec = system.dispatchers.lookup("quine.actor.node-dispatcher")
+  implicit val ec: ExecutionContext = system.dispatchers.lookup("quine.actor.node-dispatcher")
 
   import java.util.concurrent.ConcurrentHashMap
   import java.util.concurrent.atomic.AtomicInteger

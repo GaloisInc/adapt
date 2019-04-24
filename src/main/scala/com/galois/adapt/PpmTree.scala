@@ -10,6 +10,7 @@ import java.io.{BufferedWriter, File, FileWriter, PrintWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 
 import akka.pattern.ask
@@ -18,7 +19,7 @@ import com.galois.adapt
 import com.typesafe.scalalogging.LazyLogging
 
 import scala.collection.JavaConverters._
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.collection.{GenSeq, SortedMap, mutable}
 import scala.util.{Failure, Success, Try}
@@ -111,7 +112,8 @@ case class PpmDefinition[DataShape](
   graphService: GraphService[AdmUUID]
 ) extends LazyLogging {
 
-  implicit val ec = context.dispatcher
+  implicit val ec: ExecutionContext = graphService.system.dispatchers.lookup("adapt.ppm.manager-dispatcher")
+//  implicit val ec: ExecutionContext = context.dispatcher
 
   val basePath: String = ppmConfig.basedir + treeName + "-" + hostName
 
@@ -139,19 +141,23 @@ case class PpmDefinition[DataShape](
     else false
 
 
-  var alarms: Map[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])] =
+  var alarms: ConcurrentHashMap[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])] =
     if (ppmConfig.shouldloadalarms)
       Try {
         val content = new String(Files.readAllBytes(new File(inputAlarmFilePath).toPath), StandardCharsets.UTF_8)
         content.parseJson.convertTo[List[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].toMap
       } match {
-        case Success(alarm) => alarm
+        case Success(as) =>
+          val alarm = new ConcurrentHashMap[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])]()
+          alarm.putAll(as.asJava)
+          alarm
         case Failure(e) =>
           println(s"FAILED to load alarms for tree: $treeName  on host: $hostName. Starting with no alarms.")
           e.printStackTrace()
           Map.empty[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])]
+          new ConcurrentHashMap[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])]()
       }
-    else Map.empty
+    else new ConcurrentHashMap[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])]()
 
   var localProbAccumulator: SortedMap[Float,Int] = // If there are more than 2,147,483,647 alarms with a given LP; then need Long.
     if (ppmConfig.shouldloadlocalprobabilitiesfromalarms && shouldApplyThreshold) {
@@ -244,7 +250,9 @@ case class PpmDefinition[DataShape](
 
       val alarmDetails = (timestamps, System.currentTimeMillis, alarm, setNamespacedUuidDetails, Map.empty[String,Int])
       val newAlarm = AnAlarm(key,alarmDetails)
-      alarms = alarms + AnAlarm.unapply(newAlarm).get
+//      alarms = alarms + AnAlarm.unapply(newAlarm).get
+      val x = AnAlarm.unapply(newAlarm).get
+      alarms.put(x._1, x._2)
 
       def thresholdAllows: Boolean = alarm.lastOption.forall( (i: PpmTreeNodeAlarm) => ! ((i.localProb > localProbThreshold) && shouldApplyThreshold) )
 
@@ -254,12 +262,14 @@ case class PpmDefinition[DataShape](
     }
   }
 
-  def setAlarmRating(key: List[ExtractedValue], rating: Option[Int], namespace: String): Boolean = alarms.get(key).fold(false) { a =>
+  def setAlarmRating(key: List[ExtractedValue], rating: Option[Int], namespace: String): Boolean = Option(alarms.get(key)).fold(false) { a =>
     rating match {
       case Some(number) => // set the alarm rating in this namespace
-        alarms = alarms + (key -> a.copy (_5 = a._5 + (namespace -> number) ) ); true
+//        alarms = alarms + (key -> a.copy (_5 = a._5 + (namespace -> number) ) ); true
+        alarms.put(key, a.copy(_5 = a._5 + (namespace -> number) )); true
       case None => // Unset the alarm rating.
-        alarms = alarms + (key -> a.copy (_5 = a._5 - namespace) ); true
+//        alarms = alarms + (key -> a.copy (_5 = a._5 - namespace) ); true
+        alarms.put(key, a.copy (_5 = a._5 - namespace)); true
     }
   }
 
@@ -289,7 +299,7 @@ case class PpmDefinition[DataShape](
 
       if (ppmConfig.shouldsavealarms) {
         println(s"Started saving Alarms for: $treeName ...")
-        val content = alarms.toList.toJson.prettyPrint
+        val content = alarms.asScala.toList.toJson.prettyPrint
         val outputFile = new File(outputAlarmFilePath)
         if ( ! outputFile.exists) outputFile.createNewFile()
         Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
@@ -328,7 +338,7 @@ case class PpmNodeActorGetTopLevelCountResult(count: Int) // We can just query t
 
 class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphService: GraphService[AdmUUID]) extends Actor with ActorLogging { thisActor =>
 
-  implicit val ec = context.dispatcher
+  implicit val ec: ExecutionContext = graphService.system.dispatchers.lookup("adapt.ppm.manager-dispatcher")
 
   val (pathDelimiterRegexPattern, pathDelimiterChar) = if (isWindows) ("""\\""", """\""") else ("""/""" ,   "/")
   val sudoOrPowershellComparison: String => Boolean = if (isWindows) {
@@ -743,7 +753,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
 
   def saveTrees(): Future[Unit] = {
-    ppmList.toList.foldLeft(Future.successful(()))((acc, ppmTree) => acc.flatMap(_ => ppmTree.saveStateAsync()))
+    ppmList.foldLeft(Future.successful(()))((acc, ppmTree) => acc.flatMap(_ => ppmTree.saveStateAsync()))
   }
 
   def ppm(name: String): Option[PpmDefinition[_]] = ppmList.find(_.treeName == name)
@@ -855,7 +865,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val o: Object = (PpmFileObject(predicateObject.fileObjectType, objUuid), Some(predicateObject.path))
 //        esoTrees.foreach(ppm => ppm.observe((e, s, o)))
         esoChildren.foreach{ case(_,ref) => ref ! MakeObservation[ESO]( (e,s,o) )}
-      }.failed.map(e => log.warning(s"Preparing ESOFileInstance observation failed: ${e.getMessage}"))
+      } match { case Failure(e) => log.warning(s"Preparing ESOFileInstance observation failed: ${e.getMessage}"); case _ => ()}
 
     case msg @ ESONetworkInstance(eventType, earliestTimestampNanos, latestTimestampNanos, hostName, subject, predicateObject) =>
       Try {
@@ -867,7 +877,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val o: Object = (PpmNetFlowObject(predicateObject.remotePort, predicateObject.localPort, predicateObject.remoteAddress, predicateObject.localAddress, objUuid), None)
 //        esoTrees.foreach(ppm => ppm.observe((e, s, o)))
         esoChildren.foreach{ case(_,ref) => ref ! MakeObservation[ESO]( (e,s,o) )}
-      }.failed.map(e => log.warning(s"Preparing ESONetworkInstance observation failed: ${e.getMessage}"))
+      } match { case Failure(e) => log.warning(s"Preparing ESONetworkInstance observation failed: ${e.getMessage}"); case _ => ()}
 
     case msg @ ESOSrcSnkInstance(eventType, earliestTimestampNanos, latestTimestampNanos, hostName, subject, predicateObject) =>
       Try {
@@ -879,7 +889,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         val o: Object = (PpmSrcSinkObject(predicateObject.srcSinkType, objUuid), None)
 //        esoTrees.foreach(ppm => ppm.observe((e, s, o)))
         esoChildren.foreach{ case(_,ref) => ref ! MakeObservation[ESO]( (e,s,o) )}
-      }.failed.map(e => log.warning(s"Preparing ESOSrcSnkInstance observation failed: ${e.getMessage}"))
+      } match { case Failure(e) => log.warning(s"Preparing ESOSrcSnkInstance observation failed: ${e.getMessage}"); case _ => ()}
 
     case msg @ SEOESInstance(s1: Subject, eventKind: String, ESOInstance(e: Event, s2: Subject, o: Object))  =>
 //      seoesTrees.foreach(ppm => ppm.observe((s1, eventKind, (e, s2, o))))
@@ -895,8 +905,8 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
     case PpmTreeAlarmQuery(treeName, queryPath, namespace, startAtTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
       val resultOpt = ppm(treeName).map( tree =>
-        if (queryPath.isEmpty) tree.alarms.values.map(a => a.copy(_5 = a._5.get(namespace))).toList
-        else tree.alarms.collect{ case (k,v) if k.startsWith(queryPath) => v.copy(_5 = v._5.get(namespace))}.toList
+        if (queryPath.isEmpty) tree.alarms.asScala.values.map(a => a.copy(_5 = a._5.get(namespace))).toList
+        else tree.alarms.asScala.collect{ case (k,v) if k.startsWith(queryPath) => v.copy(_5 = v._5.get(namespace))}.toList
       ).map { r =>
         val filteredResults = r.filter { case (dataTimestamps, observationMillis, alarm, uuids, ratingOpt) =>
           (if (forwardFromStartTime) dataTimestamps.min >= startAtTime else dataTimestamps.max <= startAtTime) &&

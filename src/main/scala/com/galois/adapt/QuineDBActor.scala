@@ -230,25 +230,15 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         }
 
       case anAdm: AdmPrincipal          => anAdm.create(Some(anAdm.uuid))
-
       case anAdm: AdmFileObject         => anAdm.create(Some(anAdm.uuid))
-
       case anAdm: AdmNetFlowObject      => anAdm.create(Some(anAdm.uuid))
-
       case anAdm: AdmPathNode           => anAdm.create(Some(anAdm.uuid))
-
       case anAdm: AdmPort               => anAdm.create(Some(anAdm.uuid))
-
       case anAdm: AdmAddress            => anAdm.create(Some(anAdm.uuid))
-
       case anAdm: AdmSrcSinkObject      => anAdm.create(Some(anAdm.uuid))
-
       case anAdm: AdmProvenanceTagNode  => anAdm.create(Some(anAdm.uuid))
-
       case anAdm: AdmHost               => anAdm.create(Some(anAdm.uuid))
-
       case anAdm: AdmSynthesized        => anAdm.create(Some(anAdm.uuid))
-
       case _                            => throw new Exception("Unexpected ADM")
     }).flatMap {
       case Success(s) => Future.successful(System.nanoTime() - startNanos)
@@ -277,7 +267,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
     }
 
-  val shouldRecordDBWriteTimes = true
+  val shouldRecordDBWriteTimes = false
   if (shouldRecordDBWriteTimes && idx >= 0) context.system.scheduler.schedule(30 seconds, 300 seconds){
     val shouldWriteToFile = false
     Future{
@@ -318,14 +308,14 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   var timeWaiting: AtomicLong = new AtomicLong(0)
   var timeWorking: AtomicLong = new AtomicLong(0)
 
-  def startWork(): Unit = {
+  def startWork(): Unit = if (shouldRecordDBWriteTimes) {
     val now = System.nanoTime()
     lastSent.compareAndSet(0L, now)
     timeWaiting.addAndGet(now - lastSent.get())
     lastRecv.set(now)
   }
 
-  def stopWork(): Unit = {
+  def stopWork(): Unit = if (shouldRecordDBWriteTimes) {
     val now = System.nanoTime()
     lastRecv.compareAndSet(0L, now)
     timeWorking.addAndGet(now - lastRecv.get())
@@ -336,10 +326,10 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   override def receive = {
 
     // Run the query without specifying what the output type will be. This is the variant used by 'cmdline_query.py'
-    case WithSender(sndr, StringQuery(q, shouldParse)) =>
+    case StringQuery(q, shouldParse) =>
       log.debug(s"Received string query: $q")
       println(s"Received string query: $q")
-      sndr ! {
+      sender() ! {
         gremlin.queryEither(q).map { resultsEither =>
           resultsEither.fold(qge => Failure(throw qge), Success(_)).map { results =>
             if (shouldParse) {
@@ -352,10 +342,10 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       }
 
     // Run a query that returns vertices
-    case WithSender(sndr, NodeQuery(q, shouldParse)) =>
+    case NodeQuery(q, shouldParse) =>
       log.debug(s"Received node query: $q")
       println(s"Received node query: $q")
-      sndr ! {
+      sender() ! {
         // The Gremlin adapter for quine doesn't store much information on nodes, so we have to
         // actively go get that information
         gremlin.queryEither(q + s""".as('vertex')
@@ -370,10 +360,10 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       }
 
     // Run a query that returns edges
-    case WithSender(sndr, EdgeQuery(q, shouldParse)) =>
+    case EdgeQuery(q, shouldParse) =>
       log.debug(s"Received new edge query: $q")
       println(s"Received new edge query: $q")
-      sndr ! {
+      sender() ! {
         gremlin.queryEitherExpecting[com.rrwright.quine.gremlin.Edge](q).map { edgesEither =>
           edgesEither.fold(qge => Failure(throw qge), Success(_)).map { edges =>
             if (shouldParse) JsArray(edges.map(ApiJsonProtocol.quineEdgeToJson).toVector)
@@ -386,25 +376,16 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
     case Left(a: ADM) =>
       startWork()
       val s = sender()
-//      retryOnFailure(3)(
-//        writeAdm(a, Timeout(0.01 seconds))
-//      )(Timeout(1 second), implicitly)
       writeAdm(a, Timeout(0.3 seconds))
         .map(t => if (shouldRecordDBWriteTimes) nodeTimes.put(t, None) else t)
-//        .map(edgeTimes.add)
         .recoveryMessage("Writing NODE failed at ID: {} for ADM Node: {}", a.uuid, a)
         .ackOnComplete(s)
 
     case Right(e: EdgeAdm2Adm) =>
-//      sender() ! Ack
       startWork()
       val s = sender()
-//      retryOnFailure(3)(
-//        writeAdmEdge(e, Timeout(0.15 seconds))
-//      )(Timeout(1 second), implicitly)
       writeAdmEdge(e, Timeout(0.5 seconds))
         .map(t => if (shouldRecordDBWriteTimes) edgeTimes.put(t, None) else t)
-//        .map(edgeTimes.add)
         .recoveryMessage("Writing EDGE failed at IDs: {} and: {} with label: {}", e.src, e.tgt, e.label)
         .ackOnComplete(s)
 

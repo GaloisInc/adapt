@@ -256,7 +256,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
   def answerPolicy3(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int, timestampSeconds: Long, responseUri: String, requestId: Int, dbActor: ActorRef)(implicit system: ActorSystem, materializer: Materializer): Unit = {
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_UIAction
 
-    implicit val ec = system.dispatchers.lookup("quine.actor.node-dispatcher")
+    implicit val ec: ExecutionContext = system.dispatchers.lookup("quine.actor.node-dispatcher")
 
     trait Policy3Result
     trait InsufficientData extends Policy3Result
@@ -365,7 +365,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy_NetData
     // https://git.tc.bbn.com/bbn/tc-policy-enforcement/wikis/Policy4V1
     // TODO
-    implicit val ec = system.dispatchers.lookup("quine.actor.node-dispatcher")
+    implicit val ec: ExecutionContext = system.dispatchers.lookup("quine.actor.node-dispatcher")
 
     def alecsQuery(fileName: String): Future[Option[String]] = {
       import scala.concurrent.duration._
@@ -496,7 +496,7 @@ object PolicyEnforcementDemo extends SprayJsonSupport with DefaultJsonProtocol {
 
   def returnPolicyResult(responseCode: Int, message: Option[String], responseUri: String)(implicit system: ActorSystem, materializer: Materializer): Future[HttpResponse] = {
 
-    implicit val ec = system.dispatchers.lookup("quine.actor.node-dispatcher")
+    implicit val ec: ExecutionContext = system.dispatchers.lookup("quine.actor.node-dispatcher")
 
     val body = message.map(m => HttpEntity(m)).getOrElse(HttpEntity.Empty)
 //    Response codes:
