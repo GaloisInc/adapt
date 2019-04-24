@@ -340,7 +340,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
   implicit val ec: ExecutionContext = graphService.system.dispatchers.lookup("adapt.ppm.manager-dispatcher")
 
-  val (pathDelimiterRegexPattern, pathDelimiterChar) = if (isWindows) ("""\\""", """\""") else ("""/""" ,   "/")
+  val (pathDelimiterRegexPattern, pathDelimiterChar) = if (isWindows) ("""\\""", "\\") else ("""/""" ,   "/")
   val sudoOrPowershellComparison: String => Boolean = if (isWindows) {
     _.toLowerCase.contains("powershell")
   } else {
