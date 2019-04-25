@@ -219,45 +219,45 @@ object Application extends App {
 
   val sqidHostPrefix = quineConfig.thishost.replace(".", "-")
 
-  val sqidFile = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOFile-accumulator"))
-  val standingFetchFileActor = system.actorOf(
-    RoundRobinPool(15).props(
-      Props(
-        classOf[StandingFetchActor[ESOFileInstance]],
-        implicitly[Queryable[ESOFileInstance]],
-        StandingFetches.onESOFileMatch _
-      ).withDispatcher("quine.actor.standing-fetch-dispatcher")
-    ), name = sqidFile.get.name)
+  val sqidFile = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOFile-accumulator")(
+    onTell = Some({
+      case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
+        val queryable = implicitly[Queryable[ESOFileInstance]]
+        val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
+        StandingFetches.onESOFileMatch(reconstructed)
+    })
+  ))
+  val standingFetchFileActor = ActorRef.noSender
 
-  val sqidSrcSnk = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOSrcSnk-accumulator"))
-  val standingFetchSrcSnkActor = system.actorOf(
-    RoundRobinPool(5).props(
-      Props(
-        classOf[StandingFetchActor[ESOSrcSnkInstance]],
-        implicitly[Queryable[ESOSrcSnkInstance]],
-        StandingFetches.onESOSrcSinkMatch _
-      ).withDispatcher("quine.actor.standing-fetch-dispatcher")
-    ), name = sqidSrcSnk.get.name)
+  val sqidSrcSnk = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOSrcSnk-accumulator")(
+    onTell = Some({
+      case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
+        val queryable = implicitly[Queryable[ESOSrcSnkInstance]]
+        val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
+        StandingFetches.onESOSrcSinkMatch(reconstructed)
+    })
+  ))
+  val standingFetchSrcSnkActor = ActorRef.noSender
 
-  val sqidNetwork = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESONetwork-accumulator"))
-  val standingFetchNetworkActor = system.actorOf(
-    RoundRobinPool(5).props(
-      Props(
-        classOf[StandingFetchActor[ESONetworkInstance]],
-        implicitly[Queryable[ESONetworkInstance]],
-        StandingFetches.onESONetworkMatch _
-      ).withDispatcher("quine.actor.standing-fetch-dispatcher")
-    ), name = sqidNetwork.get.name)
+  val sqidNetwork = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESONetwork-accumulator")(
+    onTell = Some({
+      case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
+        val queryable = implicitly[Queryable[ESONetworkInstance]]
+        val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
+        StandingFetches.onESONetworkMatch(reconstructed)
+    })
+  ))
+  val standingFetchNetworkActor = ActorRef.noSender
 
-  val sqidParentProcess = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ProcessParentage"))
-  val standingFetchProcessParentageActor = system.actorOf(
-    RoundRobinPool(5).props(
-      Props(
-        classOf[StandingFetchActor[ChildProcess]],
-        implicitly[Queryable[ChildProcess]],
-        StandingFetches.onESOProcessMatch _
-      ).withDispatcher("quine.actor.standing-fetch-dispatcher")
-    ), name = sqidParentProcess.get.name)
+  val sqidParentProcess = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ProcessParentage")(
+   onTell = Some({
+      case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
+        val queryable = implicitly[Queryable[ChildProcess]]
+        val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
+        StandingFetches.onESOProcessMatch(reconstructed)
+    })
+  ))
+  val standingFetchProcessParentageActor = ActorRef.noSender 
 
   graph.currentGraph.standingQueryActors = graph.currentGraph.standingQueryActors +
     (sqidFile.get -> standingFetchFileActor) +

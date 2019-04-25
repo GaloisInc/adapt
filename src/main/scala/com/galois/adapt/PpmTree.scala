@@ -10,8 +10,10 @@ import java.io.{BufferedWriter, File, FileWriter, PrintWriter}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListMap}
+import scala.collection.concurrent.{Map => ConcurrentMap}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
+import scala.collection.JavaConverters._
 
 import akka.pattern.ask
 import akka.util.Timeout
@@ -141,49 +143,46 @@ case class PpmDefinition[DataShape](
     else false
 
 
-  var alarms: ConcurrentHashMap[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])] =
-    if (ppmConfig.shouldloadalarms)
+  var alarms: ConcurrentMap[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])] =
+    new ConcurrentHashMap[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])]().asScala
+  if (ppmConfig.shouldloadalarms) {
+    Try {
+      val content = new String(Files.readAllBytes(new File(inputAlarmFilePath).toPath), StandardCharsets.UTF_8)
+      content.parseJson.convertTo[List[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]]
+    } match {
+      case Success(as) =>
+        alarms ++= as
+      case Failure(e) =>
+        println(s"FAILED to load alarms for tree: $treeName  on host: $hostName. Starting with no alarms.")
+        e.printStackTrace()
+    }
+  }
+
+  // ConcurrentSkipListMap because is concurrent _and_ sorted
+  // If there are more than 2,147,483,647 alarms with a given LP; then need Long.
+  var localProbAccumulator = new ConcurrentSkipListMap[Float,Int](Ordering[Float])
+  if (ppmConfig.shouldloadlocalprobabilitiesfromalarms && shouldApplyThreshold) {
+    val noveltyLPs =
       Try {
         val content = new String(Files.readAllBytes(new File(inputAlarmFilePath).toPath), StandardCharsets.UTF_8)
-        content.parseJson.convertTo[List[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].toMap
+        content.parseJson.convertTo[List[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].map(_._2._3.last.localProb).groupBy(identity).mapValues(_.size)
       } match {
-        case Success(as) =>
-          val alarm = new ConcurrentHashMap[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])]()
-          alarm.putAll(as.asJava)
-          alarm
+        case Success(lps) =>
+          println(s"Successfully loaded local probability alarms for tree: $treeName on host: $hostName.")
+          lps
         case Failure(e) =>
-          println(s"FAILED to load alarms for tree: $treeName  on host: $hostName. Starting with no alarms.")
+          println(s"FAILED to load local probability alarms for tree: $treeName  on host: $hostName. Starting with empty local probability accumulator.")
           e.printStackTrace()
-          Map.empty[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])]
-          new ConcurrentHashMap[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])]()
+          Map.empty[Float, Int]
       }
-    else new ConcurrentHashMap[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])]()
+    val noveltiesLoaded = noveltyLPs.values.sum
+    println(s"Loaded $noveltiesLoaded for $treeName on $hostName")
+    localProbAccumulator.putAll(noveltyLPs.asJava)
+  } else {
+    println(s"Starting with empty local probability accumulator for $treeName on host $hostName")
+  }
 
-  var localProbAccumulator: SortedMap[Float,Int] = // If there are more than 2,147,483,647 alarms with a given LP; then need Long.
-    if (ppmConfig.shouldloadlocalprobabilitiesfromalarms && shouldApplyThreshold) {
-      val noveltyLPs =
-        Try {
-          val content = new String(Files.readAllBytes(new File(inputAlarmFilePath).toPath), StandardCharsets.UTF_8)
-          content.parseJson.convertTo[List[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].map(_._2._3.last.localProb).groupBy(identity).mapValues(_.size)
-        } match {
-          case Success(lps) =>
-            println(s"Successfully loaded local probability alarms for tree: $treeName on host: $hostName.")
-            lps
-          case Failure(e) =>
-            println(s"FAILED to load local probability alarms for tree: $treeName  on host: $hostName. Starting with empty local probability accumulator.")
-            e.printStackTrace()
-            Map.empty[Float, Int]
-        }
-      val noveltiesLoaded = noveltyLPs.values.sum
-      println(s"Loaded $noveltiesLoaded for $treeName on $hostName")
-      SortedMap.empty(Ordering[Float]) ++ noveltyLPs
-    }
-    else {
-      println(s"Starting with empty local probability accumulator for $treeName on host $hostName")
-      SortedMap.empty(Ordering[Float])
-    }
-
-  var localProbCount: Int = localProbAccumulator.values.sum
+  var localProbCount: Int = localProbAccumulator.values.asScala.sum
 
   var localProbThreshold: Float = 1
 
@@ -196,7 +195,7 @@ case class PpmDefinition[DataShape](
           // Since we are only concerned with low lp novelties, we need not track large lps with great precision.
           // This serves to reduce the max size of the lpAccumulator map.
           val approxLp = if (lp >= 0.3) math.round(lp * 10) / 10F else lp
-          localProbAccumulator += (approxLp -> (localProbAccumulator.getOrElse(approxLp, 0) + 1))
+          localProbAccumulator.put(approxLp, localProbAccumulator.getOrDefault(approxLp, 0) + 1)
           localProbCount += 1
         }
       }
@@ -207,11 +206,14 @@ case class PpmDefinition[DataShape](
 
     var accLPCount = 0
 
-    localProbThreshold = localProbAccumulator.takeWhile {
-      case (_, thisLPCount) =>
+    localProbThreshold = localProbAccumulator
+      .entrySet().iterator().asScala
+      .takeWhile { case entry =>
+        val thisLPCount = entry.getValue
         accLPCount += thisLPCount
         accLPCount <= percentileOfTotal
-    }.lastOption.map(_._1).getOrElse(1F)
+      }
+      .foldLeft(1F)((_, newLast) => newLast.getKey)  // Apparently Scala iterators don't support 
 
     println(s"LP THRESHOLD LOG: $treeName     $hostName: $localProbCount novelties collected.")
     println(s"LP THRESHOLD LOG: $treeName     $hostName: $localProbThreshold is current local probability threshold.")
@@ -262,16 +264,18 @@ case class PpmDefinition[DataShape](
     }
   }
 
-  def setAlarmRating(key: List[ExtractedValue], rating: Option[Int], namespace: String): Boolean = Option(alarms.get(key)).fold(false) { a =>
-    rating match {
-      case Some(number) => // set the alarm rating in this namespace
+  def setAlarmRating(key: List[ExtractedValue], rating: Option[Int], namespace: String): Boolean = alarms.get(key)
+    .map { a =>
+      rating match {
+        case Some(number) => // set the alarm rating in this namespace
 //        alarms = alarms + (key -> a.copy (_5 = a._5 + (namespace -> number) ) ); true
-        alarms.put(key, a.copy(_5 = a._5 + (namespace -> number) )); true
-      case None => // Unset the alarm rating.
+          alarms += key -> (a.copy(_5 = a._5 + (namespace -> number)))
+        case None => // Unset the alarm rating.
 //        alarms = alarms + (key -> a.copy (_5 = a._5 - namespace) ); true
-        alarms.put(key, a.copy (_5 = a._5 - namespace)); true
+          alarms += key -> (a.copy(_5 = a._5 - namespace))
+      }
     }
-  }
+    .nonEmpty
 
   val saveEveryAndNoMoreThan = 3600L * 1000L //ppmConfig.saveintervalseconds.getOrElse(0L) * 1000  // convert seconds to milliseconds
   val lastSaveCompleteMillis = new AtomicLong(0L)
@@ -299,7 +303,7 @@ case class PpmDefinition[DataShape](
 
       if (ppmConfig.shouldsavealarms) {
         println(s"Started saving Alarms for: $treeName ...")
-        val content = alarms.asScala.toList.toJson.prettyPrint
+        val content = alarms.toList.toJson.prettyPrint
         val outputFile = new File(outputAlarmFilePath)
         if ( ! outputFile.exists) outputFile.createNewFile()
         Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
@@ -340,7 +344,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
   implicit val ec: ExecutionContext = graphService.system.dispatchers.lookup("adapt.ppm.manager-dispatcher")
 
-  val (pathDelimiterRegexPattern, pathDelimiterChar) = if (isWindows) ("""\\""", """\""") else ("""/""" ,   "/")
+  val (pathDelimiterRegexPattern, pathDelimiterChar) = if (isWindows) ("""\\""", "\\") else ("""/""" ,   "/")
   val sudoOrPowershellComparison: String => Boolean = if (isWindows) {
     _.toLowerCase.contains("powershell")
   } else {
@@ -905,8 +909,8 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
     case PpmTreeAlarmQuery(treeName, queryPath, namespace, startAtTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
       val resultOpt = ppm(treeName).map( tree =>
-        if (queryPath.isEmpty) tree.alarms.asScala.values.map(a => a.copy(_5 = a._5.get(namespace))).toList
-        else tree.alarms.asScala.collect{ case (k,v) if k.startsWith(queryPath) => v.copy(_5 = v._5.get(namespace))}.toList
+        if (queryPath.isEmpty) tree.alarms.values.map(a => a.copy(_5 = a._5.get(namespace))).toList
+        else tree.alarms.collect{ case (k,v) if k.startsWith(queryPath) => v.copy(_5 = v._5.get(namespace))}.toList
       ).map { r =>
         val filteredResults = r.filter { case (dataTimestamps, observationMillis, alarm, uuids, ratingOpt) =>
           (if (forwardFromStartTime) dataTimestamps.min >= startAtTime else dataTimestamps.max <= startAtTime) &&
