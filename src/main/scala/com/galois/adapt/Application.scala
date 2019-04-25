@@ -38,6 +38,7 @@ object Application extends App {
   org.slf4j.LoggerFactory.getILoggerFactory  // This is here just to make SLF4j shut up and not log lots of error messages when instantiating the Kafka producer.
   runFlow match { case "quine" => (); case _ => wrongRunFlow() }
 
+
   // Open up for SSH ammonite shelling via `ssh repl@localhost -p22222`
   import ammonite.sshd._
   import org.apache.sshd.server.auth.password.AcceptAllPasswordAuthenticator
@@ -210,17 +211,23 @@ object Application extends App {
 
 
 
-  val ppmManagerActors: Map[HostName, ActorRef] = ingestConfig.hosts.map { host: IngestHost =>
-    val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows, graph).withDispatcher("adapt.ppm.manager-dispatcher")
-    val ref = system.actorOf(props, s"ppm-actor-${host.hostName}")
-    host.hostName -> ref
-  }.toMap // + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false, graph), s"ppm-actor-$hostNameForAllHosts"))
+//  val ppmManagerActors: Map[HostName, ActorRef] = ingestConfig.hosts.map { host: IngestHost =>
+//    val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows, graph).withDispatcher("adapt.ppm.manager-dispatcher")
+//    val ref = system.actorOf(props, s"ppm-actor-${host.hostName}")
+//    host.hostName -> ref
+//  }.toMap // + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false, graph), s"ppm-actor-$hostNameForAllHosts"))
+
+  val ppmManagers: Map[HostName, PpmManager] = ingestConfig.hosts.map(host =>
+    host.hostName -> new PpmManager(host.hostName, host.simpleTa1Name, host.isWindows, graph)
+  ).toMap
+
+
 
 
   val sqidHostPrefix = quineConfig.thishost.replace(".", "-")
 
   val sqidFile = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOFile-accumulator")(
-    onTell = Some({
+    resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
         val queryable = implicitly[Queryable[ESOFileInstance]]
         val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
@@ -230,7 +237,7 @@ object Application extends App {
   val standingFetchFileActor = ActorRef.noSender
 
   val sqidSrcSnk = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOSrcSnk-accumulator")(
-    onTell = Some({
+    resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
         val queryable = implicitly[Queryable[ESOSrcSnkInstance]]
         val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
@@ -240,7 +247,7 @@ object Application extends App {
   val standingFetchSrcSnkActor = ActorRef.noSender
 
   val sqidNetwork = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESONetwork-accumulator")(
-    onTell = Some({
+    resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
         val queryable = implicitly[Queryable[ESONetworkInstance]]
         val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
@@ -250,14 +257,14 @@ object Application extends App {
   val standingFetchNetworkActor = ActorRef.noSender
 
   val sqidParentProcess = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ProcessParentage")(
-   onTell = Some({
+    resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
         val queryable = implicitly[Queryable[ChildProcess]]
         val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
         StandingFetches.onESOProcessMatch(reconstructed)
     })
   ))
-  val standingFetchProcessParentageActor = ActorRef.noSender 
+  val standingFetchProcessParentageActor = ActorRef.noSender
 
   graph.currentGraph.standingQueryActors = graph.currentGraph.standingQueryActors +
     (sqidFile.get -> standingFetchFileActor) +
@@ -271,6 +278,7 @@ object Application extends App {
 //    system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
 
   AlarmReporter  // instantiate AlarmReporter (LazyInit) and corresponding actor
+  StandingFetches  // Initialize object.
 
   val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
 //  val logFile = config.getString("adapt.logfile")
@@ -291,7 +299,7 @@ object Application extends App {
 
   def startWebServer(dbActor: ActorRef): Http.ServerBinding = {
     println(s"Starting the web server at: http://${runtimeConfig.webinterface}:${runtimeConfig.port}")
-    val route = Routes.mainRoute(dbActor, statusActor, ppmManagerActors)
+    val route = Routes.mainRoute(dbActor, statusActor, ppmManagers)
     val httpServer = Http().bindAndHandle(route, runtimeConfig.webinterface, runtimeConfig.port)
     Await.result(httpServer, 10 seconds)
   }
@@ -402,7 +410,9 @@ object Application extends App {
 
       val saveF = if (ppmConfig.shouldsaveppmtrees) {
         println(s"Saving PPM trees to disk...")
-        ppmManagerActors.values.toList.foldLeft(Future.successful(Ack))((a, b) => a.flatMap(_ => (b ? SaveTrees(true)).mapTo[Ack.type]))
+        ppmManagers.values.toList.foldLeft(Future.successful( () ))((a, b) =>
+          a.flatMap(_ => b.saveTrees()) // (b ? SaveTrees(true)).mapTo[Ack.type]))
+        )
       } else {
         Future.successful( Ack )
       }

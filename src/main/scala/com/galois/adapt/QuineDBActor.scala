@@ -267,8 +267,8 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
     }
 
-  val shouldRecordDBWriteTimes = false
-  if (shouldRecordDBWriteTimes && idx >= 0) context.system.scheduler.schedule(30 seconds, 300 seconds){
+  val shouldRecordDBWriteTimes = true
+  if (shouldRecordDBWriteTimes && idx >= 0) context.system.scheduler.schedule(30 seconds, 60 seconds){
     val shouldWriteToFile = false
     Future{
       if (shouldWriteToFile) {

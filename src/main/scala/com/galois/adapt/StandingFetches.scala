@@ -1,6 +1,7 @@
 package com.galois.adapt
 
 import akka.util.Timeout
+import com.galois.adapt.AdaptConfig.HostName
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.PpmSummarizer.AbstractionOne
 import com.galois.adapt.cdm20._
@@ -11,12 +12,10 @@ import scala.util.Try
 import com.rrwright.quine.runtime.FutureRecoverWith
 import com.rrwright.quine.language.BoopickleScheme._
 import com.rrwright.quine.language._
+import Application.{graph, ppmManagers}
 
 
 case object StandingFetches extends LazyLogging {
-
-  import Application.{graph, ppmManagerActors}
-
   implicit val timeout = Timeout(10.4 seconds)
   implicit val ec: ExecutionContext = graph.system.dispatchers.lookup("quine.actor.node-dispatcher")
 
@@ -50,7 +49,7 @@ case object StandingFetches extends LazyLogging {
 
 
   def onESOFileMatch(l: List[ESOFileInstance]): Unit = l.foreach{ eso =>
-    ppmManagerActors.get(eso.hostName).fold(logger.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! eso)
+    ppmManagers.get(eso.hostName).fold(logger.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_.esoFileInstance(eso))
     makeComplexObsEdge(eso.subject.qid, eso.predicateObject.qid, eso.eventType)
 
     // CommunicationPathThroughObject:  (write, then read)
@@ -72,7 +71,7 @@ case object StandingFetches extends LazyLogging {
             val pn2 = eso.subject.path
             val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_write", ESOInstance(e, (s2, Some(pn2)), (o, Some(pno))))
 //            println(s"CommunicationPathThroughObject: $seoesInstance")
-            ppmManagerActors.get(eso.hostName).fold(logger.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
+            ppmManagers.get(eso.hostName).fold(logger.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_.seoesInstance(seoesInstance))
           }
         }
       }.recoveryMessage("SEOES extraction for CommunicationPathThroughObject failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
@@ -98,7 +97,7 @@ case object StandingFetches extends LazyLogging {
               val pn2 = eso.subject.path
               val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_execute", ESOInstance(e, (s2, Some(pn2)), (o, Some(pno))))
 //              println(s"FileExecuteDelete: $seoesInstance")
-              ppmManagerActors.get(eso.hostName).fold(logger.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
+              ppmManagers.get(eso.hostName).fold(logger.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_.seoesInstance(seoesInstance))
             }
         }
       }.recoveryMessage("SEOES extraction for FileExecuteDelete failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
@@ -124,7 +123,7 @@ case object StandingFetches extends LazyLogging {
               val pn2 = eso.subject.path
               val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_write", ESOInstance(e, (s2, Some(pn2)), (o, Some(pno))))
 //              println(s"FilesWrittenThenExecuted: $seoesInstance")
-              ppmManagerActors.get(eso.hostName).fold(logger.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
+              ppmManagers.get(eso.hostName).fold(logger.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_.seoesInstance(seoesInstance))
             }
         }
       }.recoveryMessage("SEOES extraction for FilesWrittenThenExecuted failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
@@ -149,7 +148,7 @@ case object StandingFetches extends LazyLogging {
                 val pnO = Some(eso.predicateObject.path)
                 val oeseoInstance = OESEOInstance((n, None), "did_read", ESOInstance(e, (s, Some(pnS)), (o, pnO)))
 //                println(s"ProcessWritesFileSoonAfterNetflowRead: $oeseoInstance")
-                ppmManagerActors.get(eso.hostName).fold(logger.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! oeseoInstance)
+                ppmManagers.get(eso.hostName).fold(logger.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_.oeseoInstance(oeseoInstance))
               }
             }
         }
@@ -159,7 +158,7 @@ case object StandingFetches extends LazyLogging {
 
 
   def onESONetworkMatch(l: List[ESONetworkInstance]): Unit = l.foreach{ eso =>
-    ppmManagerActors.get(eso.hostName).fold(logger.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! eso)
+    ppmManagers.get(eso.hostName).fold(logger.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_.esoNetworkInstance(eso))
     makeComplexObsEdge(eso.subject.qid, eso.predicateObject.qid, eso.eventType)
 
     // CommunicationPathThroughObject:  (write, then read)
@@ -181,7 +180,7 @@ case object StandingFetches extends LazyLogging {
             val pn2 = eso.subject.path
             val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_write", ESOInstance(e, (s2, Some(pn2)), (o, pno)))
 //            println(s"CommunicationPathThroughObject: $seoesInstance")
-            ppmManagerActors.get(eso.hostName).fold(logger.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
+            ppmManagers.get(eso.hostName).fold(logger.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_.seoesInstance(seoesInstance))
           }
         }
       }.recoveryMessage("SEOES extraction for CommunicationPathThroughObject failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
@@ -200,7 +199,7 @@ case object StandingFetches extends LazyLogging {
 
 
   def onESOSrcSinkMatch(l: List[ESOSrcSnkInstance]): Unit = l.foreach{ eso =>
-    ppmManagerActors.get(eso.hostName).fold(logger.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! eso)
+    ppmManagers.get(eso.hostName).fold(logger.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_.esoSrcSinkInstance(eso))
     makeComplexObsEdge(eso.subject.qid, eso.predicateObject.qid, eso.eventType)
 
     // CommunicationPathThroughObject:  (write, then read)
@@ -222,7 +221,7 @@ case object StandingFetches extends LazyLogging {
             val pn2 = eso.subject.path
             val seoesInstance = SEOESInstance((s1, Some(pn1)), "did_write", ESOInstance(e, (s2, Some(pn2)), (o, pno)))
 //            println(s"CommunicationPathThroughObject: $seoesInstance")
-            ppmManagerActors.get(eso.hostName).fold(logger.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_ ! seoesInstance)
+            ppmManagers.get(eso.hostName).fold(logger.error(s"No PPM Actor with hostname: ${eso.hostName}"))(_.seoesInstance(seoesInstance))
           }
         }
       }.recoveryMessage("SEOES extraction for CommunicationPathThroughObject failed after matching: {} and querying ObjectWriter on {}", eso, objectCustomId)
@@ -238,7 +237,14 @@ case object StandingFetches extends LazyLogging {
       val childSubject = PpmSubject(pp.cid, pp.subjectTypes, pp.qid.map(q => graph.idProvider.customIdFromQid(q)).flatMap(_.toOption).get, Some(pp.startTimestampNanos))
       val ssInstance = SSInstance((parentSubject, Some(pp.parentSubject.path)), (childSubject, Some(pp.path)))
       val hostName = pp.hostName
-      ppmManagerActors.get(hostName).fold(logger.error(s"No PPM Actor with hostname: {}", hostName))(_ ! ssInstance)
+      ppmManagers.get(hostName).fold(logger.error(s"No PPM Actor with hostname: {}", hostName))(_.ssInstance(ssInstance))
     }
   }
+
+
+
+
+
+
+
 }

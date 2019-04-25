@@ -165,19 +165,21 @@ object PpmSummarizer {
 
 
   // In the case of trying to summarize from the "BetweenHosts" PPM tree set: query all hosts and merge the results.
-  val allHostPossibilities = Application.ppmManagerActors.keySet - Application.hostNameForAllHosts   // AdaptConfig.ingestConfig.hosts.map(_.hostName)
+  val allHostPossibilities = Application.ppmManagers.keySet - Application.hostNameForAllHosts   // AdaptConfig.ingestConfig.hosts.map(_.hostName)
 
   def summarize(processName: String, hostName: Option[HostName], pid: Option[Int]): Future[TreeRepr] = {
     implicit val timeout = Timeout(30 seconds)
     (hostName, hostName contains Application.hostNameForAllHosts) match {
       case (Some(hn), false) =>
-        (Application.ppmManagerActors(hn) ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList))
-          .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map{r => summarize(r.repr) }
+        Application.ppmManagers(hn).ppmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList)
+//          .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
+          .map{r => summarize(r.repr) }
       case x => // None or Some(BetweenHosts)
         allHostPossibilities.foldLeft(Future.successful(List.empty[(HostName, TreeRepr)])) { case (accF, aHost) =>
           accF.flatMap(acc =>
-            (Application.ppmManagerActors(aHost) ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList))
-              .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map { r => (aHost -> summarize(r.repr)) :: acc }  // Summarize before merging.
+            Application.ppmManagers(aHost).ppmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList)
+//              .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
+              .map { r => (aHost -> summarize(r.repr)) :: acc }  // Summarize before merging.
           )
         }.map(trees => TreeRepr.fromNamespacedChildren("SummarizedFromHosts", trees.toMap))
     }
@@ -187,13 +189,15 @@ object PpmSummarizer {
     implicit val timeout = Timeout(30 seconds)
     (hostName, hostName contains Application.hostNameForAllHosts) match {
       case (Some(hn), false) =>
-        (Application.ppmManagerActors(hn) ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList))
-          .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map { r => r.repr }
+        Application.ppmManagers(hn).ppmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList)
+//          .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
+          .map { r => r.repr }
       case _ => // None or Some(BetweenHosts)
         allHostPossibilities.foldLeft(Future.successful(List.empty[(HostName, TreeRepr)])) { case (accF, aHost) =>
           accF.flatMap(acc =>
-            (Application.ppmManagerActors(aHost) ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList))
-              .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map { r => (aHost -> r.repr) :: acc }
+            Application.ppmManagers(aHost).ppmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList)
+//              .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
+              .map { r => (aHost -> r.repr) :: acc }
           )
         }.map(trees => TreeRepr.fromNamespacedChildren("FullTreeFromHosts", trees.toMap))
     }
@@ -202,9 +206,10 @@ object PpmSummarizer {
   def summarizableProcesses: Future[Map[HostName, TreeRepr]] = {
     implicit val timeout = Timeout(30 seconds)
     Future.sequence(
-      Application.ppmManagerActors.map { case (hostName, ref) if hostName != Application.hostNameForAllHosts =>
-        (ref ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity"))
-        .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map {result => hostName -> result.repr.truncate(1).withoutQNodes}
+      Application.ppmManagers.map { case (hostName, mgr) if hostName != Application.hostNameForAllHosts =>
+        mgr.ppmNodeActorBeginGetTreeRepr("SummarizedProcessActivity")    // TODO: Find another way!!!!!!!!
+//        .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
+          .map {result => hostName -> result.repr.truncate(1).withoutQNodes}
       }
     ).map(_.toMap)
   }
@@ -214,17 +219,19 @@ object PpmSummarizer {
     if (Application.hostNameForAllHosts == hostName)
       allHostPossibilities.foldLeft(Future.successful(List.empty[HostName])) { case (accF, aHost) =>
         accF.flatMap(acc =>
-          (Application.ppmManagerActors(aHost) ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList))
-            .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map {
-            _.repr.withoutQNodes.renormalizeProbs.mostNovelKeys(maxCount).map(ex => s"$aHost: $ex") ++ acc
-          }
+          Application.ppmManagers(aHost).ppmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList)
+//            .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
+            .map {
+              _.repr.withoutQNodes.renormalizeProbs.mostNovelKeys(maxCount).map(ex => s"$aHost: $ex") ++ acc
+            }
         )
       }
     else
-      (Application.ppmManagerActors(hostName) ? PpmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList))
-      .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity).map {
-        _.repr.withoutQNodes.renormalizeProbs.mostNovelKeys(maxCount).map(ex => s"$hostName: $ex")
-      }
+      (Application.ppmManagers(hostName).ppmNodeActorBeginGetTreeRepr("SummarizedProcessActivity", List(processName) ++ pid.map(_.toString).toList))
+//      .mapTo[Future[PpmNodeActorGetTreeReprResult]].flatMap(identity)
+        .map {
+          _.repr.withoutQNodes.renormalizeProbs.mostNovelKeys(maxCount).map(ex => s"$hostName: $ex")
+        }
   }
 
 
