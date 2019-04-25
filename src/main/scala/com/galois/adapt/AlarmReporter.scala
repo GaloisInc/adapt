@@ -28,7 +28,16 @@ import Application.system
 import ApiJsonProtocol._
 import com.galois.adapt.AdaptConfig.HostName
 
-case class ProcessDetails(processName: String, pid: Option[Int], hostName: HostName, dataTimestamps: Set[Long])
+case class ProcessDetails(processName: String, pid: Option[Int], hostName: HostName, dataTimestamps: Set[Long]) {
+  def toJson: JsValue = {
+    JsObject(
+      "processName" -> JsString(processName),
+      "pid" -> JsString(pid.toString),
+      "hostName" -> JsString(hostName),
+      "dataTimestamps" -> JsArray(dataTimestamps.toList.map(x => JsNumber(x)).toVector)
+    )
+  }
+}
 
 case class AlarmEventMetaData(runID: String, alarmCategory: String)
 
