@@ -22,6 +22,14 @@ KILLALL="NO"
 SKIPASSEMBLY="NO"
 OUTSTUFF=/dev/null
 
+BBN_JVM_OPTS=()
+BBN_JVM_OPTS[1]=("-XX:+UseConcMarkSweepGC" "-Xmx150G")  # Total mem: 161195
+BBN_JVM_OPTS[2]=("-XX:+UseConcMarkSweepGC" "-Xmx150G")  # Total mem: 161195
+BBN_JVM_OPTS[3]=("-XX:+UseConcMarkSweepGC" "-Xmx150G")  # Total mem: 161195
+BBN_JVM_OPTS[4]=("-XX:+UseConcMarkSweepGC" "-Xmx150G")  # Total mem: 161195
+BBN_JVM_OPTS[5]=("-XX:+UseConcMarkSweepGC" "-Xmx25G")  # Total mem: 28142
+BBN_JVM_OPTS[6]=("-XX:+UseConcMarkSweepGC" "-Xmx25G")  # Total mem: 28142
+
 # Options
 while getopts "hi:ksd:v" OPT; do
   case $OPT in
@@ -80,7 +88,7 @@ for NODENUM in ${MACHINES_INVOLVED[@]}; do
     ssh $BBN_AUTH gw.tc.bbn.com "scp $FOLDER.conf $NODENUM:~/$FOLDER.conf" &> $OUTSTUFF
 
     # Copy and run the JAR on the node
-    NODECMD="./vvm_java.sh -Xmx30G -Dconfig.file=/home/darpa/$FOLDER.conf -jar ./quine-adapt.jar"
+    NODECMD="./vvm_java.sh ${BBN_JVM_OPTS[$NODENUM][*]} -Dconfig.file=/home/darpa/$FOLDER.conf -jar ./quine-adapt.jar"
     ssh $BBN_AUTH gw.tc.bbn.com "scp quine-adapt.jar $NODENUM:~"           &> $OUTSTUFF
     ssh $BBN_AUTH gw.tc.bbn.com "ssh $NODENUM '$NODECMD'"                  &> $OUTSTUFF
 
