@@ -99,7 +99,7 @@ object AdaptConfig extends Utils {
   case class QuineHost(
     ip: Ip,
     shardcount: Int,
-    namespaces: List[String],
+    namespaces: List[String]
   )
 
   case class AdmConfig(

@@ -523,7 +523,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         NamespacedUuidDetails(d._2._1.uuid, d._2._2.map(_.path), Some(d._2._1.cid))),
       d => d._1._1.startTimestampNanos.toSet ++ d._2._1.startTimestampNanos.toSet,
       shouldApplyThreshold = false
-    )(graphService),
+    )(graphService)
   ) //.par
 
   val seoesTrees = List(

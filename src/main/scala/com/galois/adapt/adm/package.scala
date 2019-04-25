@@ -17,6 +17,8 @@ import com.rrwright.quine.language._
 import shapeless._
 import shapeless.record.Record
 
+import com.github.blemale.scaffeine.{Cache, Scaffeine}
+
 // TODO: convert `toMap` to use Shapeless. It is _begging_ to be done with shapeless
 package object adm {
 
@@ -130,6 +132,12 @@ package object adm {
     def getHostName: Option[HostName]
 
     def toMap: Map[String, Any]        // A property map (keys are constant for a given type
+
+    override def hashCode: Int = uuid.hashCode
+    override def equals(that: Any): Boolean = that match {
+      case a: ADM => uuid == a.uuid
+      case _ => false
+    }
   }
 
 
@@ -253,7 +261,21 @@ package object adm {
   }
 
   case object AdmPathNode extends NodeConstants(Record(type_of = "AdmPathNode")) {
+   
+    // Keep a cache of path nodes already seen. If we see the same input again, no point in
+    // recomputing the output!
+    val admPathNodeCacheSize = 10000
+    val cache: Cache[(String, String, Boolean), AdmPathNode] = Scaffeine()
+      .maximumSize(admPathNodeCacheSize)
+      .build[(String, String, Boolean), AdmPathNode]()
+    
     def normalized(path: String, provider: String, isWindows: Boolean): Option[AdmPathNode] = {
+
+      // Start by checking the cache...
+      val cacheKey = (path, provider, isWindows)
+      for (admPathNode <- cache.getIfPresent(cacheKey)) {
+        return Some(admPathNode)
+      }
 
       var pathFixed: String = path.trim
 
@@ -369,7 +391,9 @@ package object adm {
       if (segsRev.isEmpty && !absolute) return None
 
       val norm = (if (absolute) { sep } else { "" }) + ((1 to backhops).map(_ => "..") ++ segsRev.reverse).mkString(sep)
-      Some(AdmPathNode(norm, provider))
+      val admPathNode = AdmPathNode(norm, provider)
+      cache.put(cacheKey, admPathNode)
+      Some(admPathNode)
     }
   }
 
@@ -708,11 +732,23 @@ package object adm {
 
 object DeterministicUUID {
 
-  def apply(str: String): UUID = {
-    UUID.nameUUIDFromBytes(str.getBytes)
-  }
+  // Deterministically build a UUID from a String 
+  final def apply(str: String): UUID = cacheApply1.get(str, applyUncached(_))
+  
+  private val cacheApply1: Cache[String, UUID] = Scaffeine()
+    .maximumSize(1000)
+    .build[String, UUID]()
+    
+  private def applyUncached(str: String): UUID = UUID.nameUUIDFromBytes(str.getBytes)
 
-  def apply(fields: Seq[UUID]): UUID = {
+  // Deterministically build a UUID from a sequence of UUIDs
+  final def apply(fields: Seq[UUID]): UUID = cacheApply2.get(fields, applyUncached(_))
+  
+  private val cacheApply2: Cache[Seq[UUID], UUID] = Scaffeine()
+    .maximumSize(1000)
+    .build[Seq[UUID], UUID]()
+    
+  private def applyUncached(fields: Seq[UUID]): UUID = {
     val byteBuffer: ByteBuffer = ByteBuffer.allocate(8 * 2 * fields.length)
     for (value <- fields) {
       byteBuffer.putLong(value.getLeastSignificantBits)
