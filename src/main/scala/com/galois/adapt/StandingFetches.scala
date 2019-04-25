@@ -25,7 +25,6 @@ case object StandingFetches extends LazyLogging {
   val deleteTypes = Set[EventType](EVENT_UNLINK, EVENT_TRUNCATE)
 
   def makeComplexObsEdge(subjectQid: Option[QuineId], objectQid: Option[QuineId], eventType: EventType): Future[Unit] = {
-    AbstractionOne.go(eventType)
     val eventlabelOpt = eventType match {
       case e if readTypes contains e   => Some("did_read")
       case e if writeTypes contains e  => Some("did_write")
