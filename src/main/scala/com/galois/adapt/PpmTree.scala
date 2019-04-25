@@ -11,25 +11,29 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.util.UUID
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListMap}
+
 import scala.collection.concurrent.{Map => ConcurrentMap}
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong, AtomicReference}
+
 import scala.collection.JavaConverters._
 import akka.pattern.ask
 import akka.util.Timeout
 import com.galois.adapt
 import com.typesafe.scalalogging.LazyLogging
+
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.collection.{GenSeq, SortedMap, mutable}
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Random, Success, Try}
 import AdaptConfig._
-import Application.{ppmManagers, hostNameForAllHosts}
+import Application.{hostNameForAllHosts, ppmManagers}
 import spray.json._
 import ApiJsonProtocol._
 import com.rrwright.quine.language.QuineId
 import com.rrwright.quine.runtime.GraphService
 import com.rrwright.quine.runtime.Novelty
+
 import scala.annotation.tailrec
 
 
@@ -232,16 +236,72 @@ case class PpmDefinition[DataShape](
 //    Application.ppmManagers(hostname).ppm(treeName).get.recordNovelty()
 //  }
 
+  type ObservationId = Long
+
+  val lowerBoundQueueLength = new AtomicLong(0L)
+  val someoneDequing = new AtomicBoolean(false)
+  val queuedObservations = new java.util.concurrent.ConcurrentLinkedDeque[(List[ExtractedValue], Set[NamespacedUuidDetails], Set[Long], Int, ObservationId)]()
+
+  /*
+   *  If you observe something with a _different_ extracted value, you are responsible for emitting existing values
+   */
+
   def observe(observation: DataShape): Unit = if (incomingFilter(observation)) {
-    graphService.observe(
-      treeRootQid,
-      treeName,
-      hostName,
-      PpmTree.prepareObservation[DataShape](observation, discriminators),
-      uuidCollector(observation),
-      timestampExtractor(observation),
-      (hostName: String, nov: Novelty[Set[NamespacedUuidDetails]]) => ppmManagers(hostName).novelty(nov)
-    )
+
+    val extractedValues: List[ExtractedValue] = PpmTree.prepareObservation[DataShape](observation, discriminators)
+    val uuidsCollected: Set[NamespacedUuidDetails] = uuidCollector(observation)
+    val timestampsCollected: Set[Long] = timestampExtractor(observation)
+    val thisId: Long = Random.nextLong()
+
+    queuedObservations.add((extractedValues, uuidsCollected, timestampsCollected, 1, thisId))
+    lowerBoundQueueLength.incrementAndGet()
+
+    if (someoneDequing.compareAndSet(false, true)) {
+      // Only entered by one thread at once!
+
+      var stop = false
+      while (!stop && lowerBoundQueueLength.get() > 1) {
+
+        lowerBoundQueueLength.decrementAndGet()
+        val (extracted, uuids, timestamps, count, anId) = queuedObservations.removeLast()
+        stop = stop || anId == thisId
+
+        var uuidsNew: Set[NamespacedUuidDetails] = uuids
+        var timestampsNew: Set[Long] = timestamps
+        var countNew: Int = count
+
+        var remainingCycles = 100
+        while (extracted == queuedObservations.peekLast()._1 && remainingCycles > 0) {
+          remainingCycles -= 1
+
+          lowerBoundQueueLength.decrementAndGet()
+          val (_, uuids, timestamps, count, anId) = queuedObservations.removeLast()
+          stop = stop || anId == thisId
+
+          uuidsNew = uuids ++ uuidsNew
+          timestampsNew = timestamps ++ timestampsNew
+          countNew = count + countNew
+        }
+
+        if (lowerBoundQueueLength.get() > 0) {
+          graphService.observe(
+            treeRootQid,
+            treeName,
+            hostName,
+            extractedValues,
+            uuidsNew,
+            timestampsNew,
+            (hostName: String, nov: Novelty[Set[NamespacedUuidDetails]]) => ppmManagers(hostName).novelty(nov),
+            countNew
+          )
+        } else {
+          queuedObservations.addLast((extracted, uuidsNew, timestampsNew, countNew, 0L))
+          stop = true
+        }
+      }
+
+      someoneDequing.set(false)
+    }
   }
 
   //process name and pid/uuid
