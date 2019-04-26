@@ -82,7 +82,7 @@ case class ConciseAlarmEvent(
       "localProbThreshold" -> JsNumber(this.localProbThreshold),
       "ppmTreeNodeAlarms" -> JsArray(this.ppmTreeNodeAlarms.map(_.toJson).toVector),
       "alarmID" -> JsNumber(this.alarmID),
-      "processDetails" -> processDetails.toJson
+      "processDetails" -> JsArray(processDetails.map(_.toJson).toVector)
     )
   }
 }
@@ -275,7 +275,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
     alarmDetails.processDetailsSet.foreach { pd =>
       processRefSet += (pd -> (processRefSet.getOrElse(pd, Set.empty[Long]) + alarmID))
       processInstanceCounter(pd) += 1
-      totalProcessInstanceCount += 1
+      distinctProcessInstanceCount =  if (processInstanceCounter.keySet.contains(pd)) distinctProcessInstanceCount else distinctProcessInstanceCount+1
     }
 
     // is this a cleaner solution?
