@@ -242,6 +242,8 @@ case class PpmDefinition[DataShape](
   val someoneDequing = new AtomicBoolean(false)
   val queuedObservations = new java.util.concurrent.ConcurrentLinkedDeque[(List[ExtractedValue], Set[NamespacedUuidDetails], Set[Long], Int, ObservationId)]()
 
+  graphService.system.scheduler.schedule(10 seconds, 60 seconds)(println(s"Alec's lowerBoundQueueLength for: $hostName $treeName size: ${lowerBoundQueueLength.get()}"))
+
   /*
    *  If you observe something with a _different_ extracted value, you are responsible for emitting existing values
    */
@@ -255,6 +257,7 @@ case class PpmDefinition[DataShape](
 
     queuedObservations.add((extractedValues, uuidsCollected, timestampsCollected, 1, thisId))
     lowerBoundQueueLength.incrementAndGet()
+
 
     if (someoneDequing.compareAndSet(false, true)) {
       // Only entered by one thread at once!
@@ -919,7 +922,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
     val o: Object = (PpmFileObject(eso.predicateObject.fileObjectType, objUuid), Some(eso.predicateObject.path))
     esoTrees.foreach(ppm => ppm.observe((e, s, o)))
 //        esoChildren.foreach{ case(_,ref) => ref ! MakeObservation[ESO]( (e,s,o) )}
-  } match { case Failure(e) => logger.warn(s"Preparing ESOFileInstance observation failed: ${e.getMessage}"); case _ => ()}
+  } match { case Failure(e) => logger.warn(s"Preparing ESOFileInstance: $eso observation failed: ${e.getMessage}"); case _ => ()}
 
   def esoNetworkInstance(eso: ESONetworkInstance): Unit = Try {
 //    println(eso)
@@ -931,7 +934,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
     val o: Object = (PpmNetFlowObject(eso.predicateObject.remotePort, eso.predicateObject.localPort, eso.predicateObject.remoteAddress, eso.predicateObject.localAddress, objUuid), None)
     esoTrees.foreach(ppm => ppm.observe((e, s, o)))
 //        esoChildren.foreach{ case(_,ref) => ref ! MakeObservation[ESO]( (e,s,o) )}
-  } match { case Failure(e) => logger.warn(s"Preparing ESONetworkInstance observation failed: ${e.getMessage}"); case _ => ()}
+  } match { case Failure(e) => logger.warn(s"Preparing ESONetworkInstance: $eso observation failed: ${e.getMessage}"); case _ => ()}
 
   def esoSrcSinkInstance(eso: ESOSrcSnkInstance): Unit = Try {
 //    println(eso)
@@ -943,7 +946,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
     val o: Object = (PpmSrcSinkObject(eso.predicateObject.srcSinkType, objUuid), None)
     esoTrees.foreach(ppm => ppm.observe((e, s, o)))
 //        esoChildren.foreach{ case(_,ref) => ref ! MakeObservation[ESO]( (e,s,o) )}
-  } match { case Failure(e) => logger.warn(s"Preparing ESOSrcSnkInstance observation failed: ${e.getMessage}"); case _ => ()}
+  } match { case Failure(e) => logger.warn(s"Preparing ESOSrcSnkInstance: $eso observation failed: ${e.getMessage}"); case _ => ()}
 
   def seoesInstance(seoes: SEOESInstance): Unit = {
 //    println(seoes)

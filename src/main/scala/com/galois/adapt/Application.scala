@@ -135,7 +135,7 @@ object Application extends App {
 //    MapDBMultimap()(as),
 //    EmptyPersistor()(as),
     idProvider = AdmUuidProvider,
-    indexer = Indexer.currentIndex(EmptyIndex),
+    indexer = Indexer.currentIndex(EmptyIndex), //InMemoryIndex(Some(Set('cid, 'path)))),
     inMemorySoftNodeLimit = Some(quineConfig.inmemsoftlimit),
     inMemoryHardNodeLimit = Some(quineConfig.inmemhardlimit),
     uiPort = None

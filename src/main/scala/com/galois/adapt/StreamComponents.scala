@@ -32,14 +32,15 @@ object FlowComponents {
         lastTimestampNanos = System.nanoTime()
       }
       counter = counter + 1
-      val className = item match {
+      def makeName(thing: Any): String = thing match {
         case (_, e: Event) => e.eventType.toString
         case (_, i: AnyRef) => i.getClass.getSimpleName
         case e: Event => e.eventType.toString
-        case Left(l) => s"Left[${l.getClass.getSimpleName}]"
+        case Left(l) => makeName(l)
         case Right(r) => s"Right[${r.getClass.getSimpleName}]"
         case i => i.getClass.getSimpleName
       }
+      val className = makeName(item)
       recentPopulationCounter += (className -> (recentPopulationCounter.getOrElse(className, 0L) + 1))
       totalPopulationCounter  += (className -> (totalPopulationCounter.getOrElse(className, 0L)  + 1))
 
