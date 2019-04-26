@@ -17,7 +17,7 @@ usage ()
 
 BBN_AUTH=""
 FOLDER=""
-DELETEME="/data/persistence-lmdb.db/*"
+DELETEME="/data/persistence-multimap_by_event.db"
 KILLALL="NO"
 SKIPASSEMBLY="NO"
 OUTSTUFF=/dev/null
