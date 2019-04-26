@@ -4,7 +4,7 @@ import java.io.{File, PrintWriter}
 import java.nio.ByteBuffer
 import java.text.NumberFormat
 import java.util.UUID
-import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicLong
 import shapeless.cachedImplicit
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
@@ -15,9 +15,11 @@ import spray.json.{JsArray, JsNumber, JsObject, JsString, JsValue, RootJsonForma
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
+import scala.collection.JavaConverters._
 import com.rrwright.quine.runtime.GraphService
 import com.rrwright.quine.gremlin.{GremlinQueryRunner, TypeAnnotationFieldReader}
 import com.rrwright.quine.runtime.QuineIdProvider
+import com.rrwright.quine.runtime.FutureRecoverWith
 import com.rrwright.quine.language.{DomainNodeSetSingleton, NoConstantsDomainNode, PickleReader, PickleScheme, Queryable, QuineId}
 import com.rrwright.quine.language.EdgeDirections._
 import com.rrwright.quine.language.BoopickleScheme._
@@ -34,7 +36,7 @@ object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
       case (AdaptConfig.QuineHost(_, _, namespaces), hostIdx) => namespaces.map(_ -> hostIdx)
     }.toMap
 
-  println(s"AdmUuidProvider namespaceIdx:\n${namespaceIdx.mkString("\n")}")
+  println(s"AdmUuidProvider namespaceIdx:\n${namespaceIdx.mkString("    ","\n", "")}")
 
 
   def newCustomId(): AdmUUID = AdmUUID(UUID.randomUUID(), "synthesized")
@@ -110,6 +112,9 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   val nf = NumberFormat.getInstance()
 
   implicit val service = graphService
+
+//  implicit val ec = service.system.dispatchers.lookup("quine.actor.node-dispatcher")
+
 //  implicit val timeout = Timeout(21 seconds)
   lazy val graph: org.apache.tinkerpop.gremlin.structure.Graph = ???
 
@@ -157,8 +162,13 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 
   implicit class FutureAckOnComplete(f: Future[_]) extends AnyRef {
     def ackOnComplete(ackTo: ActorRef, successF: => Unit = ()): Unit = f.onComplete{
-      case Success(_) => ackTo ! Ack
-      case Failure(e) => /*e.printStackTrace();*/ ackTo ! Ack
+      case Success(_) =>
+        ackTo ! Ack
+        stopWork()
+      case Failure(e) =>
+//        e.printStackTrace()
+        ackTo ! Ack
+        stopWork()
     }
   }
 
@@ -212,11 +222,13 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
           graphService.standingFetch[ESONetworkInstance](anAdm.uuid, Application.sqidNetwork)(wrongFunc)
           x
         }
+
       case anAdm: AdmSubject =>
         anAdm.create(Some(anAdm.uuid)).map { x =>
-          graphService.standingFetch[ChildProcess](anAdm.uuid, Application.sqidParentProcess)(wrongFunc)
+            graphService.standingFetch[ChildProcess](anAdm.uuid, Application.sqidParentProcess)(wrongFunc)
           x
         }
+
       case anAdm: AdmPrincipal          => anAdm.create(Some(anAdm.uuid))
       case anAdm: AdmFileObject         => anAdm.create(Some(anAdm.uuid))
       case anAdm: AdmNetFlowObject      => anAdm.create(Some(anAdm.uuid))
@@ -229,67 +241,95 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       case anAdm: AdmSynthesized        => anAdm.create(Some(anAdm.uuid))
       case _                            => throw new Exception("Unexpected ADM")
     }).flatMap {
-      case Success(t) => Future.successful(System.nanoTime() - startNanos)
+      case Success(s) => Future.successful(System.nanoTime() - startNanos)
       case Failure(f) => Future.failed(f)
     }
   }
 
   def writeAdmEdge(e: EdgeAdm2Adm, timeout: Timeout): Future[Long] = {
-    implicit val t = timeout
+    val src = AdmUuidProvider.customIdToQid(e.src)
+    val dest = AdmUuidProvider.customIdToQid(e.tgt)
     val startNanos = System.nanoTime()
-    graphService.dumbOps.addEdge(
-      AdmUuidProvider.customIdToQid(e.src),
-      AdmUuidProvider.customIdToQid(e.tgt),
-      e.label
-    ).map(_ => System.nanoTime() - startNanos)
+    graphService.dumbOps.addEdge(src, dest, e.label)(timeout)
+      .map(_ => System.nanoTime() - startNanos)
   }
 
   def FutureTx[T](body: => T)(implicit ec: ExecutionContext): Future[T] = Future(body)
+
 
   val nodeTimes =  // Not exactly correct because it is a set instead of a list, but close enough:
     new java.util.LinkedHashMap[Long, None.type](10000, 1F, true) {
       override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
     }
-//    new ConcurrentLinkedQueue[Long]()
 
   val edgeTimes =  // Not exactly correct because it is a set instead of a list, but close enough:
     new java.util.LinkedHashMap[Long, None.type](10000, 1F, true) {
       override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
     }
-//    new ConcurrentLinkedQueue[Long]()
 
   val shouldRecordDBWriteTimes = true
-  if (shouldRecordDBWriteTimes) context.system.scheduler.schedule(10 seconds, 30 seconds){
-    import scala.collection.JavaConverters._
+  if (shouldRecordDBWriteTimes && idx >= 0) context.system.scheduler.schedule(30 seconds, 60 seconds){
+    val shouldWriteToFile = false
     Future{
-      val nodeWriter = new PrintWriter(new File(s"stats/$idx-nodes.csv"))
-      nodeWriter.write(nodeTimes.asScala.mkString("", ",", "\n"))
-      nodeWriter.close()
+      if (shouldWriteToFile) {
+        val nodeWriter = new PrintWriter(new File(s"stats/$idx-nodes.csv"))
+        nodeWriter.write(nodeTimes.asScala.mkString("", ",", "\n"))
+        nodeWriter.close()
 
-      val edgeWriter = new PrintWriter(new File(s"stats/$idx-edges.csv"))
-      edgeWriter.write(edgeTimes.asScala.mkString("", ",", "\n"))
-      edgeWriter.close()
-
-      val (ntotal, ncount, nmax) = nodeTimes.keySet().asScala.foldLeft((0L, 0L, 0L)){
-        case ((total, count, max), next) => (total + next, count + 1, if (next > max) next else max)
-      }
-      val (etotal, ecount, emax) = edgeTimes.keySet().asScala.foldLeft((0L, 0L, 0L)){
-        case ((total, count, max), next) => (total + next, count + 1, if (next > max) next else max)
+        val edgeWriter = new PrintWriter(new File(s"stats/$idx-edges.csv"))
+        edgeWriter.write(edgeTimes.asScala.mkString("", ",", "\n"))
+        edgeWriter.close()
       }
 
-      println(s"QuineDB: $idx - Average write time for ${nf.format(ncount)} nodes: ${nf.format((ntotal.toDouble / ncount).toInt)} nanoseconds.  Max: ${nf.format(nmax.toInt)}")
-      println(s"QuineDB: $idx - Average write time for ${nf.format(ecount)} edges: ${nf.format((etotal.toDouble / ecount).toInt)} nanoseconds.  Max: ${nf.format(emax.toInt)}")
+      val (ntotal, ncount, nmax, nmin) = nodeTimes.keySet().asScala.foldLeft((0L, 0L, 0L, Long.MaxValue)){
+        case ((total, count, max, min), next) => (total + next, count + 1, if (next > max) next else max, if (next < min) next else min)
+      }
+      val (etotal, ecount, emax, emin) = edgeTimes.keySet().asScala.foldLeft((0L, 0L, 0L, Long.MaxValue)){
+        case ((total, count, max, min), next) => (total + next, count + 1, if (next > max) next else max, if (next < min) next else min)
+      }
+
+      println(
+        s"""QuineDB-$idx: Work/wait ratio: ${timeWorking.get().toDouble / timeWaiting.get()}         Work: ${nf.format(timeWorking.get())}  Wait: ${nf.format(timeWaiting.get())}
+           |           Average write time for ${nf.format(ecount)} edges: ${nf.format((etotal.toDouble / ecount).toLong)} nanoseconds.  Min: ${nf.format(emin.toLong)}  Max: ${nf.format(emax.toLong)}
+           |           Average write time for ${nf.format(ncount)} nodes: ${nf.format((ntotal.toDouble / ncount).toLong)} nanoseconds.  Min: ${nf.format(nmin.toLong)}  Max: ${nf.format(nmax.toLong)}""".stripMargin
+      )
+      timeWaiting.set(0L)
+      timeWorking.set(0L)
+      lastRecv.set(0L)
+      lastSent.set(0L)
     }
+  }
+
+//  TODO: hypothesis: there are lots of remote calls being made in the cadets data. but why?
+
+  var lastRecv: AtomicLong = new AtomicLong(0)
+  var lastSent: AtomicLong = new AtomicLong(0)
+
+  var timeWaiting: AtomicLong = new AtomicLong(0)
+  var timeWorking: AtomicLong = new AtomicLong(0)
+
+  def startWork(): Unit = if (shouldRecordDBWriteTimes) {
+    val now = System.nanoTime()
+    lastSent.compareAndSet(0L, now)
+    timeWaiting.addAndGet(now - lastSent.get())
+    lastRecv.set(now)
+  }
+
+  def stopWork(): Unit = if (shouldRecordDBWriteTimes) {
+    val now = System.nanoTime()
+    lastRecv.compareAndSet(0L, now)
+    timeWorking.addAndGet(now - lastRecv.get())
+    lastSent.set(now)
   }
 
 
   override def receive = {
 
     // Run the query without specifying what the output type will be. This is the variant used by 'cmdline_query.py'
-    case WithSender(sndr, StringQuery(q, shouldParse)) =>
+    case StringQuery(q, shouldParse) =>
       log.debug(s"Received string query: $q")
       println(s"Received string query: $q")
-      sndr ! {
+      sender() ! {
         gremlin.queryEither(q).map { resultsEither =>
           resultsEither.fold(qge => Failure(throw qge), Success(_)).map { results =>
             if (shouldParse) {
@@ -302,10 +342,10 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       }
 
     // Run a query that returns vertices
-    case WithSender(sndr, NodeQuery(q, shouldParse)) =>
+    case NodeQuery(q, shouldParse) =>
       log.debug(s"Received node query: $q")
       println(s"Received node query: $q")
-      sndr ! {
+      sender() ! {
         // The Gremlin adapter for quine doesn't store much information on nodes, so we have to
         // actively go get that information
         gremlin.queryEither(q + s""".as('vertex')
@@ -320,10 +360,10 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       }
 
     // Run a query that returns edges
-    case WithSender(sndr, EdgeQuery(q, shouldParse)) =>
+    case EdgeQuery(q, shouldParse) =>
       log.debug(s"Received new edge query: $q")
       println(s"Received new edge query: $q")
-      sndr ! {
+      sender() ! {
         gremlin.queryEitherExpecting[com.rrwright.quine.gremlin.Edge](q).map { edgesEither =>
           edgesEither.fold(qge => Failure(throw qge), Success(_)).map { edges =>
             if (shouldParse) JsArray(edges.map(ApiJsonProtocol.quineEdgeToJson).toVector)
@@ -333,22 +373,20 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       }
 
 
-    case WithSender(s: ActorRef, Left(a: ADM)) =>
-//      sender() ! Ack
-      retryOnFailure(3)(
-        writeAdm(a, Timeout(0.01 seconds))
-      )(Timeout(1 second), implicitly)
+    case Left(a: ADM) =>
+      startWork()
+      val s = sender()
+      writeAdm(a, Timeout(0.3 seconds))
         .map(t => if (shouldRecordDBWriteTimes) nodeTimes.put(t, None) else t)
-//        .map(edgeTimes.add)
+        .recoveryMessage("Writing NODE failed at ID: {} for ADM Node: {}", a.uuid, a)
         .ackOnComplete(s)
 
-    case WithSender(s: ActorRef, Right(e: EdgeAdm2Adm)) =>
-//      sender() ! Ack
-      retryOnFailure(3)(
-        writeAdmEdge(e, Timeout(0.15 seconds))
-      )(Timeout(1 second), implicitly)
+    case Right(e: EdgeAdm2Adm) =>
+      startWork()
+      val s = sender()
+      writeAdmEdge(e, Timeout(0.5 seconds))
         .map(t => if (shouldRecordDBWriteTimes) edgeTimes.put(t, None) else t)
-//        .map(edgeTimes.add)
+        .recoveryMessage("Writing EDGE failed at IDs: {} and: {} with label: {}", e.src, e.tgt, e.label)
         .ackOnComplete(s)
 
     case InitMsg => sender() ! Ack
@@ -387,6 +425,8 @@ class QuineRouter(count: Int, graph: GraphService[AdmUUID]) extends Actor with A
       nextIdx += 1
       context watch r
       router = router.addRoutee(r)
+    case InitMsg => (0 until count).foreach(_ => sender() ! Ack )
+    case CompleteMsg => println("CompleteMsg at QuineRouter"); sender() ! Ack
     case x => router.route(WithSender(sender(), x), sender())
   }
 }

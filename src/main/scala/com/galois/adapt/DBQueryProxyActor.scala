@@ -11,17 +11,17 @@ import com.galois.adapt.cdm19.CDM19
 import com.galois.adapt.cdm20.CDM20
 import org.apache.tinkerpop.gremlin.structure.{Edge, Graph, Vertex}
 import spray.json.{JsArray, JsNull, JsNumber, JsObject, JsString, JsValue}
-
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Try}
 import scala.concurrent.duration._
 
-trait DBQueryProxyActor extends Actor with ActorLogging {
-  implicit val ec: ExecutionContext = context.dispatcher
 
+trait DBQueryProxyActor extends Actor with ActorLogging {
   // The actor is responsible for the graph
   val graph: Graph
+
+  implicit val ec: ExecutionContext = Application.system.dispatchers.lookup("quine.actor.node-dispatcher")
 
   // Mutable set tracking all of the namespaces see so far
   val namespaces: mutable.Set[String] = mutable.Set.empty

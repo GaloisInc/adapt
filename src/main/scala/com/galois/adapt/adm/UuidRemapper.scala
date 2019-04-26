@@ -8,11 +8,10 @@ import akka.stream.{FlowShape, OverflowStrategy}
 import akka.stream.scaladsl.{Broadcast, Flow, FlowOps, GraphDSL, Merge, MergePreferred, Partition}
 import com.galois.adapt.MapSetUtils.AlmostMap
 import com.galois.adapt.adm.EntityResolution.{Time, Timed}
-import com.galois.adapt.adm.UuidRemapper.UuidRemapperFlow
-
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
+
 
 object UuidRemapper {
 

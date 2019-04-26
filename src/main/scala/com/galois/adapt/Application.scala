@@ -16,6 +16,7 @@ import akka.event.Logging
 import shapeless._
 import shapeless.syntax.singleton._
 import AdaptConfig._
+import akka.routing.RoundRobinPool
 import com.typesafe.config.ConfigFactory
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
@@ -36,6 +37,7 @@ import com.rrwright.quine.language.BoopickleScheme._
 object Application extends App {
   org.slf4j.LoggerFactory.getILoggerFactory  // This is here just to make SLF4j shut up and not log lots of error messages when instantiating the Kafka producer.
   runFlow match { case "quine" => (); case _ => wrongRunFlow() }
+
 
   // Open up for SSH ammonite shelling via `ssh repl@localhost -p22222`
   import ammonite.sshd._
@@ -120,15 +122,20 @@ object Application extends App {
 
   implicit val graph = GraphService.clustered(
     config = ConfigFactory.parseString(clusterConfigSrc),
-    persistor = as => LMDBSnapshotPersistor(
-      mapSizeBytes = {
-        val size: Long = runtimeConfig.lmdbgigabytes * 1024L * 1024L * 1024L
-        println("LMDB size: " + NumberFormat.getInstance().format(size))
-        size
-      }
-    )(as), // EmptyPersistor()(as),
+    persistor = as =>
+//      LMDBSnapshotPersistor(
+//        "data/persistence-lmdb.db",
+//        mapSizeBytes = {
+//          val size: Long = runtimeConfig.lmdbgigabytes * 1024L * 1024L * 1024L
+//          println("LMDB size: " + NumberFormat.getInstance().format(size))
+//          size
+//        }
+//      )(as),
+      TimelessMapDBMultimap("data/persistence-multimap_by_event.db")(as),
+//    MapDBMultimap()(as),
+//    EmptyPersistor()(as),
     idProvider = AdmUuidProvider,
-    indexer = Indexer.currentIndex(EmptyIndex),
+    indexer = Indexer.currentIndex(EmptyIndex), //InMemoryIndex(Some(Set('cid, 'path)))),
     inMemorySoftNodeLimit = Some(quineConfig.inmemsoftlimit),
     inMemoryHardNodeLimit = Some(quineConfig.inmemhardlimit),
     uiPort = None
@@ -137,7 +144,7 @@ object Application extends App {
 
   // Wait for all members of the cluster to be ready:
   val clusterStartupDeadline: Deadline = 300.seconds.fromNow
-  while ( ! graph.clusterIsReady) {
+  while ( ! graph.graphIsReady) {
     if (clusterStartupDeadline.isOverdue()) throw new RuntimeException(s"Timeout expired while waiting for cluster hosts to become active.")
     Thread.sleep(1000)
   }
@@ -204,51 +211,60 @@ object Application extends App {
 
 
 
-  val ppmManagerActors: Map[HostName, ActorRef] = ingestConfig.hosts.map { host: IngestHost =>
-    val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows, graph).withDispatcher("adapt.ppm.manager-dispatcher")
-    val ref = system.actorOf(props, s"ppm-actor-${host.hostName}")
-    host.hostName -> ref
-  }.toMap + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false, graph), s"ppm-actor-$hostNameForAllHosts"))
-  // TODO nichole:  what instrumentation source should I give to the `hostNameForAllHosts` PpmManager? This smells bad...
+//  val ppmManagerActors: Map[HostName, ActorRef] = ingestConfig.hosts.map { host: IngestHost =>
+//    val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows, graph).withDispatcher("adapt.ppm.manager-dispatcher")
+//    val ref = system.actorOf(props, s"ppm-actor-${host.hostName}")
+//    host.hostName -> ref
+//  }.toMap // + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false, graph), s"ppm-actor-$hostNameForAllHosts"))
+
+  val ppmManagers: Map[HostName, PpmManager] = ingestConfig.hosts.map(host =>
+    host.hostName -> new PpmManager(host.hostName, host.simpleTa1Name, host.isWindows, graph)
+  ).toMap
+
+
 
 
   val sqidHostPrefix = quineConfig.thishost.replace(".", "-")
 
-  val sqidFile = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOFile-accumulator"))
-  val standingFetchFileActor = system.actorOf(
-    Props(
-      classOf[StandingFetchActor[ESOFileInstance]],
-      implicitly[Queryable[ESOFileInstance]],
-      StandingFetches.onESOFileMatch _
-    ), sqidFile.get.name
-  )
+  val sqidFile = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOFile-accumulator")(
+    resultHandler = Some({
+      case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
+        val queryable = implicitly[Queryable[ESOFileInstance]]
+        val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
+        StandingFetches.onESOFileMatch(reconstructed)
+    })
+  ))
+  val standingFetchFileActor = ActorRef.noSender
 
-  val sqidSrcSnk = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOSrcSnk-accumulator"))
-  val standingFetchSrcSnkActor = system.actorOf(
-    Props(
-      classOf[StandingFetchActor[ESOSrcSnkInstance]],
-      implicitly[Queryable[ESOSrcSnkInstance]],
-      StandingFetches.onESOSrcSinkMatch _
-    ), sqidSrcSnk.get.name
-  )
+  val sqidSrcSnk = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOSrcSnk-accumulator")(
+    resultHandler = Some({
+      case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
+        val queryable = implicitly[Queryable[ESOSrcSnkInstance]]
+        val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
+        StandingFetches.onESOSrcSinkMatch(reconstructed)
+    })
+  ))
+  val standingFetchSrcSnkActor = ActorRef.noSender
 
-  val sqidNetwork = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESONetwork-accumulator"))
-  val standingFetchNetworkActor = system.actorOf(
-    Props(
-      classOf[StandingFetchActor[ESONetworkInstance]],
-      implicitly[Queryable[ESONetworkInstance]],
-      StandingFetches.onESONetworkMatch _
-    ), sqidNetwork.get.name
-  )
+  val sqidNetwork = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESONetwork-accumulator")(
+    resultHandler = Some({
+      case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
+        val queryable = implicitly[Queryable[ESONetworkInstance]]
+        val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
+        StandingFetches.onESONetworkMatch(reconstructed)
+    })
+  ))
+  val standingFetchNetworkActor = ActorRef.noSender
 
-  val sqidParentProcess = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ProcessParentage"))
-  val standingFetchProcessParentageActor = system.actorOf(
-    Props(
-      classOf[StandingFetchActor[ChildProcess]],
-      implicitly[Queryable[ChildProcess]],
-      StandingFetches.onESOProcessMatch _
-    ), sqidParentProcess.get.name
-  )
+  val sqidParentProcess = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ProcessParentage")(
+    resultHandler = Some({
+      case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
+        val queryable = implicitly[Queryable[ChildProcess]]
+        val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
+        StandingFetches.onESOProcessMatch(reconstructed)
+    })
+  ))
+  val standingFetchProcessParentageActor = ActorRef.noSender
 
   graph.currentGraph.standingQueryActors = graph.currentGraph.standingQueryActors +
     (sqidFile.get -> standingFetchFileActor) +
@@ -258,9 +274,11 @@ object Application extends App {
 
 
   val parallelism = quineConfig.quineactorparallelism
-  val quineRouter = system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
+  val uiDBInterface = system.actorOf(Props(classOf[QuineDBActor], graph, -1), s"QuineDB-UI")
+//    system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
 
   AlarmReporter  // instantiate AlarmReporter (LazyInit) and corresponding actor
+  StandingFetches  // Initialize object.
 
   val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
 //  val logFile = config.getString("adapt.logfile")
@@ -272,17 +290,21 @@ object Application extends App {
     if (runtimeConfig.quitonerror) Runtime.getRuntime.halt(1)
     Supervision.Resume
   }
-  implicit val materializer = ActorMaterializer(ActorMaterializerSettings(system).withSupervisionStrategy(streamErrorStrategy))
+  implicit val materializer = ActorMaterializer(
+    ActorMaterializerSettings(system)
+      .withSupervisionStrategy(streamErrorStrategy)
+      .withDispatcher("stream-dispatcher")
+  )
 
 
   def startWebServer(dbActor: ActorRef): Http.ServerBinding = {
     println(s"Starting the web server at: http://${runtimeConfig.webinterface}:${runtimeConfig.port}")
-    val route = Routes.mainRoute(dbActor, statusActor, ppmManagerActors)
+    val route = Routes.mainRoute(dbActor, statusActor, ppmManagers)
     val httpServer = Http().bindAndHandle(route, runtimeConfig.webinterface, runtimeConfig.port)
     Await.result(httpServer, 10 seconds)
   }
 
-  startWebServer(quineRouter)
+  startWebServer(uiDBInterface)
   statusActor ! InitMsg
 
 
@@ -291,28 +313,88 @@ object Application extends App {
   }.toMap
 
 
-  println("Running Quine ingest.")
-  RunnableGraph.fromGraph(GraphDSL.create() { implicit b =>
+  val lruDedup = Flow[Either[ADM, EdgeAdm2Adm]].statefulMapConcat{ () =>
+    // This is meant only to decrease the number of duplicates, not perfectly eliminate dupes. Viz. meant to help performance, not correctness.
+    // Some duplication isn't so bad--it results in a no-op on the graph, and a duplicate standing fetch.
+    val seenPaths = new java.util.LinkedHashMap[AdmPathNode, None.type](500, 1F, true) {
+      override def removeEldestEntry(eldest: java.util.Map.Entry[AdmPathNode, None.type]) = this.size() >= 500
+    }
+    val seenSubjects = new java.util.LinkedHashMap[AdmSubject, None.type](200, 1F, true) {
+      override def removeEldestEntry(eldest: java.util.Map.Entry[AdmSubject, None.type]) = this.size() >= 200
+    }
+    val seenPorts = new java.util.LinkedHashMap[AdmPort, None.type](200, 1F, true) {
+      override def removeEldestEntry(eldest: java.util.Map.Entry[AdmPort, None.type]) = this.size() >= 200
+    }
+    val seenAddresses = new java.util.LinkedHashMap[AdmAddress, None.type](200, 1F, true) {
+      override def removeEldestEntry(eldest: java.util.Map.Entry[AdmAddress, None.type]) = this.size() >= 200
+    }
+    val seenNetflows = new java.util.LinkedHashMap[AdmNetFlowObject, None.type](200, 1F, true) {
+      override def removeEldestEntry(eldest: java.util.Map.Entry[AdmNetFlowObject, None.type]) = this.size() >= 200
+    }
+    val seenEdges = new java.util.LinkedHashMap[EdgeAdm2Adm, None.type](10000, 1F, true) {
+      override def removeEldestEntry(eldest: java.util.Map.Entry[EdgeAdm2Adm, None.type]) = this.size() >= 10000
+    }
+
+    {
+      case a @ Left(adm: AdmPathNode) =>
+        val result = if (seenPaths.containsKey(adm)) Nil else List(a)
+        seenPaths.put(adm, None)
+        result
+
+      case a @ Left(adm: AdmSubject) =>
+        val result = if (seenSubjects.containsKey(adm)) Nil else List(a)
+        seenSubjects.put(adm, None)
+        result
+
+      case a @ Left(adm: AdmPort) =>
+        val result = if (seenPorts.containsKey(adm)) Nil else List(a)
+        seenPorts.put(adm, None)
+        result
+
+      case a @ Left(adm: AdmAddress) =>
+        val result = if (seenAddresses.containsKey(adm)) Nil else List(a)
+        seenAddresses.put(adm, None)
+        result
+
+      case a @ Left(adm: AdmNetFlowObject) =>
+        val result = if (seenNetflows.containsKey(adm)) Nil else List(a)
+        seenNetflows.put(adm, None)
+        result
+
+      case a @ Right(edge) =>
+        val result = if (seenEdges.containsKey(edge)) Nil else List(a)
+        seenEdges.put(edge, None)
+        result
+
+      case a => List(a)
+    }
+  }
+
+
+  val quineSink: Sink[Either[ADM, EdgeAdm2Adm], NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit q: GraphDSL.Builder[NotUsed]  =>
     import GraphDSL.Implicits._
+    val balance = q.add(Balance[Either[ADM, EdgeAdm2Adm]](parallelism))
+    (0 until parallelism).foreach { idx =>
+      val quineDBRef = system.actorOf(Props(classOf[QuineDBActor], graph, idx), s"QuineDB-$idx")
+      balance.out(idx) ~> Sink.actorRefWithAck(quineDBRef, InitMsg, Ack, CompleteMsg, println).async
+    }
+    SinkShape(balance.in)
+  })
+
+
+  println("Running Quine ingest.")
     val hostSources = cdmSources.values.toSeq
     val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
-    implicit val mapAsyncUnorderedTimeout = Timeout(0.58 seconds) // NOTE: A good choice here depends on the choice in QuineDBActor of how many retries and how long of a timeout in that use of `retryOnFailure`
-    implicit val mapAsyncUnorderedEc = system.dispatchers.lookup("quine.actor.node-dispatcher")
     for (((host, source), i) <- hostSources.zipWithIndex) {
       source
         .via(printCounter(host.hostName, statusActor))
         .via(debug.debugBuffer(s"[${host.hostName}]  0.) before ER"))
         .via(erMap(host.hostName))
         .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB"))
+        .via(lruDedup)
         .via(printCounter(host.hostName+" ADM", statusActor))
-        .mapAsyncUnordered(parallelism)(adm =>      // TODO: This is too much parallelism for multiple host sources!!!!!!!!!!!!!!!!!!!!!!!!
-          retryOnFailure(3)(quineRouter ? adm)
-            .recover{ case ignore => () } // Silence unacknowledged futures after multiple deliveries
-        ).recover{ case x => println(s"\n\nFAILING AT END OF STREAM.\n\n"); x.printStackTrace() }
-        .runWith(Sink.ignore)
+        .runWith(quineSink)
     }
-    ClosedShape
-  }).run()
 
 
 
@@ -324,11 +406,13 @@ object Application extends App {
       println(s"Stopping ammonite...")
       replServer.stopImmediately()
 
-      implicit val executionContext = system.dispatcher
+      implicit val executionContext: ExecutionContext = system.dispatchers.lookup("quine.actor.node-dispatcher")
 
       val saveF = if (ppmConfig.shouldsaveppmtrees) {
         println(s"Saving PPM trees to disk...")
-        ppmManagerActors.values.toList.foldLeft(Future.successful(Ack))((a, b) => a.flatMap(_ => (b ? SaveTrees(true)).mapTo[Ack.type]))
+        ppmManagers.values.toList.foldLeft(Future.successful( () ))((a, b) =>
+          a.flatMap(_ => b.saveTrees()) // (b ? SaveTrees(true)).mapTo[Ack.type]))
+        )
       } else {
         Future.successful( Ack )
       }
@@ -346,7 +430,7 @@ object Application extends App {
   def wrongRunFlow(): Unit = {
     println(
       raw"""
-Unknown runflow argument. Quitting. (Did you mean quine?)
+Unknown runflow argument. Quitting. (Did you mean: quine?)
 
                 \
                  \

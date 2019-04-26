@@ -33,18 +33,18 @@ object PpmFlowComponents {
 
 
   // Produce a Sink which accepts any type of observation to distribute as an observation to PPM tree actors for every host.
-  def ppmObservationDistributorSink[T]: Sink[T, NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit b =>
-    import GraphDSL.Implicits._
-    val actorList: List[ActorRef] = Application.ppmManagerActors.toList.map(_._2)
-    val broadcast = b.add(Broadcast[T](actorList.size))
-    actorList.foreach { ref => broadcast ~> Sink.actorRefWithAck[T](ref, InitMsg, Ack, CompleteMsg) }
-    SinkShape(broadcast.in)
-  })
-
-  def ppmSink(implicit system: ActorSystem, ec: ExecutionContext): Sink[Either[ADM, EdgeAdm2Adm], NotUsed] =
-    ppmStateAccumulator.to(
-      ppmObservationDistributorSink // [(Event, ADM, Set[AdmPathNode], ADM, Set[AdmPathNode])]
-    )
+//  def ppmObservationDistributorSink[T]: Sink[T, NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit b =>
+//    import GraphDSL.Implicits._
+//    val actorList: List[ActorRef] = Application.ppmManagerActors.toList.map(_._2)
+//    val broadcast = b.add(Broadcast[T](actorList.size))
+//    actorList.foreach { ref => broadcast ~> Sink.actorRefWithAck[T](ref, InitMsg, Ack, CompleteMsg) }
+//    SinkShape(broadcast.in)
+//  })
+//
+//  def ppmSink(implicit system: ActorSystem, ec: ExecutionContext): Sink[Either[ADM, EdgeAdm2Adm], NotUsed] =
+//    ppmStateAccumulator.to(
+//      ppmObservationDistributorSink // [(Event, ADM, Set[AdmPathNode], ADM, Set[AdmPathNode])]
+//    )
 
   def ppmStateAccumulator(implicit system: ActorSystem, ec: ExecutionContext): Flow[Either[ADM, EdgeAdm2Adm], CompletedESO, NotUsed] = Flow[Either[ADM, EdgeAdm2Adm]].statefulMapConcat[CompletedESO]{ () =>
       // Load these maps from disk on startup

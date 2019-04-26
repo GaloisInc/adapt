@@ -23,7 +23,7 @@ lazy val adapt = (project in file(".")).settings(
     "com.github.pureconfig" %% "pureconfig" % "0.9.2",
     "org.scalatest" %% "scalatest" % "3.0.0",
     "org.apache.avro" % "avro" % "1.8.2",
-    "com.typesafe.scala-logging" %% "scala-logging" % "3.7.2",
+    "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0",
 
     "com.typesafe.akka" %% "akka-actor"           % akkaV,
     "com.typesafe.akka" %% "akka-stream"          % akkaV,
@@ -40,6 +40,7 @@ lazy val adapt = (project in file(".")).settings(
     "com.typesafe.akka" %% "akka-stream-kafka" % "0.22",  // "1.0.1",
     "com.github.alexandrnikitin" %% "bloom-filter" % "0.10.1",
     "org.mapdb" % "mapdb" % "3.0.7",
+    "com.github.blemale" %% "scaffeine" % "2.6.0",
     "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.3.3",
 
 //  , "com.bbn" % "tc-avro" % "1.0-SNAPSHOT"
