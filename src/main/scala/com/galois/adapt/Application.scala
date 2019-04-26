@@ -231,6 +231,10 @@ object Application extends App {
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
         val queryable = implicitly[Queryable[ESOFileInstance]]
         val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
+//        val size = nodeComponents.map(_.flatValues().size).sum
+//        println(s"File NodeComponents stats = List size: ${nodeComponents.size} Combined depth: ${size} ${
+//          if (size > 100) s"BIG one's paths:\n   Predicate: ${reconstructed.map(_.predicateObject.path.path).mkString(", ")}\n   Subject: ${reconstructed.map(_.subject.path.path).mkString(", ")}" else ""
+//        }")
         StandingFetches.onESOFileMatch(reconstructed)
     })
   ))
@@ -337,7 +341,10 @@ object Application extends App {
 
     {
       case a @ Left(adm: AdmPathNode) =>
-        val result = if (seenPaths.containsKey(adm)) Nil else List(a)
+        val result = if (seenPaths.containsKey(adm)) Nil else {
+//          println(s"Received path node: ${adm.path}")
+          List(a)
+        }
         seenPaths.put(adm, None)
         result
 
