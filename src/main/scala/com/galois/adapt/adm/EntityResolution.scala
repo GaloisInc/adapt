@@ -79,11 +79,34 @@ object EntityResolution {
 //    val deduplicate: DeduplicateNodesAndEdges.OrderAndDedupFlow =
 //      DeduplicateNodesAndEdges.apply(numUuidRemapperShards, seenNodesSets, seenEdgesSets, deduplicateShardCount)
 
+    // CDM nodes with this CDM UUID (or edges to/from this CDM UUID) should be ignored
+    val badUuid = new UUID(0L, 0L)
+
     Flow[(String, CurrentCdm)]
+      .via(Flow[(String, CurrentCdm)].filter {
+        case (_, cdm: Host) => cdm.uuid != badUuid
+        case (_, cdm: Principal) => cdm.uuid != badUuid
+        case (_, cdm: Subject) => cdm.uuid != badUuid
+        case (_, cdm: FileObject) => cdm.uuid != badUuid
+        case (_, cdm: IpcObject) => cdm.uuid != badUuid
+        case (_, cdm: RegistryKeyObject) => cdm.uuid != badUuid
+        case (_, cdm: PacketSocketObject) => cdm.uuid != badUuid
+        case (_, cdm: NetFlowObject) => cdm.uuid != badUuid
+        case (_, cdm: MemoryObject) => cdm.uuid != badUuid
+        case (_, cdm: SrcSinkObject) => cdm.uuid != badUuid
+        case (_, cdm: Event) => cdm.uuid != badUuid
+        case _ => true
+      })
       .via(annotateTime(maxTimeJump))                                         // Annotate with a monotonic time
       .buffer(2000, OverflowStrategy.backpressure)
       .concat(Source.fromIterator(() => Iterator(maxTimeMarker)))             // Expire everything in UuidRemapper
       .via(erWithoutRemaps(eventExpiryTime, maxEventsMerged, host)) // Entity resolution without remaps
+      .via(Flow[Timed[UuidRemapperInfo]].filter({
+        case Timed(_, UuidRemapper.AnEdge(EdgeCdm2Cdm(cdm1, _, cdm2))) => cdm1.uuid != badUuid && cdm2.uuid != badUuid
+        case Timed(_, UuidRemapper.AnEdge(EdgeCdm2Adm(cdm1, _, _))) => cdm1.uuid != badUuid
+        case Timed(_, UuidRemapper.AnEdge(EdgeAdm2Cdm(_, _, cdm2))) => cdm2.uuid != badUuid
+        case _ => true
+      }))
       .concat(Source.fromIterator(() => Iterator(maxTimeRemapper)))           // Expire everything in UuidRemapper
       .buffer(2000, OverflowStrategy.backpressure)
       .via(remapper)                                                          // Remap UUIDs
