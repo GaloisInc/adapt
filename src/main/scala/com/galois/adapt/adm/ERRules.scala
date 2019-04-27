@@ -163,24 +163,24 @@ object ERRules {
         e.predicateObject.map(obj => EdgeCdm2Cdm(CdmUUID(e.getUuid, provider), "predicateObject", CdmUUID(obj, provider))),
         e.predicateObject2.map(obj => EdgeCdm2Cdm(CdmUUID(e.getUuid, provider), "predicateObject2", CdmUUID(obj, provider))),
 
-        e.predicateObjectPath.flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).flatMap(pathNode => {
-          e.predicateObject.map(predicateObject => {
+        e.predicateObjectPath.flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).flatMap(pathNode =>
+          e.predicateObject.map(predicateObject =>
             (EdgeCdm2Adm(CdmUUID(predicateObject, provider), "path", pathNode.uuid), pathNode)
-          })
-        }),
-        e.predicateObject2Path.flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).flatMap(pathNode => {
-          e.predicateObject2.map(predicateObject2 => {
+          )
+        ),
+        e.predicateObject2Path.flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).flatMap(pathNode =>
+          e.predicateObject2.map(predicateObject2 =>
             (EdgeCdm2Adm(CdmUUID(predicateObject2, provider), "path", pathNode.uuid), pathNode)
-          })
-        }),
-        e.properties.getOrElse(Map()).get("exec").flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).flatMap(pathNode => {
+          )
+        ),
+        e.properties.getOrElse(Map()).get("exec").flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).flatMap(pathNode =>
           e.subjectUuid.map(subj =>
             (EdgeCdm2Adm(CdmUUID(subj, provider), "path", pathNode.uuid), pathNode)
           )
-        }),
-//        e.properties.getOrElse(Map()).get("exec").flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).map(pathNode => {
+        ),
+//        e.properties.getOrElse(Map()).get("exec").flatMap(p => AdmPathNode.normalized(p, provider, isWindows)).map(pathNode =>
 //          (EdgeCdm2Adm(CdmUUID(e.getUuid, provider), "eventPath", pathNode.uuid), pathNode)
-//        })
+//        )
         None  // Choosing not to create "eventPath" edges.
       )
     }

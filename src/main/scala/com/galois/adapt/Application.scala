@@ -223,6 +223,11 @@ object Application extends App {
 
 
 
+  val esoFileInstanceBranch = branchOf[ESOFileInstance]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
+  val esoSrcSinkInstanceBranch = branchOf[ESOSrcSnkInstance]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
+  val esoNetworkInstanceBranch = branchOf[ESONetworkInstance]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
+  val esoChildProcessInstanceBranch = branchOf[ChildProcess]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
+
 
   val sqidHostPrefix = quineConfig.thishost.replace(".", "-")
 
@@ -230,11 +235,18 @@ object Application extends App {
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
         val queryable = implicitly[Queryable[ESOFileInstance]]
-        val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
-//        val size = nodeComponents.map(_.flatValues().size).sum
-//        println(s"File NodeComponents stats = List size: ${nodeComponents.size} Combined depth: ${size} ${
-//          if (size > 100) s"BIG one's paths:\n   Predicate: ${reconstructed.map(_.predicateObject.path.path).mkString(", ")}\n   Subject: ${reconstructed.map(_.subject.path.path).mkString(", ")}" else ""
-//        }")
+        val reconstructed = nodeComponents.toList.flatMap(nc => queryable.fromNodeComponents(nc))
+        val size = nodeComponents.toList.map(_.flatValues().size).sum
+          if (size > 100) println(
+            s"File NodeComponents stats = List size: ${nodeComponents.toList.size} Size: $size ${
+            s"\nBig: ${nodeComponents.map(_.flatValues().mkString("\n")).mkString("\n\n")}"
+//            s"""BIG one's paths:
+//               |  Predicates:
+//               |${reconstructed.map(r => r.predicateObject.path.path -> graph.idProvider.customIdFromQid(r.predicateObject.qid.get).get).mkString("    ", "\n    ", "")}
+//               |  Subjects:
+//               |${reconstructed.map(r => r.subject.path.path -> graph.idProvider.customIdFromQid(r.subject.qid.get).get).mkString("    ", "\n    ", "")}""".stripMargin
+            }"
+          )
         StandingFetches.onESOFileMatch(reconstructed)
     })
   ))
@@ -244,7 +256,7 @@ object Application extends App {
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
         val queryable = implicitly[Queryable[ESOSrcSnkInstance]]
-        val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
+        val reconstructed = nodeComponents.toList.flatMap(nc => queryable.fromNodeComponents(nc))
         StandingFetches.onESOSrcSinkMatch(reconstructed)
     })
   ))
@@ -254,7 +266,7 @@ object Application extends App {
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
         val queryable = implicitly[Queryable[ESONetworkInstance]]
-        val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
+        val reconstructed = nodeComponents.toList.flatMap(nc => queryable.fromNodeComponents(nc))
         StandingFetches.onESONetworkMatch(reconstructed)
     })
   ))
@@ -264,7 +276,7 @@ object Application extends App {
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
         val queryable = implicitly[Queryable[ChildProcess]]
-        val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
+        val reconstructed = nodeComponents.toList.flatMap(nc => queryable.fromNodeComponents(nc))
         StandingFetches.onESOProcessMatch(reconstructed)
     })
   ))
