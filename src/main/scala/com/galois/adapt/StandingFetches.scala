@@ -45,6 +45,15 @@ case object StandingFetches extends LazyLogging {
     }
     opt.getOrElse(Future.successful(()))
   }
+>
+  val objectWriterBranch = branchOf[ObjectWriter]()
+  val objectWriterQueryable = implicitly[Queryable[ObjectWriter]]
+
+  val objectExecutorBranch = branchOf[ObjectExecutor]()
+  val objectExecutorQuerable = implicitly[Queryable[ObjectExecutor]]
+
+  val netflowReadingProcessBranch = branchOf[NetflowReadingProcess]()
+  val netflowReadingProcessQueryable = implicitly[Queryable[NetflowReadingProcess]]
 
 
   def onESOFileMatch(l: List[ESOFileInstance]): Unit = l.foreach{ eso =>
@@ -56,8 +65,8 @@ case object StandingFetches extends LazyLogging {
       // Get any existing patterns with ObjectWriter which form the first half of the SEOES pattern (viz. SEO).
       val objectQid = eso.predicateObject.qid.get
       val objectCustomId = graph.idProvider.customIdFromQid(objectQid)
-      val objWritersFut = graph.getNodeComponents(objectQid, branchOf[ObjectWriter](), None).map { ncList =>
-        ncList.flatMap { nc => implicitly[Queryable[ObjectWriter]].fromNodeComponents(nc)
+      val objWritersFut = graph.getNodeComponents(objectQid, objectWriterBranch, None).map { ncList =>
+        ncList.flatMap { nc => objectWriterQueryable.fromNodeComponents(nc)
           .collect{ case ow if ow.did_write.target.qid != eso.subject.qid => // Ignore matches when the subject is the same on each side.
 
             // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
@@ -81,9 +90,9 @@ case object StandingFetches extends LazyLogging {
     if ((deleteTypes contains eso.eventType) && eso.predicateObject.qid.isDefined) {  // Test if this ESO matches the second half of the pattern
       val objectQid = eso.predicateObject.qid.get
       val objectCustomId = graph.idProvider.customIdFromQid(objectQid)
-      val objWritersFut = graph.getNodeComponents(objectQid, branchOf[ObjectExecutor](), None).map { ncList =>
+      val objWritersFut = graph.getNodeComponents(objectQid, objectExecutorBranch, None).map { ncList =>
         ncList.flatMap { nc =>
-          implicitly[Queryable[ObjectExecutor]].fromNodeComponents(nc)
+          objectExecutorQuerable.fromNodeComponents(nc)
             .collect { case ow => // DONT'T ignore matches when the subject is the same on each side.
 
               // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
@@ -107,9 +116,9 @@ case object StandingFetches extends LazyLogging {
     if ((execTypes contains eso.eventType) && eso.predicateObject.qid.isDefined) {  // Test if this ESO matches the second half of the pattern
       val objectQid = eso.predicateObject.qid.get
       val objectCustomId = graph.idProvider.customIdFromQid(objectQid)
-      val objWritersFut = graph.getNodeComponents(objectQid, branchOf[ObjectWriter](), None).map { ncList =>
+      val objWritersFut = graph.getNodeComponents(objectQid, objectWriterBranch, None).map { ncList =>
         ncList.flatMap { nc =>
-          implicitly[Queryable[ObjectWriter]].fromNodeComponents(nc)
+          objectWriterQueryable.fromNodeComponents(nc)
             .collect { case ow => // DON'T ignore matches when the subject is the same on each side.
 
               // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
@@ -133,9 +142,9 @@ case object StandingFetches extends LazyLogging {
     if ((writeTypes contains eso.eventType) && eso.predicateObject.qid.isDefined) {  // Test if this ESO matches the second half of the pattern
       val subjectQid = eso.subject.qid.get
       val subjectCustomId = graph.idProvider.customIdFromQid(subjectQid)
-      val objWritersFut = graph.getNodeComponents(subjectQid, branchOf[NetflowReadingProcess](), None).map { ncList =>
+      val objWritersFut = graph.getNodeComponents(subjectQid, netflowReadingProcessBranch, None).map { ncList =>
         ncList.foreach { nc =>
-          implicitly[Queryable[NetflowReadingProcess]].fromNodeComponents(nc)
+          netflowReadingProcessQueryable.fromNodeComponents(nc)
             .foreach{ nfrp =>
               val delta = eso.latestTimestampNanos - nfrp.latestNetflowRead.latestTimestampNanos
               if (delta >= 0 && delta <= 1e10.toLong) {
@@ -165,8 +174,8 @@ case object StandingFetches extends LazyLogging {
       // Get any existing patterns with ObjectWriter which form the first half of the SEOES pattern (viz. SEO).
       val objectQid = eso.predicateObject.qid.get
       val objectCustomId = graph.idProvider.customIdFromQid(objectQid)
-      val objWritersFut = graph.getNodeComponents(objectQid, branchOf[ObjectWriter](), None).map { ncList =>
-        ncList.flatMap { nc => implicitly[Queryable[ObjectWriter]].fromNodeComponents(nc)
+      val objWritersFut = graph.getNodeComponents(objectQid, objectWriterBranch, None).map { ncList =>
+        ncList.flatMap { nc => objectWriterQueryable.fromNodeComponents(nc)
           .collect{ case ow if ow.did_write.target.qid != eso.subject.qid => // Ignore matches when the subject is the same on each side.
 
             // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
@@ -206,8 +215,8 @@ case object StandingFetches extends LazyLogging {
       // Get any existing patterns with ObjectWriter which form the first half of the SEOES pattern (viz. SEO).
       val objectQid = eso.predicateObject.qid.get
       val objectCustomId = graph.idProvider.customIdFromQid(objectQid)
-      val objWritersFut = graph.getNodeComponents(objectQid, branchOf[ObjectWriter](), None).map { ncList =>
-        ncList.flatMap { nc => implicitly[Queryable[ObjectWriter]].fromNodeComponents(nc)
+      val objWritersFut = graph.getNodeComponents(objectQid, objectWriterBranch, None).map { ncList =>
+        ncList.flatMap { nc => objectWriterQueryable.fromNodeComponents(nc)
           .collect{ case ow if ow.did_write.target.qid != eso.subject.qid => // Ignore matches when the subject is the same on each side.
 
             // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
