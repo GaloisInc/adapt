@@ -94,7 +94,8 @@ object AdaptConfig extends Utils {
     thishost: Ip,
     hosts: List[QuineHost],  // Order matters!
     inmemsoftlimit: Int,
-    inmemhardlimit: Int
+    inmemhardlimit: Int,
+    ppmobservationbuffer: Int
   )
   case class QuineHost(
     ip: Ip,

@@ -5,21 +5,23 @@ import java.nio.ByteBuffer
 import java.text.NumberFormat
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
+
 import shapeless.cachedImplicit
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import akka.util.Timeout
+import com.galois.adapt.AdaptConfig.HostName
+import com.galois.adapt.NoveltyDetection.NamespacedUuidDetails
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm20._
 import spray.json.{JsArray, JsNumber, JsObject, JsString, JsValue, RootJsonFormat}
+
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import scala.collection.JavaConverters._
-import com.rrwright.quine.runtime.GraphService
+import com.rrwright.quine.runtime.{FutureRecoverWith, GraphService, Novelty, QuineIdProvider}
 import com.rrwright.quine.gremlin.{GremlinQueryRunner, TypeAnnotationFieldReader}
-import com.rrwright.quine.runtime.QuineIdProvider
-import com.rrwright.quine.runtime.FutureRecoverWith
 import com.rrwright.quine.language.{DomainNodeSetSingleton, NoConstantsDomainNode, PickleReader, PickleScheme, Queryable, QuineId}
 import com.rrwright.quine.language.EdgeDirections._
 import com.rrwright.quine.language.BoopickleScheme._
@@ -107,6 +109,16 @@ case class ESOFileInstance(eventType: EventType, earliestTimestampNanos: Long, l
 case class ESOSrcSnkInstance(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, hostName: String, subject: ESOSubject, predicateObject: ESOSrcSinkObject) extends NoConstantsDomainNode
 case class ESONetworkInstance(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, hostName: String, subject: ESOSubject, predicateObject: ESONetFlowObject) extends NoConstantsDomainNode
 
+case class PpmObservation(
+  treeRootQid: QuineId,
+  treeName: String,
+  hostName: String,
+  extractedValues: List[String],
+  collectedUuids: Set[NamespacedUuidDetails],
+  timestamps: Set[Long],
+  sendNoveltiesFunc: (HostName, Novelty[Set[NamespacedUuidDetails]]) => Unit,
+  observationCount: Int
+)
 
 class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQueryProxyActor {
   val nf = NumberFormat.getInstance()
@@ -388,6 +400,28 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         .map(t => if (shouldRecordDBWriteTimes) edgeTimes.put(t, None) else t)
         .recoveryMessage("Writing EDGE failed at IDs: {} and: {} with label: {}", e.src, e.tgt, e.label)
         .ackOnComplete(s)
+
+    case PpmObservation(
+      treeRootQid,
+      treeName,
+      hostName,
+      extractedValues,
+      collectedUuids,
+      timestamps,
+      sendNoveltiesFunc,
+      observationCount,
+    ) =>
+      graphService.observe(
+        treeRootQid,
+        treeName,
+        hostName,
+        extractedValues,
+        collectedUuids,
+        timestamps,
+        sendNoveltiesFunc,
+        observationCount
+      )
+      sender() ! Ack
 
     case InitMsg => sender() ! Ack
 
