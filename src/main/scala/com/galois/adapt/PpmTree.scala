@@ -139,6 +139,7 @@ case class PpmDefinition[DataShape](
 
   private val trainingDataUsed: Boolean =
     if (ppmConfig.shouldloadppmtrees) {
+      implicit val timeout = Timeout(10 minutes)
       startingState.foreach(t => graphService.initializeTree(treeRootQid, treeName, hostName, t.toQuineRepr))
       true
     }

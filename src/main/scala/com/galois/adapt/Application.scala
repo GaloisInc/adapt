@@ -233,22 +233,29 @@ object Application extends App {
 
   val sqidHostPrefix = quineConfig.thishost.replace(".", "-")
 
+//  implicit val stringReader = implicitly[PickleReader[String]]
+
   val sqidFile = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOFile-accumulator")(
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
         val queryable = implicitly[Queryable[ESOFileInstance]]
         val reconstructed = nodeComponents.toList.flatMap(nc => queryable.fromNodeComponents(nc))
-        val size = nodeComponents.toList.map(_.flatValues().size).sum
-          if (size > 100) println(
-            s"File NodeComponents stats = List size: ${nodeComponents.toList.size} Size: $size ${
-            s"\nBig: ${nodeComponents.map(_.flatValues().mkString("\n")).mkString("\n\n")}"
-//            s"""BIG one's paths:
-//               |  Predicates:
-//               |${reconstructed.map(r => r.predicateObject.path.path -> graph.idProvider.customIdFromQid(r.predicateObject.qid.get).get).mkString("    ", "\n    ", "")}
-//               |  Subjects:
-//               |${reconstructed.map(r => r.subject.path.path -> graph.idProvider.customIdFromQid(r.subject.qid.get).get).mkString("    ", "\n    ", "")}""".stripMargin
-            }"
-          )
+//        val size = nodeComponents.toList.map(_.flatValues().size).sum
+//          println(
+//            s"File NodeComponents stats = List size: ${nodeComponents.toList.size} Size: $size ${
+//            if (size > 20)
+//            s"\nBig: ${nodeComponents.map(_.flatValues().map(x =>
+//              x._1 -> x._2.left.map(q => graph.idProvider.customIdFromQid(q).get).right.map(p => new com.rrwright.quine.language.UnpickleOps(p.thisPickle).unpickleTry[String] -> p)
+//            ).mkString("\n")).mkString("\n\n")}"
+
+////            s"""BIG one's paths:
+////               |  Predicates:
+////               |${reconstructed.map(r => r.predicateObject.path.path -> graph.idProvider.customIdFromQid(r.predicateObject.qid.get).get).mkString("    ", "\n    ", "")}
+////               |  Subjects:
+////               |${reconstructed.map(r => r.subject.path.path -> graph.idProvider.customIdFromQid(r.subject.qid.get).get).mkString("    ", "\n    ", "")}""".stripMargin
+
+//            }"
+//          )
         StandingFetches.onESOFileMatch(reconstructed)
     })
   ))
@@ -326,9 +333,6 @@ object Application extends App {
   statusActor ! InitMsg
 
 
-  val cdmSources: Map[HostName, (IngestHost, Source[(Namespace,CDM20), NotUsed])] = ingestConfig.hosts.map { host: IngestHost =>
-    host.hostName -> (host, host.toCdmSource(ErrorHandler.print))
-  }.toMap
 
 
   val lruDedup = Flow[Either[ADM, EdgeAdm2Adm]].statefulMapConcat{ () =>
@@ -402,37 +406,47 @@ object Application extends App {
     SinkShape(balance.in)
   })
 
+
   val standingFetchSinks = new ConcurrentHashMap[AdaptConfig.HostName, ActorRef]().asScala
 
+
   println("Running Quine ingest.")
-    val hostSources = cdmSources.values.toSeq
-    val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
-    for (((host, source), i) <- hostSources.zipWithIndex) {
-      val standingFetchSink: ActorRef = RunnableGraph.fromGraph(GraphDSL.create(
-        Source.actorRef[PpmObservation](quineConfig.ppmobservationbuffer, OverflowStrategy.dropNew)
-      ) { implicit b => standingFetchSource =>
-        import GraphDSL.Implicits._
 
-        val merge = b.add(MergePreferred[Any](1, eagerComplete = true))
+  val cdmSources: Map[HostName, (IngestHost, Source[(Namespace,CDM20), NotUsed])] = ingestConfig.hosts.map { host: IngestHost =>
+    host.hostName -> (host, host.toCdmSource(ErrorHandler.print))
+  }.toMap
+  val hostSources = cdmSources.values.toSeq
+  val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
+  for ((host, source) <- hostSources) {
+    val standingFetchSink: ActorRef = RunnableGraph.fromGraph(GraphDSL.create(
+      Source.actorRef[PpmObservation](quineConfig.ppmobservationbuffer, OverflowStrategy.dropNew)
+    ) { implicit b => standingFetchSource =>
+      import GraphDSL.Implicits._
 
-        source
-          .via(printCounter(host.hostName, statusActor))
-          .via(debug.debugBuffer(s"[${host.hostName}]  0.) before ER"))
-          .via(erMap(host.hostName))
-          .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB"))
-          .via(lruDedup)
-          .via(printCounter(host.hostName+" ADM", statusActor)) ~> merge.in(0)
+      val merge = b.add(MergePreferred[Any](1, eagerComplete = true))
 
-        standingFetchSource ~> merge.preferred
+      source
+        .via(printCounter(host.hostName, statusActor))
+        .via(debug.debugBuffer(s"[${host.hostName}]  0.) before ER", 100000))
+        .via(erMap(host.hostName))
+        .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB", 100000))
+        .via(lruDedup)
+        .via(printCounter(host.hostName+" ADM", statusActor)) ~> merge.in(0)
 
-        merge.out ~> quineSink
+      standingFetchSource ~> merge.preferred
 
-        ClosedShape
-      }).run()
+      merge.out ~> quineSink
 
-      standingFetchSinks += (host.hostName -> standingFetchSink)
-    }
+      ClosedShape
+    }).run()
 
+    standingFetchSinks += (host.hostName -> standingFetchSink)
+  }
+
+
+//  def addNewIngestStream(): Unit = ???
+
+//  def terminateIngestStream(): Unit = ???
 
 
 

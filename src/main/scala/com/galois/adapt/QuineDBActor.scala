@@ -148,7 +148,8 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         "localAddress" -> "Option[String]",
         "localPort" -> "Option[Int]",
         "remoteAddress" -> "Option[String]",
-        "remotePort" -> "Option[Int]"
+        "remotePort" -> "Option[Int]",
+        "path" -> "String"
       ),
       defaultTypeNames = Seq("Boolean", "Long", "Int", "List[Int]", "List[Long]", "String"),
       typeNameToPickleReader = Map(
@@ -176,11 +177,11 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
     def ackOnComplete(ackTo: ActorRef, successF: => Unit = ()): Unit = f.onComplete{
       case Success(_) =>
         ackTo ! Ack
-        stopWork()
+        if (shouldRecordDBWriteTimes) stopWork()
       case Failure(e) =>
 //        e.printStackTrace()
         ackTo ! Ack
-        stopWork()
+        if (shouldRecordDBWriteTimes) stopWork()
     }
   }
 
@@ -386,7 +387,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 
 
     case Left(a: ADM) =>
-      startWork()
+      if (shouldRecordDBWriteTimes) startWork()
       val s = sender()
       writeAdm(a, Timeout(0.3 seconds))
         .map(t => if (shouldRecordDBWriteTimes) nodeTimes.put(t, None) else t)
@@ -394,34 +395,19 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         .ackOnComplete(s)
 
     case Right(e: EdgeAdm2Adm) =>
-      startWork()
+      if (shouldRecordDBWriteTimes) startWork()
       val s = sender()
       writeAdmEdge(e, Timeout(0.5 seconds))
         .map(t => if (shouldRecordDBWriteTimes) edgeTimes.put(t, None) else t)
         .recoveryMessage("Writing EDGE failed at IDs: {} and: {} with label: {}", e.src, e.tgt, e.label)
         .ackOnComplete(s)
 
-    case PpmObservation(
-      treeRootQid,
-      treeName,
-      hostName,
-      extractedValues,
-      collectedUuids,
-      timestamps,
-      sendNoveltiesFunc,
-      observationCount,
-    ) =>
-      graphService.observe(
-        treeRootQid,
-        treeName,
-        hostName,
-        extractedValues,
-        collectedUuids,
-        timestamps,
-        sendNoveltiesFunc,
-        observationCount
-      )
-      sender() ! Ack
+    case PpmObservation(treeRootQid, treeName, hostName, extractedValues, collectedUuids, timestamps, sendNoveltiesFunc, observationCount) =>
+      if (shouldRecordDBWriteTimes) startWork()
+      val s = sender()
+      implicit val timeout = Timeout(2 seconds)
+      graphService.observe(treeRootQid, treeName, hostName, extractedValues, collectedUuids, timestamps, sendNoveltiesFunc, observationCount)
+        .ackOnComplete(s)
 
     case InitMsg => sender() ! Ack
 

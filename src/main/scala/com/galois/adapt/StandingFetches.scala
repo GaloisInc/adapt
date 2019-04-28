@@ -45,7 +45,7 @@ case object StandingFetches extends LazyLogging {
     }
     opt.getOrElse(Future.successful(()))
   }
->
+
   val objectWriterBranch = branchOf[ObjectWriter]()
   val objectWriterQueryable = implicitly[Queryable[ObjectWriter]]
 
