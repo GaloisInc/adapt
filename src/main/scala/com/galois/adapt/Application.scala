@@ -429,13 +429,13 @@ object Application extends App {
         .via(printCounter(host.hostName, statusActor))
         .via(debug.debugBuffer(s"[${host.hostName}]  0.) before ER", 100000))
         .via(erMap(host.hostName))
-        .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB", 100000))
         .via(lruDedup)
+        .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB", 100000))
         .via(printCounter(host.hostName+" ADM", statusActor)) ~> merge.in(0)
 
       standingFetchSource ~> merge.preferred
 
-      merge.out ~> quineSink
+      merge.out.via(printCounter(host.hostName + " Quine", statusActor)) ~> quineSink
 
       ClosedShape
     }).run()

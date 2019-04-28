@@ -640,14 +640,14 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         ),
         d => List(
           d._3._2._2.map(_.path).getOrElse(d._3._2._1.uuid.rendered), // Reading subject name or UUID
-          d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
+//          d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
             d._3._3._1 match {
-              case o: PpmSrcSinkObject => s" : ${o.srcSinkType}"
-              case o: PpmFileObject => s" : ${o.fileObjectType}"
-              case o: PpmNetFlowObject => s"  NetFlow: ${o.remoteAddress.getOrElse("no_remote_address")}:${o.remotePort.getOrElse("no_remote_port")}"
-              case _ => ""
+              case o: PpmSrcSinkObject => d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + s" : ${o.srcSinkType}"
+              case o: PpmFileObject    => d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + s" : ${o.fileObjectType}"
+              case o: PpmNetFlowObject => s"NetFlow: ${o.remoteAddress.getOrElse("no_remote_address")}:${o.remotePort.getOrElse("no_remote_port")}"
+              case _                   => d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)
             }
-          )
+//          )
         )
       ),
       d => Set(NamespacedUuidDetails(d._3._1.uuid),
