@@ -287,7 +287,6 @@ case class PpmDefinition[DataShape](
         }
 
         if (lowerBoundQueueLength.get() > 0) {
-          println(s"Sent an observation to ${Application.standingFetchSinks(hostName)}")
           Application.standingFetchSinks(hostName) ! PpmObservation(
             treeRootQid,
             treeName,

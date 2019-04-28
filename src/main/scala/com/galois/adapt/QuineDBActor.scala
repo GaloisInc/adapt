@@ -410,16 +410,18 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       timestamps,
       sendNoveltiesFunc,
       observationCount,
-    ) => graphService.observe(
-      treeRootQid,
-      treeName,
-      hostName,
-      extractedValues,
-      collectedUuids,
-      timestamps,
-      sendNoveltiesFunc,
-      observationCount
-    )
+    ) =>
+      graphService.observe(
+        treeRootQid,
+        treeName,
+        hostName,
+        extractedValues,
+        collectedUuids,
+        timestamps,
+        sendNoveltiesFunc,
+        observationCount
+      )
+      sender() ! Ack
 
     case InitMsg => sender() ! Ack
 

@@ -409,7 +409,7 @@ object Application extends App {
     val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
     for (((host, source), i) <- hostSources.zipWithIndex) {
       val standingFetchSink: ActorRef = RunnableGraph.fromGraph(GraphDSL.create(
-        Source.actorRef[PpmObservation](9999, OverflowStrategy.dropNew)
+        Source.actorRef[PpmObservation](quineConfig.ppmobservationbuffer, OverflowStrategy.dropNew)
       ) { implicit b => standingFetchSource =>
         import GraphDSL.Implicits._
 
