@@ -32,6 +32,8 @@ import com.rrwright.quine.runtime._
 import com.rrwright.quine.language._
 //import com.rrwright.quine.language.JavaObjectSerializationScheme._
 import com.rrwright.quine.language.BoopickleScheme._
+import scala.collection.JavaConverters._
+import java.util.concurrent.ConcurrentHashMap
 
 
 object Application extends App {
@@ -389,10 +391,10 @@ object Application extends App {
     }
   }
 
-
-  val quineSink: Sink[Either[ADM, EdgeAdm2Adm], NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit q: GraphDSL.Builder[NotUsed]  =>
+  // One of `Either[ADM, EdgeAdm2Adm]`, `PpmObservation`
+  val quineSink: Sink[Any, NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit q: GraphDSL.Builder[NotUsed]  =>
     import GraphDSL.Implicits._
-    val balance = q.add(Balance[Either[ADM, EdgeAdm2Adm]](parallelism))
+    val balance = q.add(Balance[Any](parallelism))
     (0 until parallelism).foreach { idx =>
       val quineDBRef = system.actorOf(Props(classOf[QuineDBActor], graph, idx), s"QuineDB-$idx")
       balance.out(idx) ~> Sink.actorRefWithAck(quineDBRef, InitMsg, Ack, CompleteMsg, println).async
@@ -400,19 +402,35 @@ object Application extends App {
     SinkShape(balance.in)
   })
 
+  val standingFetchSinks = new ConcurrentHashMap[AdaptConfig.HostName, ActorRef]().asScala
 
   println("Running Quine ingest.")
     val hostSources = cdmSources.values.toSeq
     val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
     for (((host, source), i) <- hostSources.zipWithIndex) {
-      source
-        .via(printCounter(host.hostName, statusActor))
-        .via(debug.debugBuffer(s"[${host.hostName}]  0.) before ER"))
-        .via(erMap(host.hostName))
-        .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB"))
-        .via(lruDedup)
-        .via(printCounter(host.hostName+" ADM", statusActor))
-        .runWith(quineSink)
+      val standingFetchSink: ActorRef = RunnableGraph.fromGraph(GraphDSL.create(
+        Source.actorRef[PpmObservation](9999, OverflowStrategy.dropNew)
+      ) { implicit b => standingFetchSource =>
+        import GraphDSL.Implicits._
+
+        val merge = b.add(MergePreferred[Any](1, eagerComplete = true))
+
+        source
+          .via(printCounter(host.hostName, statusActor))
+          .via(debug.debugBuffer(s"[${host.hostName}]  0.) before ER"))
+          .via(erMap(host.hostName))
+          .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB"))
+          .via(lruDedup)
+          .via(printCounter(host.hostName+" ADM", statusActor)) ~> merge.in(0)
+
+        standingFetchSource ~> merge.preferred
+
+        merge.out ~> quineSink
+
+        ClosedShape
+      }).run()
+
+      standingFetchSinks += (host.hostName -> standingFetchSink)
     }
 
 
