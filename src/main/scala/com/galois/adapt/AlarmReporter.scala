@@ -185,9 +185,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
   var processRefSet: Map[ProcessDetails, Set[Long]] = Map.empty
   var alarmCounter: Long = 0
 
-  // TODO: Initialize processInstanceCounter with training data; add new function to receive.
-  var processInstanceCounter = scala.collection.mutable.Map[ProcessDetails, Int]().withDefaultValue(0)
-  var distinctProcessInstanceCount = processInstanceCounter.keys.size
+  var processInstanceCounter: scala.collection.mutable.Map[ProcessDetails, Int] = scala.collection.mutable.Map.empty
 
   def genAlarmID(): Long = {
     alarmCounter += 1
@@ -209,7 +207,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
     
     if (alarmConfig.splunk.enabled) reportSplunk(alarmEvents)
     if (alarmConfig.logging.enabled) pw.foreach(_.println(messageString))
-    if (alarmConfig.console.enabled) if (messageString.contains("processFiltered") ||messageString.contains("processSummary")) println(messageString)
+    if (alarmConfig.console.enabled) println(messageString)
   }
 
   def handleMessage(m: List[AlarmEvent], lastMessage: Boolean = false): Unit = if (lastMessage) logAlarm(m) else self ! LogAlarm(m)
@@ -218,8 +216,12 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
 
   def generateSummaryAndSend(lastMessage: Boolean): Unit = {
 
-    val numProcessInstancesToTake = math.round(distinctProcessInstanceCount * AlarmReporter.percentProcessInstancesToTake)
+    val numProcessInstancesToTake = math.round(processInstanceCounter.size * AlarmReporter.percentProcessInstancesToTake / 100)
     val minProcessInstanceCount = processInstanceCounter.toList.sortBy(-_._2).take(numProcessInstancesToTake).lastOption.map(_._2).getOrElse(0)
+
+    println("distinctProcessInstanceCount",processInstanceCounter.size)
+    println("numProcessInstancesToTake",numProcessInstancesToTake)
+    println("minProcessInstanceCount",minProcessInstanceCount)
 
     val batchedMessages: List[Future[Option[AlarmEvent]]] = processRefSet.view.map { case (pd, alarmIDs) =>
 
@@ -275,8 +277,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
 
     alarmDetails.processDetailsSet.foreach { pd =>
       processRefSet += (pd -> (processRefSet.getOrElse(pd, Set.empty[Long]) + alarmID))
-      processInstanceCounter(pd) += 1
-      distinctProcessInstanceCount =  if (processInstanceCounter.keySet.contains(pd)) distinctProcessInstanceCount else distinctProcessInstanceCount+1
+      processInstanceCounter += (pd -> (processInstanceCounter.getOrElse(pd, 0) + 1))
     }
 
     // is this a cleaner solution?
