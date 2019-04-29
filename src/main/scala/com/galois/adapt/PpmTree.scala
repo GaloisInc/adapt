@@ -357,7 +357,7 @@ case class PpmDefinition[DataShape](
   val lastSaveCompleteMillis = new AtomicLong(0L)
   val isCurrentlySaving = new AtomicBoolean(false)
 
-  def getRepr(implicit timeout: Timeout): Future[TreeRepr] = graphService.getTreeRepr(treeRootQid, treeName, List()).map(r => TreeRepr.fromQuine(r.repr))
+  def getRepr(implicit timeout: Timeout): Future[TreeRepr] = graphService.getTreeRepr(hostName, treeName, List()).map(r => TreeRepr.fromQuine(r.repr))
 
   def saveStateAsync(): Future[Unit] = {
 //    val now = System.currentTimeMillis
@@ -395,7 +395,7 @@ case class PpmDefinition[DataShape](
 
   def prettyString: Future[String] = {
     implicit val timeout = Timeout(10.1 minutes)
-    graphService.getTreeRepr(treeRootQid,treeName,List()).map(_.repr.toString())
+    graphService.getTreeRepr(hostName, treeName, List()).map(_.repr.toString())
   }
 }
 
@@ -1045,7 +1045,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
   def ppmNodeActorBeginGetTreeRepr(treeName: String, startingKey: List[ExtractedValue] = Nil)(implicit timeout: Timeout): Future[PpmNodeActorGetTreeReprResult] =
     ppm(treeName).map(d =>
-      graphService.getTreeRepr(d.treeRootQid, treeName, startingKey).map(r => PpmNodeActorGetTreeReprResult(TreeRepr.fromQuine(r.repr)))
+      graphService.getTreeRepr(hostName, treeName, startingKey).map(r => PpmNodeActorGetTreeReprResult(TreeRepr.fromQuine(r.repr)))
     ).getOrElse(Future.failed(new NoSuchElementException(s"No tree found with name $treeName")))
 
   def ppmTreeAlarmQuery(treeName: String, queryPath: List[ExtractedValue], namespace: String, startAtTime: Long = 0L, forwardFromStartTime: Boolean = true, resultSizeLimit: Option[Int] = None, excludeRatingBelow: Option[Int] = None): PpmTreeAlarmResult = {
