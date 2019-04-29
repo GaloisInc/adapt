@@ -45,7 +45,7 @@ trait AlarmEventData {
   def toJson: JsValue
 }
 
-case class DetailedAlarmEvent(processName: String, pid: String, hostName: HostName, details: String, alarmIDs: Set[Long], dataTimestamps: Set[Long]) extends AlarmEventData {
+case class DetailedAlarmEvent(processName: String, pid: String, hostName: HostName, details: String, alarmIDs: Set[Long], dataTimestamps: Set[Long], emitTimestamp: Long) extends AlarmEventData {
   def toJson: JsValue = {
     JsObject(
       "processName" -> JsString(processName),
@@ -54,7 +54,8 @@ case class DetailedAlarmEvent(processName: String, pid: String, hostName: HostNa
       "referencedRawAlarms" -> JsArray(alarmIDs.map(JsNumber(_)).toVector),
       "details" -> JsString(details),
       "alarmIDs" -> JsArray(alarmIDs.toList.map(x => JsNumber(x)).toVector),
-      "dataTimestamps" -> JsArray(dataTimestamps.toList.map(x => JsNumber(x)).toVector)
+      "dataTimestamps" -> JsArray(dataTimestamps.toList.map(x => JsNumber(x)).toVector),
+      "emitTimestamp" -> JsNumber(this.emitTimestamp)
     )
   }
 }
@@ -116,10 +117,10 @@ case object AlarmEvent {
     )
   }
 
-  def fromBatchedAlarm(alarmCategory: AlarmCategory, pd: ProcessDetails, details: String, alarmIDs: Set[Long], runID: String): AlarmEvent = {
+  def fromBatchedAlarm(alarmCategory: AlarmCategory, pd: ProcessDetails, details: String, alarmIDs: Set[Long], runID: String, emitTimestamp: Long): AlarmEvent = {
 
     AlarmEvent(
-      DetailedAlarmEvent(pd.processName, pd.pid.getOrElse("None").toString, pd.hostName, details, alarmIDs, pd.dataTimestamps),
+      DetailedAlarmEvent(pd.processName, pd.pid.getOrElse("None").toString, pd.hostName, details, alarmIDs, pd.dataTimestamps, emitTimestamp),
       AlarmEventMetaData(runID, alarmCategory.toString))
   }
 
@@ -208,7 +209,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
     
     if (alarmConfig.splunk.enabled) reportSplunk(alarmEvents)
     if (alarmConfig.logging.enabled) pw.foreach(_.println(messageString))
-    if (alarmConfig.console.enabled) println(messageString)
+    if (alarmConfig.console.enabled) if (messageString.contains("processFiltered") ||messageString.contains("processSummary")) println(messageString)
   }
 
   def handleMessage(m: List[AlarmEvent], lastMessage: Boolean = false): Unit = if (lastMessage) logAlarm(m) else self ! LogAlarm(m)
@@ -225,7 +226,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
       //Suppress empty summaries
       val summaries: Future[Option[AlarmEvent]] = PpmSummarizer.summarize(pd.processName, Some(pd.hostName), pd.pid).map { s =>
         if (s == TreeRepr.empty) None
-        else Some(AlarmEvent.fromBatchedAlarm(ProcessSummary, pd, s.readableString, alarmIDs, runID))
+        else Some(AlarmEvent.fromBatchedAlarm(ProcessSummary, pd, s.readableString, alarmIDs, runID, System.currentTimeMillis))
       }.recoverWith{ case e => log.error(s"Summarizing: $pd failed with error: ${e.getMessage}"); Future.failed(e)}
 
       // Filter out process instance summaries that don't have a lot of activity
@@ -237,17 +238,17 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
 
       //it is OK to have empty process Activities
       val completeTreeRepr: Future[Option[AlarmEvent]] = PpmSummarizer.fullTree(pd.processName, Some(pd.hostName), pd.pid).map { a =>
-        Some(AlarmEvent.fromBatchedAlarm(ProcessActivity, pd, a.withoutQNodes.readableString, alarmIDs, runID))
+        Some(AlarmEvent.fromBatchedAlarm(ProcessActivity, pd, a.withoutQNodes.readableString, alarmIDs, runID, System.currentTimeMillis))
       }.recoverWith{ case e => log.error(s"Getting Full Tree for: $pd failed with error: ${e.getMessage}"); Future.failed(e)}
 
       //Suppress empty summaries
-      val mostNovel: Future[Option[AlarmEvent]] = PpmSummarizer.mostNovelActions(numMostNovel, pd.processName, pd.hostName, pd.pid).map { mn =>
-        if (mn.isEmpty) None
-        else Some(AlarmEvent.fromBatchedAlarm(TopTwenty, pd, mn.mkString("\n"), alarmIDs, runID))
-      }.recoverWith{ case e => log.error(s"Getting Top 20 for: $pd failed with error: ${e.getMessage}"); Future.failed(e)}
+//      val mostNovel: Future[Option[AlarmEvent]] = PpmSummarizer.mostNovelActions(numMostNovel, pd.processName, pd.hostName, pd.pid).map { mn =>
+//        if (mn.isEmpty) None
+//        else Some(AlarmEvent.fromBatchedAlarm(TopTwenty, pd, mn.mkString("\n"), alarmIDs, runID, System.currentTimeMillis))
+//      }.recoverWith{ case e => log.error(s"Getting Top 20 for: $pd failed with error: ${e.getMessage}"); Future.failed(e)}
 
-      (summaries, filteredSummary, completeTreeRepr, mostNovel)
-    }.toList.flatMap(x => List(x._1, x._2, x._3, x._4))
+      (summaries, filteredSummary, completeTreeRepr)
+    }.toList.flatMap(x => List(x._1, x._2, x._3))
 
     Future.sequence(batchedMessages).map(m => handleMessage(m.flatten, lastMessage)).onFailure {
       case res => log.error(s"AlarmReporter: failed with $res.")
