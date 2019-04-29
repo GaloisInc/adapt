@@ -486,10 +486,10 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
     PpmDefinition[ESO]( "ProcessesWithNetworkActivity", hostName,
       d => d._3._1.isInstanceOf[PpmNetFlowObject],
       List(
-        d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
+        d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),   // Process
         d => {
           val nf = d._3._1.asInstanceOf[PpmNetFlowObject]
-          List(nf.remoteAddress.getOrElse("no_address_from_CDM"), nf.remotePort.getOrElse("no_port_from_CDM").toString)
+          List(nf.remoteAddress.getOrElse("no_address_from_CDM"), nf.remotePort.getOrElse("no_port_from_CDM").toString)   // Netflow
         }
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
