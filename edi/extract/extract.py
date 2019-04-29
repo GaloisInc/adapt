@@ -24,12 +24,18 @@ def escape(attr):
 		return attr
 
 def convertDict2CSVFile(dictionary, filename):
-	attributes = sorted({e for val in dictionary.values() for e in val})
+	def emit(att,atts):
+		for (a,n) in atts:
+			if a == att:
+				return n
+		return 0
+	attributes = sorted({e[0] for val in dictionary.values() for e in val})
+	escaped_attributes = [escape(att) for att in attributes]
 	with open(filename,'w') as f:
-		f.write(','.join(['Object_ID']+attributes)+'\n')
+		f.write(','.join(['Object_ID']+escaped_attributes)+'\n')
 		for obj,atts in dictionary.items():
 			f.write(obj + ','
-					+ ','.join(['1' if att in atts else '0'
+					+ ','.join([str(emit(att,atts))
 							    for att in attributes]) + '\n')
 
 
@@ -42,28 +48,31 @@ def loadSpec(specfile):
 def parseQuerySpec(spec):
 	query = spec['query']
 	obj_name = spec['objects']
+	count_name = spec['counts'] if 'counts' in spec.keys() else None
 	att_names = [att.strip() for att in spec['attributes']]
 	endpoint = 'json'
 	if 'endpoint' in spec.keys():
 		endpoint = spec['endpoint']
-	timeout = 300
+	timeout = 600
 	if 'timeout' in spec.keys():
 		timeout = int(spec['timeout'])
-	return (query,obj_name,att_names,endpoint,timeout)
+	return (query,obj_name,att_names,count_name,endpoint,timeout)
 
-def convertQueryRes2Dict(json,obj_name,att_names):
-	dict = collections.defaultdict(list)
+def convertQueryRes2Dict(json,obj_name,att_names,count_name):
+	dct = collections.defaultdict(list)
 	if type(att_names)==list:
 		for e in json:
-			dict[e[obj_name]].extend([escape(str(e[a])) for a in att_names])
+			dct[e[obj_name]].extend([(escape(str(e[a])),
+									  e[count_name] if count_name != None else 1)
+									  for a in att_names])
 	else:
 		sys.exit('Expected list of attribute names in specification')
-	return dict
+	return dct
 
-def convert2InputCSV(spec_file,output_file,db,provider):
+def convert2InputCSV(spec_file,output_file,db,provider,counts):
 	spec = loadSpec(spec_file)
 	# extract the query from specification file and get the results
-	(query,obj_name,att_names,endpoint,timeout) = parseQuerySpec(spec)
+	(query,obj_name,att_names,count_name,endpoint,timeout) = parseQuerySpec(spec)
 	# plug in the hole with provider name if available
 	if provider != None:
 		query = query % ('n.provider = "' + provider + '"')
@@ -72,7 +81,7 @@ def convert2InputCSV(spec_file,output_file,db,provider):
 	# run the query
 	query_res = db.getQuery(query,endpoint=endpoint,timeout=timeout)
 	# convert query to a dictionary grouping by object ids
-	dict = convertQueryRes2Dict(query_res,obj_name,att_names)
+	dict = convertQueryRes2Dict(query_res,obj_name,att_names,count_name)
 	# write out the dictionary to a context csv file
 	convertDict2CSVFile(dict,output_file)
 	print('Extraction successful. File '+output_file+' created.')

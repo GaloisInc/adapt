@@ -5,7 +5,14 @@
 # Dependencies
 
 ```
-pip install neo4j-driver pandas numpy matplotlib pyfpgrowth
+pip install neo4j-driver joblib pandas numpy matplotlib pyfpgrowth rpy2
+```
+
+Also, to use the R-based code for rare rule mining, R >= 3.3.3 must be
+installed and the following libraries should be installed by running
+the following command within R:
+```
+install.packages(c("stringr","ppls","plyr"))
 ```
 
 # Running
@@ -151,7 +158,9 @@ two separate CSV files.
 usage: join.py [-h] ctx1.csv ... ctxn.csv [--output OUTPUT]
 ```
 
-## Anomaly detection
+# Algorithms
+
+## Simple statistical anomaly detection
 
 The script `ad.py` implements three anomaly detection algorithms, each
 having either a batch or streaming mode.  The batch mode reads and
@@ -259,6 +268,86 @@ krimp.py [-h] --input INPUT --output OUTPUT
 There is also a `make` target to run krimp on all of the contexts, to do 
 this do `make krimpbatch`.  (Krimp only runs in batch mode, but its C++ 
 implementation is pretty fast.)
+
+## Frequent rule mining anomaly detection
+
+The Python program `fca.py` performs anomaly detection based on formal concept
+analysis to mine frequent rules and then score objects based on which rules
+are violated.  The minimum support and minimum confidence parameters can be 
+supplied (as percentage values between 0 and 100).  There are two scoring 
+methods, one based on the confidence of the rule violations (`conf`) and one 
+based on the maximum lift of the violated rules (`lift`).  
+
+```
+fca.py [-h] --input INPUT --output OUTPUTSCORESFILE
+            [--min_support SUP] [--min_confidence CONF]
+```
+
+As with other mining-based techniques, it's not always clear how to choose 
+appropriate support and confidence parameters in advance so experimentation is 
+needed.  
+
+## Rare rule mining anomaly detection
+
+The Python program `rare.py` provides a an
+anomaly detector based on rare rule mining.  The approach calls code
+in R and Java to first identify "rare rules", that is, patterns that
+happen extremely infrequently and have 100% confidence.  There is one
+parameter, the support (a percentage between 0.0 and 100) which
+determines what "rare" means.  Typical useful values are between 0.01%
+and 1%.
+
+```
+rare.py [-h] --input INPUT --output OUTPUTSCORESFILE
+            [--sup SUP]
+```
+
+The resulting score file contains all objects that satisfy some rare
+rule, with a score consisting of the maximum *lift* among all rules
+satisfied by that object.  For a rule X -> Y, lift is a metric of how
+surprising it is to see X and Y together given their individual
+probabilities.  Thus, objects whose score is high are more anomalous.
+
+As with other parameter-based methods, it is hard to know in advance
+what the best parameter setting is.  Support of 0.05 seems to work
+reasonably well but probably the best thing is to try a range of
+support parameters and aggregate the results using `combine.py`,
+specifically the `maxscore` aggregation.
+
+## Combining anomaly scores
+
+The script `combine.py` combines several score files into a single
+one, using one of several methods for combining scores or ranks.
+
+```
+combine.py [-h] [--times TIMES] [--reverse] --output OUTPUT
+                  [--aggr {uniform,weighted,maxscore,average,geometric,minrank,median}]
+                  <Context> [<Context> ...]
+```
+The inputs are provided as a list of score files.  The remaining flags
+have the following meanings:
+* `--aggr` selects the aggregation method.  There are two kinds of
+  aggregation, score combination (combines the scores directly) and
+  rank aggregation (sorts and ranks the objects, and combines the
+  ranks).  They are:
+** `weighted`/`uniform`: scores are added together with a correcting factor to record the
+presence/absence of a score.  Suitable for combining compression-based
+  scores.  The difference between `weighted` and `uniform` is that
+  `weighted` uses the actual frequencies to calculate the correcting
+  factor and `uniform` just adds one bit per context (i.e. using the
+  uniform distribution).
+** `maxscore` takes the max of the individual scores; missing scores
+are treated as 0.  Intended for use with max-lift scoring (`rank.py`).
+** `average`/`geometric`/`minrank`/`median`: perform rank aggregation
+  using the named rank combining function.  These generally work best
+  when all of the score files ahve the same set of objects, and
+  behavior is unpredictable when there are missing objects.
+* `--times` uses a time file (obtained using `times.py`) to combine the scores
+instead of sorting them by object id.
+* `--reverse` reverses the sorting order when computing ranks, for the
+ranking combination methods.  This should be used when rank
+aggregating scores where high score = more anomalous (it has no effect
+on the score combination methods)
 
 ## Checking scores against ground truth
 

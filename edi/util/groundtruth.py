@@ -1,5 +1,5 @@
 
-
+import csv
 
 class GroundTruth:
 
@@ -13,3 +13,8 @@ class GroundTruth:
         self.data = {row[0]
                      for row in reader
                      if match(row)}
+
+
+def getGroundTruth(ground_truth,type='AdmSubject::Node'):
+    with open(ground_truth) as gtfile:
+        return GroundTruth(csv.reader(gtfile), type)

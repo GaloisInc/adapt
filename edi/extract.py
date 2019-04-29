@@ -31,6 +31,9 @@ parser.add_argument('--database','-d',
 parser.add_argument('--provider','-r',
 					help = 'provider name',
 					default = None)
+parser.add_argument('--counts', '-c',
+					help = 'record counts',
+					action='store_true')
 parser.add_argument('--verbose','-v',
 					help = 'Print verbose output',
 					action = 'store_true')
@@ -43,17 +46,19 @@ if __name__ == '__main__':
 	spec_file = args.input
 	provider = args.provider
 	output_file = args.output
+	counts = args.counts
 	if args.verbose:
 		print('URL: %s' % url)
 		print('Port: %d' % port)
 		print('Specification: %s' % spec_file)
 		print('Provider: ' + str(provider))
 		print('Context output: %s' % output_file)
+		print('Record counts: %s' % str(counts))
 	if not(os.path.exists(spec_file)):
 		sys.exit('Context specification file not found: %s' % spec_file)
 	if args.database == 'adapt':
 		db = database.AdaptDatabase(url=url,port=port)
 	elif args.database == 'neo4j':
 		db = database.Neo4jDatabase(url=url,port=port)
-	ext.convert2InputCSV(spec_file,output_file,db,provider)
+	ext.convert2InputCSV(spec_file,output_file,db,provider,counts)
 
