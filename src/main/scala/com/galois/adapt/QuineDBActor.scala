@@ -5,21 +5,23 @@ import java.nio.ByteBuffer
 import java.text.NumberFormat
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
+
 import shapeless.cachedImplicit
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.routing.{ActorRefRoutee, RoundRobinRoutingLogic, Router}
 import akka.util.Timeout
+import com.galois.adapt.AdaptConfig.HostName
+import com.galois.adapt.NoveltyDetection.NamespacedUuidDetails
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm20._
 import spray.json.{JsArray, JsNumber, JsObject, JsString, JsValue, RootJsonFormat}
+
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import scala.collection.JavaConverters._
-import com.rrwright.quine.runtime.GraphService
+import com.rrwright.quine.runtime.{FutureRecoverWith, GraphService, Novelty, QuineIdProvider}
 import com.rrwright.quine.gremlin.{GremlinQueryRunner, TypeAnnotationFieldReader}
-import com.rrwright.quine.runtime.QuineIdProvider
-import com.rrwright.quine.runtime.FutureRecoverWith
 import com.rrwright.quine.language.{DomainNodeSetSingleton, NoConstantsDomainNode, PickleReader, PickleScheme, Queryable, QuineId}
 import com.rrwright.quine.language.EdgeDirections._
 import com.rrwright.quine.language.BoopickleScheme._
@@ -107,6 +109,16 @@ case class ESOFileInstance(eventType: EventType, earliestTimestampNanos: Long, l
 case class ESOSrcSnkInstance(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, hostName: String, subject: ESOSubject, predicateObject: ESOSrcSinkObject) extends NoConstantsDomainNode
 case class ESONetworkInstance(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, hostName: String, subject: ESOSubject, predicateObject: ESONetFlowObject) extends NoConstantsDomainNode
 
+case class PpmObservation(
+  treeRootQid: QuineId,
+  treeName: String,
+  hostName: String,
+  extractedValues: List[String],
+  collectedUuids: Set[NamespacedUuidDetails],
+  timestamps: Set[Long],
+  sendNoveltiesFunc: (HostName, Novelty[Set[NamespacedUuidDetails]]) => Unit,
+  observationCount: Int
+)
 
 class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQueryProxyActor {
   val nf = NumberFormat.getInstance()
@@ -136,7 +148,8 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         "localAddress" -> "Option[String]",
         "localPort" -> "Option[Int]",
         "remoteAddress" -> "Option[String]",
-        "remotePort" -> "Option[Int]"
+        "remotePort" -> "Option[Int]",
+        "path" -> "String"
       ),
       defaultTypeNames = Seq("Boolean", "Long", "Int", "List[Int]", "List[Long]", "String"),
       typeNameToPickleReader = Map(
@@ -164,11 +177,11 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
     def ackOnComplete(ackTo: ActorRef, successF: => Unit = ()): Unit = f.onComplete{
       case Success(_) =>
         ackTo ! Ack
-        stopWork()
+        if (shouldRecordDBWriteTimes) stopWork()
       case Failure(e) =>
 //        e.printStackTrace()
         ackTo ! Ack
-        stopWork()
+        if (shouldRecordDBWriteTimes) stopWork()
     }
   }
 
@@ -217,15 +230,15 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
     (a match {
       case anAdm: AdmEvent =>
         anAdm.create(Some(anAdm.uuid)).map { x =>
-          graphService.standingFetch[ESOFileInstance](anAdm.uuid, Application.sqidFile)(wrongFunc)
-          graphService.standingFetch[ESOSrcSnkInstance](anAdm.uuid, Application.sqidSrcSnk)(wrongFunc)
-          graphService.standingFetch[ESONetworkInstance](anAdm.uuid, Application.sqidNetwork)(wrongFunc)
+          graphService.standingFetchWithBranch[ESOFileInstance](anAdm.uuid, Application.esoFileInstanceBranch, Application.sqidFile)(wrongFunc)
+          graphService.standingFetchWithBranch[ESOSrcSnkInstance](anAdm.uuid, Application.esoSrcSinkInstanceBranch, Application.sqidSrcSnk)(wrongFunc)
+          graphService.standingFetchWithBranch[ESONetworkInstance](anAdm.uuid, Application.esoNetworkInstanceBranch, Application.sqidNetwork)(wrongFunc)
           x
         }
 
       case anAdm: AdmSubject =>
         anAdm.create(Some(anAdm.uuid)).map { x =>
-            graphService.standingFetch[ChildProcess](anAdm.uuid, Application.sqidParentProcess)(wrongFunc)
+            graphService.standingFetchWithBranch[ChildProcess](anAdm.uuid, Application.esoChildProcessInstanceBranch, Application.sqidParentProcess)(wrongFunc)
           x
         }
 
@@ -374,7 +387,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 
 
     case Left(a: ADM) =>
-      startWork()
+      if (shouldRecordDBWriteTimes) startWork()
       val s = sender()
       writeAdm(a, Timeout(0.3 seconds))
         .map(t => if (shouldRecordDBWriteTimes) nodeTimes.put(t, None) else t)
@@ -382,11 +395,18 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         .ackOnComplete(s)
 
     case Right(e: EdgeAdm2Adm) =>
-      startWork()
+      if (shouldRecordDBWriteTimes) startWork()
       val s = sender()
       writeAdmEdge(e, Timeout(0.5 seconds))
         .map(t => if (shouldRecordDBWriteTimes) edgeTimes.put(t, None) else t)
         .recoveryMessage("Writing EDGE failed at IDs: {} and: {} with label: {}", e.src, e.tgt, e.label)
+        .ackOnComplete(s)
+
+    case PpmObservation(treeRootQid, treeName, hostName, extractedValues, collectedUuids, timestamps, sendNoveltiesFunc, observationCount) =>
+      if (shouldRecordDBWriteTimes) startWork()
+      val s = sender()
+      implicit val timeout = Timeout(2 seconds)
+      graphService.observe(treeRootQid, treeName, hostName, extractedValues, collectedUuids, timestamps, sendNoveltiesFunc, observationCount)
         .ackOnComplete(s)
 
     case InitMsg => sender() ! Ack

@@ -238,7 +238,7 @@ package object adm {
   case class AdmPathNode(
      path: String,
      provider: String
-   ) extends ADM with DBWritable with DomainNode {
+  ) extends ADM with DBWritable with DomainNode {
     val uuid = AdmUUID(DeterministicUUID(path), provider)
     val originalCdmUuids: Set[CdmUUID] = Set.empty
 
@@ -257,10 +257,10 @@ package object adm {
       "provider" -> provider
     )
 
-    val nodeConstants = AdmPathNode
+    case object nodeConstants extends  NodeConstants(Record(type_of = "AdmPathNode"))
   }
 
-  case object AdmPathNode extends NodeConstants(Record(type_of = "AdmPathNode")) {
+  case object AdmPathNode {
    
     // Keep a cache of path nodes already seen. If we see the same input again, no point in
     // recomputing the output!

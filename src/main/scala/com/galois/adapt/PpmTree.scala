@@ -139,6 +139,7 @@ case class PpmDefinition[DataShape](
 
   private val trainingDataUsed: Boolean =
     if (ppmConfig.shouldloadppmtrees) {
+      implicit val timeout = Timeout(10 minutes)
       startingState.foreach(t => graphService.initializeTree(treeRootQid, treeName, hostName, t.toQuineRepr))
       true
     }
@@ -239,10 +240,11 @@ case class PpmDefinition[DataShape](
   type ObservationId = Long
 
   val lowerBoundQueueLength = new AtomicLong(0L)
+  var totalEmitted: Long = 0
   val someoneDequing = new AtomicBoolean(false)
   val queuedObservations = new java.util.concurrent.ConcurrentLinkedDeque[(List[ExtractedValue], Set[NamespacedUuidDetails], Set[Long], Int, ObservationId)]()
 
-  graphService.system.scheduler.schedule(10 seconds, 60 seconds)(println(s"Alec's lowerBoundQueueLength for: $hostName $treeName size: ${lowerBoundQueueLength.get()}"))
+  graphService.system.scheduler.schedule(10 seconds, 60 seconds)(println(s"Alec's lowerBoundQueueLength for: $hostName $treeName size: ${lowerBoundQueueLength.get()} (total emitted: $totalEmitted)"))
 
   /*
    *  If you observe something with a _different_ extracted value, you are responsible for emitting existing values
@@ -257,7 +259,6 @@ case class PpmDefinition[DataShape](
 
     queuedObservations.add((extractedValues, uuidsCollected, timestampsCollected, 1, thisId))
     lowerBoundQueueLength.incrementAndGet()
-
 
     if (someoneDequing.compareAndSet(false, true)) {
       // Only entered by one thread at once!
@@ -274,7 +275,7 @@ case class PpmDefinition[DataShape](
         var countNew: Int = count
 
         var remainingCycles = 100
-        while (extracted == queuedObservations.peekLast()._1 && remainingCycles > 0) {
+        while (Some(extracted) == Option(queuedObservations.peekLast()).map(_._1) && remainingCycles > 0) {
           remainingCycles -= 1
 
           lowerBoundQueueLength.decrementAndGet()
@@ -287,7 +288,7 @@ case class PpmDefinition[DataShape](
         }
 
         if (lowerBoundQueueLength.get() > 0) {
-          graphService.observe(
+          Application.standingFetchSinks(hostName) ! PpmObservation(
             treeRootQid,
             treeName,
             hostName,
@@ -297,8 +298,10 @@ case class PpmDefinition[DataShape](
             (hostName: String, nov: Novelty[Set[NamespacedUuidDetails]]) => ppmManagers(hostName).novelty(nov),
             countNew
           )
+          totalEmitted += 1
         } else {
           queuedObservations.addLast((extracted, uuidsNew, timestampsNew, countNew, 0L))
+          lowerBoundQueueLength.incrementAndGet()
           stop = true
         }
       }
@@ -354,7 +357,7 @@ case class PpmDefinition[DataShape](
   val lastSaveCompleteMillis = new AtomicLong(0L)
   val isCurrentlySaving = new AtomicBoolean(false)
 
-  def getRepr(implicit timeout: Timeout): Future[TreeRepr] = graphService.getTreeRepr(treeRootQid, treeName, List()).map(r => TreeRepr.fromQuine(r.repr))
+  def getRepr(implicit timeout: Timeout): Future[TreeRepr] = graphService.getTreeRepr(hostName, treeName, List()).map(r => TreeRepr.fromQuine(r.repr))
 
   def saveStateAsync(): Future[Unit] = {
 //    val now = System.currentTimeMillis
@@ -392,7 +395,7 @@ case class PpmDefinition[DataShape](
 
   def prettyString: Future[String] = {
     implicit val timeout = Timeout(10.1 minutes)
-    graphService.getTreeRepr(treeRootQid,treeName,List()).map(_.repr.toString())
+    graphService.getTreeRepr(hostName, treeName, List()).map(_.repr.toString())
   }
 }
 
@@ -483,10 +486,10 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
     PpmDefinition[ESO]( "ProcessesWithNetworkActivity", hostName,
       d => d._3._1.isInstanceOf[PpmNetFlowObject],
       List(
-        d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),
+        d => List(d._2._2.map(_.path).getOrElse("<no_subject_path_node>")),   // Process
         d => {
           val nf = d._3._1.asInstanceOf[PpmNetFlowObject]
-          List(nf.remoteAddress.getOrElse("no_address_from_CDM"), nf.remotePort.getOrElse("no_port_from_CDM").toString)
+          List(nf.remoteAddress.getOrElse("no_address_from_CDM"), nf.remotePort.getOrElse("no_port_from_CDM").toString)   // Netflow
         }
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid),
@@ -637,14 +640,14 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         ),
         d => List(
           d._3._2._2.map(_.path).getOrElse(d._3._2._1.uuid.rendered), // Reading subject name or UUID
-          d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
+//          d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
             d._3._3._1 match {
-              case o: PpmSrcSinkObject => s" : ${o.srcSinkType}"
-              case o: PpmFileObject => s" : ${o.fileObjectType}"
-              case o: PpmNetFlowObject => s"  NetFlow: ${o.remoteAddress.getOrElse("no_remote_address")}:${o.remotePort.getOrElse("no_remote_port")}"
-              case _ => ""
+              case o: PpmSrcSinkObject => d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + s" : ${o.srcSinkType}"
+              case o: PpmFileObject    => d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + s" : ${o.fileObjectType}"
+              case o: PpmNetFlowObject => s"NetFlow: ${o.remoteAddress.getOrElse("no_remote_address")}:${o.remotePort.getOrElse("no_remote_port")}"
+              case _                   => d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)
             }
-          )
+//          )
         )
       ),
       d => Set(NamespacedUuidDetails(d._3._1.uuid),
@@ -1042,7 +1045,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
   def ppmNodeActorBeginGetTreeRepr(treeName: String, startingKey: List[ExtractedValue] = Nil)(implicit timeout: Timeout): Future[PpmNodeActorGetTreeReprResult] =
     ppm(treeName).map(d =>
-      graphService.getTreeRepr(d.treeRootQid, treeName, startingKey).map(r => PpmNodeActorGetTreeReprResult(TreeRepr.fromQuine(r.repr)))
+      graphService.getTreeRepr(hostName, treeName, startingKey).map(r => PpmNodeActorGetTreeReprResult(TreeRepr.fromQuine(r.repr)))
     ).getOrElse(Future.failed(new NoSuchElementException(s"No tree found with name $treeName")))
 
   def ppmTreeAlarmQuery(treeName: String, queryPath: List[ExtractedValue], namespace: String, startAtTime: Long = 0L, forwardFromStartTime: Boolean = true, resultSizeLimit: Option[Int] = None, excludeRatingBelow: Option[Int] = None): PpmTreeAlarmResult = {

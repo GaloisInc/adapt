@@ -32,6 +32,8 @@ import com.rrwright.quine.runtime._
 import com.rrwright.quine.language._
 //import com.rrwright.quine.language.JavaObjectSerializationScheme._
 import com.rrwright.quine.language.BoopickleScheme._
+import scala.collection.JavaConverters._
+import java.util.concurrent.ConcurrentHashMap
 
 
 object Application extends App {
@@ -223,14 +225,37 @@ object Application extends App {
 
 
 
+  val esoFileInstanceBranch = branchOf[ESOFileInstance]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
+  val esoSrcSinkInstanceBranch = branchOf[ESOSrcSnkInstance]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
+  val esoNetworkInstanceBranch = branchOf[ESONetworkInstance]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
+  val esoChildProcessInstanceBranch = branchOf[ChildProcess]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
+
 
   val sqidHostPrefix = quineConfig.thishost.replace(".", "-")
+
+//  implicit val stringReader = implicitly[PickleReader[String]]
 
   val sqidFile = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOFile-accumulator")(
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
         val queryable = implicitly[Queryable[ESOFileInstance]]
-        val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
+        val reconstructed = nodeComponents.toList.flatMap(nc => queryable.fromNodeComponents(nc))
+//        val size = nodeComponents.toList.map(_.flatValues().size).sum
+//          println(
+//            s"File NodeComponents stats = List size: ${nodeComponents.toList.size} Size: $size ${
+//            if (size > 20)
+//            s"\nBig: ${nodeComponents.map(_.flatValues().map(x =>
+//              x._1 -> x._2.left.map(q => graph.idProvider.customIdFromQid(q).get).right.map(p => new com.rrwright.quine.language.UnpickleOps(p.thisPickle).unpickleTry[String] -> p)
+//            ).mkString("\n")).mkString("\n\n")}"
+
+////            s"""BIG one's paths:
+////               |  Predicates:
+////               |${reconstructed.map(r => r.predicateObject.path.path -> graph.idProvider.customIdFromQid(r.predicateObject.qid.get).get).mkString("    ", "\n    ", "")}
+////               |  Subjects:
+////               |${reconstructed.map(r => r.subject.path.path -> graph.idProvider.customIdFromQid(r.subject.qid.get).get).mkString("    ", "\n    ", "")}""".stripMargin
+
+//            }"
+//          )
         StandingFetches.onESOFileMatch(reconstructed)
     })
   ))
@@ -240,7 +265,7 @@ object Application extends App {
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
         val queryable = implicitly[Queryable[ESOSrcSnkInstance]]
-        val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
+        val reconstructed = nodeComponents.toList.flatMap(nc => queryable.fromNodeComponents(nc))
         StandingFetches.onESOSrcSinkMatch(reconstructed)
     })
   ))
@@ -250,7 +275,7 @@ object Application extends App {
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
         val queryable = implicitly[Queryable[ESONetworkInstance]]
-        val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
+        val reconstructed = nodeComponents.toList.flatMap(nc => queryable.fromNodeComponents(nc))
         StandingFetches.onESONetworkMatch(reconstructed)
     })
   ))
@@ -260,7 +285,7 @@ object Application extends App {
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
         val queryable = implicitly[Queryable[ChildProcess]]
-        val reconstructed = nodeComponents.flatMap(nc => queryable.fromNodeComponents(nc))
+        val reconstructed = nodeComponents.toList.flatMap(nc => queryable.fromNodeComponents(nc))
         StandingFetches.onESOProcessMatch(reconstructed)
     })
   ))
@@ -308,9 +333,6 @@ object Application extends App {
   statusActor ! InitMsg
 
 
-  val cdmSources: Map[HostName, (IngestHost, Source[(Namespace,CDM20), NotUsed])] = ingestConfig.hosts.map { host: IngestHost =>
-    host.hostName -> (host, host.toCdmSource(ErrorHandler.print))
-  }.toMap
 
 
   val lruDedup = Flow[Either[ADM, EdgeAdm2Adm]].statefulMapConcat{ () =>
@@ -337,7 +359,10 @@ object Application extends App {
 
     {
       case a @ Left(adm: AdmPathNode) =>
-        val result = if (seenPaths.containsKey(adm)) Nil else List(a)
+        val result = if (seenPaths.containsKey(adm)) Nil else {
+//          println(s"Received path node: ${adm.path}")
+          List(a)
+        }
         seenPaths.put(adm, None)
         result
 
@@ -370,10 +395,10 @@ object Application extends App {
     }
   }
 
-
-  val quineSink: Sink[Either[ADM, EdgeAdm2Adm], NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit q: GraphDSL.Builder[NotUsed]  =>
+  // One of `Either[ADM, EdgeAdm2Adm]`, `PpmObservation`
+  val quineSink: Sink[Any, NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit q: GraphDSL.Builder[NotUsed]  =>
     import GraphDSL.Implicits._
-    val balance = q.add(Balance[Either[ADM, EdgeAdm2Adm]](parallelism))
+    val balance = q.add(Balance[Any](parallelism))
     (0 until parallelism).foreach { idx =>
       val quineDBRef = system.actorOf(Props(classOf[QuineDBActor], graph, idx), s"QuineDB-$idx")
       balance.out(idx) ~> Sink.actorRefWithAck(quineDBRef, InitMsg, Ack, CompleteMsg, println).async
@@ -382,20 +407,46 @@ object Application extends App {
   })
 
 
+  val standingFetchSinks = new ConcurrentHashMap[AdaptConfig.HostName, ActorRef]().asScala
+
+
   println("Running Quine ingest.")
-    val hostSources = cdmSources.values.toSeq
-    val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
-    for (((host, source), i) <- hostSources.zipWithIndex) {
+
+  val cdmSources: Map[HostName, (IngestHost, Source[(Namespace,CDM20), NotUsed])] = ingestConfig.hosts.map { host: IngestHost =>
+    host.hostName -> (host, host.toCdmSource(ErrorHandler.print))
+  }.toMap
+  val hostSources = cdmSources.values.toSeq
+  val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
+  for ((host, source) <- hostSources) {
+    val standingFetchSink: ActorRef = RunnableGraph.fromGraph(GraphDSL.create(
+      Source.actorRef[PpmObservation](quineConfig.ppmobservationbuffer, OverflowStrategy.dropNew)
+    ) { implicit b => standingFetchSource =>
+      import GraphDSL.Implicits._
+
+      val merge = b.add(MergePreferred[Any](1, eagerComplete = true))
+
       source
         .via(printCounter(host.hostName, statusActor))
-        .via(debug.debugBuffer(s"[${host.hostName}]  0.) before ER"))
+        .via(debug.debugBuffer(s"[${host.hostName}]  0.) before ER", 100000))
         .via(erMap(host.hostName))
-        .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB"))
         .via(lruDedup)
-        .via(printCounter(host.hostName+" ADM", statusActor))
-        .runWith(quineSink)
-    }
+        .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB", 100000))
+        .via(printCounter(host.hostName+" ADM", statusActor)) ~> merge.in(0)
 
+      standingFetchSource ~> merge.preferred
+
+      merge.out.via(printCounter(host.hostName + " Quine", statusActor)) ~> quineSink
+
+      ClosedShape
+    }).run()
+
+    standingFetchSinks += (host.hostName -> standingFetchSink)
+  }
+
+
+//  def addNewIngestStream(): Unit = ???
+
+//  def terminateIngestStream(): Unit = ???
 
 
 

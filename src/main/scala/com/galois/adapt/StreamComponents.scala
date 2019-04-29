@@ -9,6 +9,7 @@ import scala.collection.mutable.{Map => MutableMap}
 import akka.actor.{ActorRef, ActorSystem}
 import akka.stream.{FlowShape, OverflowStrategy}
 import akka.util.ByteString
+import com.galois.adapt.adm.AdmEvent
 import scala.collection.mutable
 import com.galois.adapt.cdm20._
 import scala.concurrent.ExecutionContext
@@ -36,8 +37,10 @@ object FlowComponents {
         case (_, e: Event) => e.eventType.toString
         case (_, i: AnyRef) => i.getClass.getSimpleName
         case e: Event => e.eventType.toString
+        case e: AdmEvent => e.eventType.toString
         case Left(l) => makeName(l)
-        case Right(r) => s"Right[${r.getClass.getSimpleName}]"
+        case Right(r) => r.getClass.getSimpleName
+        case o: PpmObservation => "PPM - " + o.treeName
         case i => i.getClass.getSimpleName
       }
       val className = makeName(item)
