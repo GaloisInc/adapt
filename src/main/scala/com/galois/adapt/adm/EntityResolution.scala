@@ -94,7 +94,7 @@ object EntityResolution {
         case (_, cdm: NetFlowObject) => cdm.uuid != badUuid
         case (_, cdm: MemoryObject) => cdm.uuid != badUuid
         case (_, cdm: SrcSinkObject) => cdm.uuid != badUuid
-        case (_, cdm: Event) => cdm.uuid != badUuid
+        case (_, cdm: Event) => cdm.uuid != badUuid && cdm.eventType != EVENT_OTHER
         case _ => true
       }
       .via(annotateTime(maxTimeJump))                                         // Annotate with a monotonic time
