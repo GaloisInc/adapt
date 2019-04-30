@@ -185,7 +185,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
   var processRefSet: Map[ProcessDetails, Set[Long]] = Map.empty
   var alarmCounter: Long = 0
 
-  var processInstanceCounter: scala.collection.mutable.Map[ProcessDetails, Int] = scala.collection.mutable.Map.empty
+  var processInstanceCounter: Map[ProcessDetails, Int] = Map.empty
 
   def genAlarmID(): Long = {
     alarmCounter += 1
@@ -231,7 +231,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
       val filteredSummary: Future[Option[AlarmEvent]] = processInstanceCounter.getOrElse(pd, 0) match {
         case cnt if cnt >= minProcessInstanceCount =>
           summaries.map(_.map(x => AlarmEvent.changeCategory(x,ProcessFiltered)))
-        case _ => Future{None}
+        case _ => Future.successful(None)
       }
 
       //it is OK to have empty process Activities
