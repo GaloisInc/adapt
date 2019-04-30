@@ -408,7 +408,9 @@ object Application extends App {
     }))
     (0 until parallelism).foreach { idx =>
       val quineDBRef = system.actorOf(Props(classOf[QuineDBActor], graph, idx, currentlyProcessingMap), s"QuineDB-$idx")
-      partition.out(idx) ~> Sink.actorRefWithAck(quineDBRef, InitMsg, Ack, CompleteMsg, println).async
+        partition.out(idx) ~>
+          Flow[Any].buffer(1000, OverflowStrategy.backpressure) ~>
+          Sink.actorRefWithAck(quineDBRef, InitMsg, Ack, CompleteMsg, println).async
     }
     SinkShape(partition.in)
   })
