@@ -25,7 +25,7 @@ object FlowComponents {
     val recentPopulationCounter = MutableMap.empty[String, Long]
     val totalPopulationCounter = MutableMap.empty[String, Long]
 
-    val numberFormatter = NumberFormat.getInstance()
+    val nf = NumberFormat.getInstance()
 
     { item: T =>  // Type annotation T is a compilation hack! No runtime effect because it's generic.
       if (lastTimestampNanos == 0L) {
@@ -51,7 +51,7 @@ object FlowComponents {
         val nowNanos = System.nanoTime()
         val durationSeconds = (nowNanos - lastTimestampNanos) / 1e9
 
-        println(s"$counterName ingested: ${numberFormatter.format(counter)}   Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${numberFormatter.format((every / durationSeconds).toInt)} items/second. At time: ${System.currentTimeMillis}") //  Rate since beginning: ${((counter - startingCount) / ((nowNanos - originalStartTime) / 1e9)).toInt} items/second.")
+        println(s"$counterName ingested: ${nf.format(counter)}  Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${nf.format((every / durationSeconds).toInt)} /s Overall rate: ${nf.format(((counter - startingCount) / ((nowNanos - originalStartTime) / 1e9)).toInt)} /s.")
 
         statusActor ! PopulationLog(
           counterName,

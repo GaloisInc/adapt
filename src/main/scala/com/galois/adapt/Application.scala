@@ -230,16 +230,39 @@ object Application extends App {
   val esoNetworkInstanceBranch = branchOf[ESONetworkInstance]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
   val esoChildProcessInstanceBranch = branchOf[ChildProcess]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
 
+  val esoFileInstanceQueryable = implicitly[Queryable[ESOFileInstance]]
+  val esoSrcSinkInstanceQuerable = implicitly[Queryable[ESOSrcSnkInstance]]
+  val esoNetworkInstanceQueryable = implicitly[Queryable[ESONetworkInstance]]
+  val esoChildProcessInstanceQueryable = implicitly[Queryable[ChildProcess]]
 
   val sqidHostPrefix = quineConfig.thishost.replace(".", "-")
 
 //  implicit val stringReader = implicitly[PickleReader[String]]
 
+//  val subjectMultiSeen = new java.util.concurrent.ConcurrentHashMap[Set[String], None.type]()
+//  val predicateMultiSeen = new java.util.concurrent.ConcurrentHashMap[Set[String], None.type]()
+
+
   val sqidFile = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOFile-accumulator")(
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
-        val queryable = implicitly[Queryable[ESOFileInstance]]
-        val reconstructed = nodeComponents.toList.flatMap(nc => queryable.fromNodeComponents(nc))
+        val reconstructed = nodeComponents.toList.flatMap(nc =>
+          esoFileInstanceQueryable.fromNodeComponents(nc)
+        )
+
+//        if (reconstructed.lengthCompare(1) > 0) {
+//          val subjectPaths = reconstructed.map(eso => eso.subject.path.path).toSet
+//          Option(subjectMultiSeen.putIfAbsent(subjectPaths, None)) match {
+//            case None => if (subjectPaths.size > 1) println(s"Subject Paths: $subjectPaths")
+//            case _ => ()
+//          }
+//          val predicatePaths = reconstructed.map(_.predicateObject.path.path).toSet
+//          Option(predicateMultiSeen.putIfAbsent(predicatePaths, None)) match {
+//            case None => if (predicatePaths.size > 1) println(s"File Paths: $predicatePaths")
+//            case _ => ()
+//          }
+//        }
+
 //        val size = nodeComponents.toList.map(_.flatValues().size).sum
 //          println(
 //            s"File NodeComponents stats = List size: ${nodeComponents.toList.size} Size: $size ${
@@ -264,8 +287,9 @@ object Application extends App {
   val sqidSrcSnk = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOSrcSnk-accumulator")(
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
-        val queryable = implicitly[Queryable[ESOSrcSnkInstance]]
-        val reconstructed = nodeComponents.toList.flatMap(nc => queryable.fromNodeComponents(nc))
+        val reconstructed = nodeComponents.toList.flatMap(nc =>
+          esoSrcSinkInstanceQuerable.fromNodeComponents(nc)
+        )
         StandingFetches.onESOSrcSinkMatch(reconstructed)
     })
   ))
@@ -274,8 +298,9 @@ object Application extends App {
   val sqidNetwork = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESONetwork-accumulator")(
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
-        val queryable = implicitly[Queryable[ESONetworkInstance]]
-        val reconstructed = nodeComponents.toList.flatMap(nc => queryable.fromNodeComponents(nc))
+        val reconstructed = nodeComponents.toList.flatMap(nc =>
+          esoNetworkInstanceQueryable.fromNodeComponents(nc)
+        )
         StandingFetches.onESONetworkMatch(reconstructed)
     })
   ))
@@ -284,8 +309,9 @@ object Application extends App {
   val sqidParentProcess = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ProcessParentage")(
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
-        val queryable = implicitly[Queryable[ChildProcess]]
-        val reconstructed = nodeComponents.toList.flatMap(nc => queryable.fromNodeComponents(nc))
+        val reconstructed = nodeComponents.toList.flatMap(nc =>
+          esoChildProcessInstanceQueryable.fromNodeComponents(nc)
+        )
         StandingFetches.onESOProcessMatch(reconstructed)
     })
   ))
@@ -419,23 +445,29 @@ object Application extends App {
   val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
   for ((host, source) <- hostSources) {
     val standingFetchSink: ActorRef = RunnableGraph.fromGraph(GraphDSL.create(
-      Source.actorRef[PpmObservation](quineConfig.ppmobservationbuffer, OverflowStrategy.dropNew)
+      Source.actorRef[PpmObservation](quineConfig.ppmobservationbuffer,
+
+
+        OverflowStrategy.fail)
+
+
+
     ) { implicit b => standingFetchSource =>
       import GraphDSL.Implicits._
 
       val merge = b.add(MergePreferred[Any](1, eagerComplete = true))
 
-      source
-        .via(printCounter(host.hostName, statusActor))
-        .via(debug.debugBuffer(s"[${host.hostName}]  0.) before ER", 100000))
-        .via(erMap(host.hostName))
+      source.async
+        .via(printCounter(host.hostName+" CDM", statusActor))
+        .via(debug.debugBuffer(s"[${host.hostName}]  0.) before ER", 100000)).async
+        .via(erMap(host.hostName).async).async
         .via(lruDedup)
-        .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB", 100000))
+        .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB", 100000)).async
         .via(printCounter(host.hostName+" ADM", statusActor)) ~> merge.in(0)
 
       standingFetchSource ~> merge.preferred
 
-      merge.out.via(printCounter(host.hostName + " Quine", statusActor)) ~> quineSink
+      merge.out.via(printCounter(host.hostName + " Quine", statusActor)) ~> quineSink.async
 
       ClosedShape
     }).run()
@@ -444,9 +476,9 @@ object Application extends App {
   }
 
 
-//  def addNewIngestStream(): Unit = ???
+//  def addNewIngestStream(host: IngestHost): Unit = ???
 
-//  def terminateIngestStream(): Unit = ???
+//  def terminateIngestStream(hostName: HostName): Unit = ???
 
 
 

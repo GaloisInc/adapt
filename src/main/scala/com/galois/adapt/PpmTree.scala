@@ -116,7 +116,8 @@ case class PpmDefinition[DataShape](
   graphService: GraphService[AdmUUID]
 ) extends LazyLogging {
 
-  implicit val ec: ExecutionContext = graphService.system.dispatchers.lookup("adapt.ppm.manager-dispatcher")
+    implicit val ec: ExecutionContext = graphService.system.dispatchers.lookup("quine.actor.node-dispatcher")
+//  implicit val ec: ExecutionContext = graphService.system.dispatchers.lookup("adapt.ppm.manager-dispatcher")
 //  implicit val ec: ExecutionContext = context.dispatcher
 
   val basePath: String = ppmConfig.basedir + treeName + "-" + hostName
@@ -411,7 +412,7 @@ case class PpmNodeActorGetTopLevelCountResult(count: Int) // We can just query t
 
 class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphService: GraphService[AdmUUID]) extends LazyLogging { thisActor =>
 
-  implicit val ec: ExecutionContext = graphService.system.dispatchers.lookup("adapt.ppm.manager-dispatcher")
+  implicit val ec: ExecutionContext = graphService.system.dispatchers.lookup("quine.actor.node-dispatcher")
 
   val (pathDelimiterRegexPattern, pathDelimiterChar) = if (isWindows) ("""\\""", "\\") else ("""/""" ,   "/")
   val sudoOrPowershellComparison: String => Boolean = if (isWindows) {
