@@ -241,11 +241,12 @@ case class PpmDefinition[DataShape](
   type ObservationId = Long
 
   val lowerBoundQueueLength = new AtomicLong(0L)
-  var totalEmitted: Long = 0
+  var totalCompressed: Long = 0L
+  var totalEmitted: Long = 0L
   val someoneDequing = new AtomicBoolean(false)
   val queuedObservations = new java.util.concurrent.ConcurrentLinkedDeque[(List[ExtractedValue], Set[NamespacedUuidDetails], Set[Long], Int, ObservationId)]()
 
-  graphService.system.scheduler.schedule(10 seconds, 60 seconds)(println(s"Alec's lowerBoundQueueLength for: $hostName $treeName size: ${lowerBoundQueueLength.get()} (total emitted: $totalEmitted)"))
+  graphService.system.scheduler.schedule(10 seconds, 60 seconds)(println(s"Alec's lowerBoundQueueLength for: $hostName $treeName size: ${lowerBoundQueueLength.get()} (total emitted: $totalEmitted, total compressed: $totalCompressed)"))
 
   /*
    *  If you observe something with a _different_ extracted value, you are responsible for emitting existing values
@@ -277,6 +278,7 @@ case class PpmDefinition[DataShape](
 
         var remainingCycles = 100
         while (Some(extracted) == Option(queuedObservations.peekLast()).map(_._1) && remainingCycles > 0) {
+          totalCompressed += 1
           remainingCycles -= 1
 
           lowerBoundQueueLength.decrementAndGet()
