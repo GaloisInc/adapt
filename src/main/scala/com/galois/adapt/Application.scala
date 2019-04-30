@@ -401,12 +401,16 @@ object Application extends App {
 
     val currentlyProcessingMap = new java.util.concurrent.atomic.AtomicReference(Map.empty[ActorRef, AdmUUID])
 
-    val balance = q.add(Balance[Any](parallelism))
+    val partition = q.add(Partition[Any](parallelism, {
+      case Left(a: ADM) => a.uuid.hashCode
+      case Right(e: EdgeAdm2Adm) => e.tgt.hashCode
+      case _ => Random.nextInt(parallelism - 1)
+    }))
     (0 until parallelism).foreach { idx =>
       val quineDBRef = system.actorOf(Props(classOf[QuineDBActor], graph, idx, currentlyProcessingMap), s"QuineDB-$idx")
-      balance.out(idx) ~> Sink.actorRefWithAck(quineDBRef, InitMsg, Ack, CompleteMsg, println).async
+      partition.out(idx) ~> Sink.actorRefWithAck(quineDBRef, InitMsg, Ack, CompleteMsg, println).async
     }
-    SinkShape(balance.in)
+    SinkShape(partition.in)
   })
 
 
