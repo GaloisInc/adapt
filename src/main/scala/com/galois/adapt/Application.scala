@@ -402,8 +402,8 @@ object Application extends App {
     val currentlyProcessingMap = new java.util.concurrent.atomic.AtomicReference(Map.empty[ActorRef, AdmUUID])
 
     val partition = q.add(Partition[Any](parallelism, {
-      case Left(a: ADM) => a.uuid.hashCode
-      case Right(e: EdgeAdm2Adm) => e.tgt.hashCode
+      case Left(a: ADM) => Math.abs(a.uuid.hashCode) % parallelism
+      case Right(e: EdgeAdm2Adm) => Math.abs(e.tgt.hashCode) % parallelism
       case _ => Random.nextInt(parallelism - 1)
     }))
     (0 until parallelism).foreach { idx =>
