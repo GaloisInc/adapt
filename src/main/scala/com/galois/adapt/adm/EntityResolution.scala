@@ -82,6 +82,12 @@ object EntityResolution {
     // CDM nodes with this CDM UUID (or edges to/from this CDM UUID) should be ignored
     val badUuid = new UUID(0L, 0L)
 
+    val goodEventTypes = {
+      import com.galois.adapt.StandingFetches._
+
+      readTypes.union(writeTypes).union(execTypes).union(deleteTypes)
+    }
+
     Flow[(String, CurrentCdm)]
       .filter {
         case (_, cdm: Host) => cdm.uuid != badUuid
@@ -94,7 +100,7 @@ object EntityResolution {
         case (_, cdm: NetFlowObject) => cdm.uuid != badUuid
         case (_, cdm: MemoryObject) => cdm.uuid != badUuid
         case (_, cdm: SrcSinkObject) => cdm.uuid != badUuid
-        case (_, cdm: Event) => cdm.uuid != badUuid && cdm.eventType != EVENT_OTHER
+        case (_, cdm: Event) => cdm.uuid != badUuid && goodEventTypes.contains(cdm.eventType)
         case _ => true
       }
       .via(annotateTime(maxTimeJump))                                         // Annotate with a monotonic time
