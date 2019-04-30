@@ -632,41 +632,41 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         NamespacedUuidDetails(d._3._1.uuid)),
       d => Set(d._3._1.earliestTimestampNanos,d._3._1.latestTimestampNanos),
       shouldApplyThreshold = false
-    )(graphService),
+    )(graphService) // ,
 
-    new PpmDefinition[SEOES]("CommunicationPathThroughObject", hostName,
-      d => readTypes.contains(d._3._1.eventType) && d._2 == "did_write",
-        // (d._3._1.isInstanceOf[AdmSrcSinkObject] && d._3._1.asInstanceOf[AdmSrcSinkObject].srcSinkType == MEMORY_SRCSINK),  // Any kind of event to a memory object.
-      List(
-        d => List(
-          d._1._2.map(_.path).getOrElse(d._1._1.uuid.rendered)  // Writing subject name or UUID
-        ),
-        d => List(
-          d._3._2._2.map(_.path).getOrElse(d._3._2._1.uuid.rendered), // Reading subject name or UUID
-//          d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
-            d._3._3._1 match {
-              case o: PpmSrcSinkObject => d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + s" : ${o.srcSinkType}"
-              case o: PpmFileObject    => d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + s" : ${o.fileObjectType}"
-              case o: PpmNetFlowObject => s"NetFlow: ${o.remoteAddress.getOrElse("no_remote_address")}:${o.remotePort.getOrElse("no_remote_port")}"
-              case _                   => d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)
-            }
-//          )
-        )
-      ),
-      d => Set(NamespacedUuidDetails(d._3._1.uuid),
-        NamespacedUuidDetails(d._1._1.uuid, Some(d._1._2.map(_.path).getOrElse(d._1._1.uuid.rendered)), Some(d._1._1.cid)),
-        NamespacedUuidDetails(d._3._2._1.uuid, Some(d._3._2._2.map(_.path).getOrElse(d._3._2._1.uuid.rendered)), Some(d._3._2._1.cid)),
-        NamespacedUuidDetails(d._3._3._1.uuid,Some(d._3._3._2.map(_.path).getOrElse(d._3._3._1.uuid.rendered) + (  // Object name or UUID and type
-          d._3._3._1 match {
-            case o: PpmSrcSinkObject => s" : ${o.srcSinkType}"
-            case o: PpmFileObject => s" : ${o.fileObjectType}"
-            case o: PpmNetFlowObject => s"  NetFlow: ${o.remoteAddress.getOrElse("no_remote_address")}:${o.remotePort.getOrElse("no_remote_port")}"
-            case _ => ""
-          }
-          )))),
-      d => Set(d._3._1.earliestTimestampNanos,d._3._1.latestTimestampNanos),
-      shouldApplyThreshold = true
-    )(graphService)
+//    new PpmDefinition[SEOES]("CommunicationPathThroughObject", hostName,
+//      d => readTypes.contains(d._3._1.eventType) && d._2 == "did_write",
+//        // (d._3._1.isInstanceOf[AdmSrcSinkObject] && d._3._1.asInstanceOf[AdmSrcSinkObject].srcSinkType == MEMORY_SRCSINK),  // Any kind of event to a memory object.
+//      List(
+//        d => List(
+//          d._1._2.map(_.path).getOrElse(d._1._1.uuid.rendered)  // Writing subject name or UUID
+//        ),
+//        d => List(
+//          d._3._2._2.map(_.path).getOrElse(d._3._2._1.uuid.rendered), // Reading subject name or UUID
+////          d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + (  // Object name or UUID and type
+//            d._3._3._1 match {
+//              case o: PpmSrcSinkObject => d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + s" : ${o.srcSinkType}"
+//              case o: PpmFileObject    => d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + s" : ${o.fileObjectType}"
+//              case o: PpmNetFlowObject => s"NetFlow: ${o.remoteAddress.getOrElse("no_remote_address")}:${o.remotePort.getOrElse("no_remote_port")}"
+//              case _                   => d._3._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered)
+//            }
+////          )
+//        )
+//      ),
+//      d => Set(NamespacedUuidDetails(d._3._1.uuid),
+//        NamespacedUuidDetails(d._1._1.uuid, Some(d._1._2.map(_.path).getOrElse(d._1._1.uuid.rendered)), Some(d._1._1.cid)),
+//        NamespacedUuidDetails(d._3._2._1.uuid, Some(d._3._2._2.map(_.path).getOrElse(d._3._2._1.uuid.rendered)), Some(d._3._2._1.cid)),
+//        NamespacedUuidDetails(d._3._3._1.uuid,Some(d._3._3._2.map(_.path).getOrElse(d._3._3._1.uuid.rendered) + (  // Object name or UUID and type
+//          d._3._3._1 match {
+//            case o: PpmSrcSinkObject => s" : ${o.srcSinkType}"
+//            case o: PpmFileObject => s" : ${o.fileObjectType}"
+//            case o: PpmNetFlowObject => s"  NetFlow: ${o.remoteAddress.getOrElse("no_remote_address")}:${o.remotePort.getOrElse("no_remote_port")}"
+//            case _ => ""
+//          }
+//          )))),
+//      d => Set(d._3._1.earliestTimestampNanos,d._3._1.latestTimestampNanos),
+//      shouldApplyThreshold = true
+//    )(graphService)
   ) //.par
 
 
