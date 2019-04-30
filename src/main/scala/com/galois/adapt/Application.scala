@@ -299,7 +299,7 @@ object Application extends App {
 
 
   val parallelism = quineConfig.quineactorparallelism
-  val uiDBInterface = system.actorOf(Props(classOf[QuineDBActor], graph, -1), s"QuineDB-UI")
+  val uiDBInterface = system.actorOf(Props(classOf[QuineDBActor], graph, -1, new java.util.concurrent.atomic.AtomicReference(Map.empty[ActorRef, AdmUUID])), s"QuineDB-UI")
 //    system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
 
   AlarmReporter  // instantiate AlarmReporter (LazyInit) and corresponding actor
@@ -398,9 +398,12 @@ object Application extends App {
   // One of `Either[ADM, EdgeAdm2Adm]`, `PpmObservation`
   val quineSink: Sink[Any, NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit q: GraphDSL.Builder[NotUsed]  =>
     import GraphDSL.Implicits._
+
+    val currentlyProcessingMap = new java.util.concurrent.atomic.AtomicReference(Map.empty[ActorRef, AdmUUID])
+
     val balance = q.add(Balance[Any](parallelism))
     (0 until parallelism).foreach { idx =>
-      val quineDBRef = system.actorOf(Props(classOf[QuineDBActor], graph, idx), s"QuineDB-$idx")
+      val quineDBRef = system.actorOf(Props(classOf[QuineDBActor], graph, idx, currentlyProcessingMap), s"QuineDB-$idx")
       balance.out(idx) ~> Sink.actorRefWithAck(quineDBRef, InitMsg, Ack, CompleteMsg, println).async
     }
     SinkShape(balance.in)

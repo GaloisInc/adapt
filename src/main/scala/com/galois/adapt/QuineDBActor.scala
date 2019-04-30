@@ -120,8 +120,14 @@ case class PpmObservation(
   observationCount: Int
 )
 
-class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQueryProxyActor {
+class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int, 
+  currentlyProcessingMap: java.util.concurrent.atomic.AtomicReference[Map[ActorRef, AdmUUID]]
+) extends DBQueryProxyActor {
   val nf = NumberFormat.getInstance()
+
+  currentlyProcessingMap.updateAndGet(new java.util.function.UnaryOperator[Map[ActorRef, AdmUUID]] {
+    def apply(m: Map[ActorRef, AdmUUID]) = m + (self -> AdmUUID(new java.util.UUID(0,0), ""))
+  })
 
   implicit val service = graphService
 
@@ -223,8 +229,19 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 
   def wrongFunc(x: Any): Unit = println("This is not the function you are looking for.")
 
+  val threshold: Double = 0.5
 
   def writeAdm(a: ADM, timeout: Timeout): Future[Long] = {
+    currentlyProcessingMap.updateAndGet(new java.util.function.UnaryOperator[Map[ActorRef, AdmUUID]] {
+      def apply(m: Map[ActorRef, AdmUUID]) = {
+        val n = m + (self -> a.uuid) 
+        val proportion = n.values.filter(_ == a.uuid).size.toDouble / n.size
+        if (proportion > threshold) {
+          println(s"Woah there! ${proportion * 100}% of QuineDB actors are blocked on ${a.uuid}!!!")
+        }
+        n
+      }
+    })
     implicit val t = timeout
     val startNanos = System.nanoTime()
     (a match {
@@ -260,6 +277,16 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   }
 
   def writeAdmEdge(e: EdgeAdm2Adm, timeout: Timeout): Future[Long] = {
+    currentlyProcessingMap.updateAndGet(new java.util.function.UnaryOperator[Map[ActorRef, AdmUUID]] {
+      def apply(m: Map[ActorRef, AdmUUID]) = {
+        val n = m + (self -> e.tgt)
+        val proportion = n.values.filter(_ == e.tgt).size.toDouble / n.size
+        if (proportion > threshold) {
+          println(s"Woah there! ${proportion * 100}% of QuineDB actors are blocked on ${e.tgt}!!!")
+        }
+        n
+      }
+    })
     val src = AdmUuidProvider.customIdToQid(e.src)
     val dest = AdmUuidProvider.customIdToQid(e.tgt)
     val startNanos = System.nanoTime()
@@ -426,9 +453,12 @@ case class WithSender[A](sender: ActorRef, message: A)
 
 
 class QuineRouter(count: Int, graph: GraphService[AdmUUID]) extends Actor with ActorLogging {
+
+  val currentlyProcessingMap = new java.util.concurrent.atomic.AtomicReference(Map.empty[ActorRef, AdmUUID])
+
   var router = {
     val routees = (0 until count) map { idx =>
-      val r = context.actorOf(Props(classOf[QuineDBActor], graph, idx))
+      val r = context.actorOf(Props(classOf[QuineDBActor], graph, idx, currentlyProcessingMap))
       context watch r
       ActorRefRoutee(r)
     }
@@ -441,7 +471,10 @@ class QuineRouter(count: Int, graph: GraphService[AdmUUID]) extends Actor with A
     case msg @ Terminated(a) =>
       log.warning(s"Received $msg")
       router = router.removeRoutee(a)
-      val r = context.actorOf(Props(classOf[QuineDBActor], graph, nextIdx))
+      currentlyProcessingMap.updateAndGet(new java.util.function.UnaryOperator[Map[ActorRef, AdmUUID]] {
+        def apply(m: Map[ActorRef, AdmUUID]) = m - a
+      })
+      val r = context.actorOf(Props(classOf[QuineDBActor], graph, nextIdx, currentlyProcessingMap))
       nextIdx += 1
       context watch r
       router = router.addRoutee(r)
