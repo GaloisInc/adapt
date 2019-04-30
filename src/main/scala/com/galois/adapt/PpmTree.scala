@@ -240,7 +240,7 @@ case class PpmDefinition[DataShape](
   type ObservationId = Long
 
   val lowerBoundQueueLength = new AtomicLong(0L)
-  val totalCompressed: Long = 0L
+  var totalCompressed: Long = 0L
   var totalEmitted: Long = 0L
   val someoneDequing = new AtomicBoolean(false)
   val queuedObservations = new java.util.concurrent.ConcurrentLinkedDeque[(List[ExtractedValue], Set[NamespacedUuidDetails], Set[Long], Int, ObservationId)]()
