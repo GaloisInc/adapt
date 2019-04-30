@@ -28,7 +28,16 @@ import Application.system
 import ApiJsonProtocol._
 import com.galois.adapt.AdaptConfig.HostName
 
-case class ProcessDetails(processName: String, pid: Option[Int], hostName: HostName)
+case class ProcessDetails(processName: String, pid: Option[Int], hostName: HostName, dataTimestamps: Set[Long]) {
+  def toJson: JsValue = {
+    JsObject(
+      "processName" -> JsString(processName),
+      "pid" -> JsString(pid.toString),
+      "hostName" -> JsString(hostName),
+      "dataTimestamps" -> JsArray(dataTimestamps.toList.map(x => JsNumber(x)).toVector)
+    )
+  }
+}
 
 case class AlarmEventMetaData(runID: String, alarmCategory: String)
 
@@ -36,14 +45,17 @@ trait AlarmEventData {
   def toJson: JsValue
 }
 
-case class DetailedAlarmEvent(processName: String, pid: String, hostName: HostName, details: String, alarmIDs: Set[Long]) extends AlarmEventData {
+case class DetailedAlarmEvent(processName: String, pid: String, hostName: HostName, details: String, alarmIDs: Set[Long], dataTimestamps: Set[Long], emitTimestamp: Long) extends AlarmEventData {
   def toJson: JsValue = {
     JsObject(
       "processName" -> JsString(processName),
       "pid" -> JsString(pid),
       "hostName" -> JsString(hostName),
       "referencedRawAlarms" -> JsArray(alarmIDs.map(JsNumber(_)).toVector),
-      "details" -> JsString(details)
+      "details" -> JsString(details),
+      "alarmIDs" -> JsArray(alarmIDs.toList.map(x => JsNumber(x)).toVector),
+      "dataTimestamps" -> JsArray(dataTimestamps.toList.map(x => JsNumber(x)).toVector),
+      "emitTimestamp" -> JsNumber(this.emitTimestamp)
     )
   }
 }
@@ -71,7 +83,7 @@ case class ConciseAlarmEvent(
       "localProbThreshold" -> JsNumber(this.localProbThreshold),
       "ppmTreeNodeAlarms" -> JsArray(this.ppmTreeNodeAlarms.map(_.toJson).toVector),
       "alarmID" -> JsNumber(this.alarmID),
-      "processDetails" -> processDetails.toJson
+      "processDetails" -> JsArray(processDetails.map(_.toJson).toVector)
     )
   }
 }
@@ -105,11 +117,15 @@ case object AlarmEvent {
     )
   }
 
-  def fromBatchedAlarm(alarmCategory: AlarmCategory, pd: ProcessDetails, details: String, alarmIDs: Set[Long], runID: String): AlarmEvent = {
+  def fromBatchedAlarm(alarmCategory: AlarmCategory, pd: ProcessDetails, details: String, alarmIDs: Set[Long], runID: String, emitTimestamp: Long): AlarmEvent = {
 
     AlarmEvent(
-      DetailedAlarmEvent(pd.processName, pd.pid.getOrElse("None").toString, pd.hostName, details, alarmIDs),
+      DetailedAlarmEvent(pd.processName, pd.pid.getOrElse("None").toString, pd.hostName, details, alarmIDs, pd.dataTimestamps, emitTimestamp),
       AlarmEventMetaData(runID, alarmCategory.toString))
+  }
+
+  def changeCategory(alarmEvent: AlarmEvent, alarmCategory: AlarmCategory): AlarmEvent = {
+    AlarmEvent(alarmEvent.data, AlarmEventMetaData(alarmEvent.metadata.runID,alarmCategory.toString))
   }
 }
 
@@ -127,6 +143,9 @@ case object TopTwenty extends AlarmCategory {
   override def toString = "topTwenty"
 }
 
+case object ProcessFiltered extends AlarmCategory {
+  override def toString = "processFiltered"
+}
 /*
 * Valid Messages for the AlarmReporterActor
 *
@@ -166,8 +185,10 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
   var processRefSet: Map[ProcessDetails, Set[Long]] = Map.empty
   var alarmCounter: Long = 0
 
+  var processInstanceCounter: Map[ProcessDetails, Int] = Map.empty
+
   def genAlarmID(): Long = {
-    alarmCounter += 1;
+    alarmCounter += 1
     alarmCounter
   }
 
@@ -195,25 +216,36 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
 
   def generateSummaryAndSend(lastMessage: Boolean): Unit = {
 
+    val numProcessInstancesToTake = math.round(processInstanceCounter.size * AlarmReporter.percentProcessInstancesToTake / 100)
+    val minProcessInstanceCount = processInstanceCounter.toList.sortBy(-_._2).take(numProcessInstancesToTake).lastOption.map(_._2).getOrElse(0)
+
     val batchedMessages: List[Future[Option[AlarmEvent]]] = processRefSet.view.map { case (pd, alarmIDs) =>
+
       //Suppress empty summaries
       val summaries: Future[Option[AlarmEvent]] = PpmSummarizer.summarize(pd.processName, Some(pd.hostName), pd.pid).map { s =>
         if (s == TreeRepr.empty) None
-        else Some(AlarmEvent.fromBatchedAlarm(ProcessSummary, pd, s.readableString, alarmIDs, runID))
+        else Some(AlarmEvent.fromBatchedAlarm(ProcessSummary, pd, s.readableString, alarmIDs, runID, System.currentTimeMillis))
       }.recoverWith{ case e => log.error(s"Summarizing: $pd failed with error: ${e.getMessage}"); Future.failed(e)}
+
+      // Filter out process instance summaries that don't have a lot of activity
+      val filteredSummary: Future[Option[AlarmEvent]] = processInstanceCounter.getOrElse(pd, 0) match {
+        case cnt if cnt >= minProcessInstanceCount =>
+          summaries.map(_.map(x => AlarmEvent.changeCategory(x,ProcessFiltered)))
+        case _ => Future.successful(None)
+      }
 
       //it is OK to have empty process Activities
       val completeTreeRepr: Future[Option[AlarmEvent]] = PpmSummarizer.fullTree(pd.processName, Some(pd.hostName), pd.pid).map { a =>
-        Some(AlarmEvent.fromBatchedAlarm(ProcessActivity, pd, a.withoutQNodes.readableString, alarmIDs, runID))
+        Some(AlarmEvent.fromBatchedAlarm(ProcessActivity, pd, a.withoutQNodes.readableString, alarmIDs, runID, System.currentTimeMillis))
       }.recoverWith{ case e => log.error(s"Getting Full Tree for: $pd failed with error: ${e.getMessage}"); Future.failed(e)}
 
       //Suppress empty summaries
-      val mostNovel: Future[Option[AlarmEvent]] = PpmSummarizer.mostNovelActions(numMostNovel, pd.processName, pd.hostName, pd.pid).map { mn =>
-        if (mn.isEmpty) None
-        else Some(AlarmEvent.fromBatchedAlarm(TopTwenty, pd, mn.mkString("\n"), alarmIDs, runID))
-      }.recoverWith{ case e => log.error(s"Getting Top 20 for: $pd failed with error: ${e.getMessage}"); Future.failed(e)}
+//      val mostNovel: Future[Option[AlarmEvent]] = PpmSummarizer.mostNovelActions(numMostNovel, pd.processName, pd.hostName, pd.pid).map { mn =>
+//        if (mn.isEmpty) None
+//        else Some(AlarmEvent.fromBatchedAlarm(TopTwenty, pd, mn.mkString("\n"), alarmIDs, runID, System.currentTimeMillis))
+//      }.recoverWith{ case e => log.error(s"Getting Top 20 for: $pd failed with error: ${e.getMessage}"); Future.failed(e)}
 
-      (summaries, completeTreeRepr, mostNovel)
+      (summaries, filteredSummary, completeTreeRepr)
     }.toList.flatMap(x => List(x._1, x._2, x._3))
 
     Future.sequence(batchedMessages).map(m => handleMessage(m.flatten, lastMessage)).onFailure {
@@ -241,6 +273,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
 
     alarmDetails.processDetailsSet.foreach { pd =>
       processRefSet += (pd -> (processRefSet.getOrElse(pd, Set.empty[Long]) + alarmID))
+      processInstanceCounter += (pd -> (processInstanceCounter.getOrElse(pd, 0) + 1))
     }
 
     // is this a cleaner solution?
@@ -293,6 +326,8 @@ object AlarmReporter extends LazyLogging {
 
   //Assumes ppmConfig.basedir is already created
   val logFilenamePrefix: String = AdaptConfig.ppmConfig.basedir + alarmConfig.logging.fileprefix
+
+  val percentProcessInstancesToTake = splunkConfig.percentProcessInstancesToTake
 
   val alarmReporterActor: ActorRef = system.actorOf(Props(classOf[AlarmReporterActor], runID, splunkConfig.maxbufferlength, splunkHecClient, alarmConfig, logFilenamePrefix), "alarmReporter")
 
