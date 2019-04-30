@@ -195,16 +195,19 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
       // ADM UUID
       case a: AdmUUID => JsString(a.rendered)
 
-      // Special cases (commented out because they are pretty verbose) and functionality is
-      // anyways accessible via the "vertex" and "edges" endpoints
-      //   case v: Vertex => ApiJsonProtocol.vertexToJson(v)
-      //   case e: Edge => ApiJsonProtocol.edgeToJson(e)
+      // Vertex and edges
+      case com.rrwright.quine.gremlin.Vertex(qid) =>
+        JsString(s"Vertex(${qidToString(qid)})")
+      case com.rrwright.quine.gremlin.Edge(src,lbl,tgt) =>
+        JsString(s"Edge(${qidToString(src)}, ${lbl.name}, ${qidToString(tgt)})")
 
       // Other: Any custom 'toString'
       case o => JsString(o.toString)
 
     }
   }
+
+  def qidToString(qid: com.rrwright.quine.language.QuineId): String = AdmUuidProvider.customIdFromQid(qid).toOption.fold(qid.toString)(_.rendered)
 
   def vertexToJson(v: Vertex): JsValue = {
     val jsProps = v.keys().asScala.toList.map { k =>
