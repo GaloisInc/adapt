@@ -230,15 +230,15 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
     (a match {
       case anAdm: AdmEvent =>
         anAdm.create(Some(anAdm.uuid)).map { x =>
-          graphService.standingFetchWithBranch[ESOFileInstance](anAdm.uuid, Application.esoFileInstanceBranch, Application.sqidFile)(wrongFunc)
-          graphService.standingFetchWithBranch[ESOSrcSnkInstance](anAdm.uuid, Application.esoSrcSinkInstanceBranch, Application.sqidSrcSnk)(wrongFunc)
-          graphService.standingFetchWithBranch[ESONetworkInstance](anAdm.uuid, Application.esoNetworkInstanceBranch, Application.sqidNetwork)(wrongFunc)
+         // graphService.standingFetchWithBranch[ESOFileInstance](anAdm.uuid, Application.esoFileInstanceBranch, Application.sqidFile)(wrongFunc)
+         // graphService.standingFetchWithBranch[ESOSrcSnkInstance](anAdm.uuid, Application.esoSrcSinkInstanceBranch, Application.sqidSrcSnk)(wrongFunc)
+         // graphService.standingFetchWithBranch[ESONetworkInstance](anAdm.uuid, Application.esoNetworkInstanceBranch, Application.sqidNetwork)(wrongFunc)
           x
         }
 
       case anAdm: AdmSubject =>
         anAdm.create(Some(anAdm.uuid)).map { x =>
-            graphService.standingFetchWithBranch[ChildProcess](anAdm.uuid, Application.esoChildProcessInstanceBranch, Application.sqidParentProcess)(wrongFunc)
+         //   graphService.standingFetchWithBranch[ChildProcess](anAdm.uuid, Application.esoChildProcessInstanceBranch, Application.sqidParentProcess)(wrongFunc)
           x
         }
 
