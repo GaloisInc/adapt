@@ -403,11 +403,12 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         .ackOnComplete(s)
 
     case PpmObservation(treeRootQid, treeName, hostName, extractedValues, collectedUuids, timestamps, sendNoveltiesFunc, observationCount) =>
-      if (shouldRecordDBWriteTimes) startWork()
-      val s = sender()
-      implicit val timeout = Timeout(2 seconds)
-      graphService.observe(treeRootQid, treeName, hostName, extractedValues, collectedUuids, timestamps, sendNoveltiesFunc, observationCount)
-        .ackOnComplete(s)
+      sender() ! Ack
+    //  if (shouldRecordDBWriteTimes) startWork()
+    //  val s = sender()
+    //  implicit val timeout = Timeout(2 seconds)
+    //  graphService.observe(treeRootQid, treeName, hostName, extractedValues, collectedUuids, timestamps, sendNoveltiesFunc, observationCount)
+    //    .ackOnComplete(s)
 
     case InitMsg => sender() ! Ack
 
