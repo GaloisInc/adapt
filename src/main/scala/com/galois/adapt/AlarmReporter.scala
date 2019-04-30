@@ -219,10 +219,6 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
     val numProcessInstancesToTake = math.round(processInstanceCounter.size * AlarmReporter.percentProcessInstancesToTake / 100)
     val minProcessInstanceCount = processInstanceCounter.toList.sortBy(-_._2).take(numProcessInstancesToTake).lastOption.map(_._2).getOrElse(0)
 
-    println("distinctProcessInstanceCount",processInstanceCounter.size)
-    println("numProcessInstancesToTake",numProcessInstancesToTake)
-    println("minProcessInstanceCount",minProcessInstanceCount)
-
     val batchedMessages: List[Future[Option[AlarmEvent]]] = processRefSet.view.map { case (pd, alarmIDs) =>
 
       //Suppress empty summaries
