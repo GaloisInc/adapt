@@ -422,7 +422,7 @@ object Application extends App {
   }
 
   // One of `Either[ADM, EdgeAdm2Adm]`, `PpmObservation`
-  val quineSink: Sink[Any, NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit q: GraphDSL.Builder[NotUsed]  =>
+  def quineSink(): Sink[Any, NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit q: GraphDSL.Builder[NotUsed]  =>
     import GraphDSL.Implicits._
     val balance = q.add(Balance[Any](parallelism))
     (0 until parallelism).foreach { idx =>
@@ -447,11 +447,10 @@ object Application extends App {
     val standingFetchSink: ActorRef = RunnableGraph.fromGraph(GraphDSL.create(
       Source.actorRef[PpmObservation](quineConfig.ppmobservationbuffer,
 
+        OverflowStrategy.dropNew
+//        OverflowStrategy.fail
 
-        OverflowStrategy.fail)
-
-
-
+    )
     ) { implicit b => standingFetchSource =>
       import GraphDSL.Implicits._
 
@@ -467,7 +466,7 @@ object Application extends App {
 
       standingFetchSource ~> merge.preferred
 
-      merge.out.via(printCounter(host.hostName + " Quine", statusActor)) ~> quineSink.async
+      merge.out.via(printCounter(host.hostName + " Quine", statusActor)) ~> quineSink().async
 
       ClosedShape
     }).run()
