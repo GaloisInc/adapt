@@ -270,56 +270,104 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   def FutureTx[T](body: => T)(implicit ec: ExecutionContext): Future[T] = Future(body)
 
 
-  val nodeTimes =  // Not exactly correct because it is a set instead of a list, but close enough:
+  var nodeTimes =  // Not exactly correct because it is a set instead of a list, but close enough:
     new java.util.LinkedHashMap[Long, None.type](10000, 1F, true) {
       override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
     }
 
-  val edgeTimes =  // Not exactly correct because it is a set instead of a list, but close enough:
+  var edgeTimes =  // Not exactly correct because it is a set instead of a list, but close enough:
     new java.util.LinkedHashMap[Long, None.type](10000, 1F, true) {
       override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
     }
 
+  var obsTimes =  // Not exactly correct because it is a set instead of a list, but close enough:
+    new java.util.LinkedHashMap[Long, None.type](10000, 1F, true) {
+      override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
+    }
+
+  var nodeCount = new AtomicLong(0L)
+  var edgeCount = new AtomicLong(0L)
+  var obsCount = new AtomicLong(0L)
+  var lastRecv: AtomicLong = new AtomicLong(0)
+  var lastSent: AtomicLong = new AtomicLong(0)
+  var timeWaiting: AtomicLong = new AtomicLong(0)
+  var timeWorking: AtomicLong = new AtomicLong(0)
+
+  val myselfRef = context.self
   val shouldRecordDBWriteTimes = true
-  if (shouldRecordDBWriteTimes && idx >= 0) context.system.scheduler.schedule(30 seconds, 60 seconds){
-    val shouldWriteToFile = false
-    Future{
-      if (shouldWriteToFile) {
-        val nodeWriter = new PrintWriter(new File(s"stats/$idx-nodes.csv"))
-        nodeWriter.write(nodeTimes.asScala.mkString("", ",", "\n"))
-        nodeWriter.close()
-
-        val edgeWriter = new PrintWriter(new File(s"stats/$idx-edges.csv"))
-        edgeWriter.write(edgeTimes.asScala.mkString("", ",", "\n"))
-        edgeWriter.close()
-      }
-
-      val (ntotal, ncount, nmax, nmin) = nodeTimes.keySet().asScala.foldLeft((0L, 0L, 0L, Long.MaxValue)){
-        case ((total, count, max, min), next) => (total + next, count + 1, if (next > max) next else max, if (next < min) next else min)
-      }
-      val (etotal, ecount, emax, emin) = edgeTimes.keySet().asScala.foldLeft((0L, 0L, 0L, Long.MaxValue)){
-        case ((total, count, max, min), next) => (total + next, count + 1, if (next > max) next else max, if (next < min) next else min)
-      }
-
-      println(
-        s"""QuineDB-$idx: Work/wait ratio: ${timeWorking.get().toDouble / timeWaiting.get()}         Work: ${nf.format(timeWorking.get())}  Wait: ${nf.format(timeWaiting.get())}
-           |           Average write time for ${nf.format(ecount)} edges: ${nf.format((etotal.toDouble / ecount).toLong)} nanoseconds.  Min: ${nf.format(emin.toLong)}  Max: ${nf.format(emax.toLong)}
-           |           Average write time for ${nf.format(ncount)} nodes: ${nf.format((ntotal.toDouble / ncount).toLong)} nanoseconds.  Min: ${nf.format(nmin.toLong)}  Max: ${nf.format(nmax.toLong)}""".stripMargin
-      )
-      timeWaiting.set(0L)
-      timeWorking.set(0L)
-      lastRecv.set(0L)
-      lastSent.set(0L)
-    }
+  if (shouldRecordDBWriteTimes && idx >= 0) context.system.scheduler.schedule(30 seconds, 60 seconds) {
+    myselfRef ! PrintStats
   }
+
+  def recordResults() = {
+    val oldNodeTimes = nodeTimes
+    val oldEdgeTimes = edgeTimes
+    val oldObsTimes = obsTimes
+    nodeTimes =  // Not exactly correct because it is a set instead of a list, but close enough:
+      new java.util.LinkedHashMap[Long, None.type](10000, 1F, true) {
+        override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
+      }
+    edgeTimes =  // Not exactly correct because it is a set instead of a list, but close enough:
+      new java.util.LinkedHashMap[Long, None.type](10000, 1F, true) {
+      override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
+    }
+    obsTimes =  // Not exactly correct because it is a set instead of a list, but close enough:
+      new java.util.LinkedHashMap[Long, None.type](10000, 1F, true) {
+        override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
+      }
+    printResults(nodeCount.get(), edgeCount.get(), obsCount.get(), timeWaiting.get(), timeWorking.get(), lastSent.get(), lastRecv.get(), oldNodeTimes, oldEdgeTimes, oldObsTimes)
+    nodeCount.set(0L)
+    edgeCount.set(0L)
+    obsCount.set(0L)
+    nodeTimes.clear()
+    edgeTimes.clear()
+    obsTimes.clear()
+    timeWaiting.set(0L)
+    timeWorking.set(0L)
+    lastRecv.set(0L)
+    lastSent.set(0L)
+  }
+
+  def printResults(nodeCount: Long, edgeCount: Long, obsCount: Long, timeWaiting: Long, timeWorking: Long, lastSent: Long, lastRecv: Long, oldNodeTimes: java.util.LinkedHashMap[Long, None.type], oldEdgeTimes: java.util.LinkedHashMap[Long, None.type], oldObsTimes: java.util.LinkedHashMap[Long, None.type], shouldWriteToFile: Boolean = false) = Future {
+    val nodeTimes = oldNodeTimes.asScala.keys
+    val edgeTimes = oldEdgeTimes.asScala.keys
+    val obsTimes = oldObsTimes.asScala.keys
+
+    if (shouldWriteToFile) {
+      val nodeWriter = new PrintWriter(new File(s"stats/$idx-nodes.csv"))
+      nodeWriter.write(nodeTimes.mkString("", ",", "\n"))
+      nodeWriter.close()
+
+      val edgeWriter = new PrintWriter(new File(s"stats/$idx-edges.csv"))
+      edgeWriter.write(edgeTimes.mkString("", ",", "\n"))
+      edgeWriter.close()
+
+      val obsWriter = new PrintWriter(new File(s"stats/$idx-obs.csv"))
+      obsWriter.write(obsTimes.mkString("", ",", "\n"))
+      obsWriter.close()
+    }
+
+    val (ntotal, ncount, nmax, nmin) = nodeTimes.foldLeft((0L, 0L, 0L, Long.MaxValue)) {
+      case ((total, count, max, min), next) => (total + next, count + 1, if (next > max) next else max, if (next < min) next else min)
+    }
+    val (etotal, ecount, emax, emin) = edgeTimes.foldLeft((0L, 0L, 0L, Long.MaxValue)) {
+      case ((total, count, max, min), next) => (total + next, count + 1, if (next > max) next else max, if (next < min) next else min)
+    }
+    val (ototal, ocount, omax, omin) = obsTimes.foldLeft((0L, 0L, 0L, Long.MaxValue)) {
+      case ((total, count, max, min), next) => (total + next, count + 1, if (next > max) next else max, if (next < min) next else min)
+    }
+
+    println(
+      s"""QuineDB-$idx: Work/wait ratio: ${timeWorking.toDouble / timeWaiting}         Work: ${nf.format(timeWorking)}  Wait: ${nf.format(timeWaiting)}
+         |           Processed ${nf.format(nodeCount)} nodes. Avg write time for ${nf.format(ncount)} nodes: ${nf.format((ntotal.toDouble / ncount).toLong)} nanoseconds.  Min: ${nf.format(nmin.toLong)}  Max: ${nf.format(nmax.toLong)}
+         |           Processed ${nf.format(edgeCount)} edges. Avg write time for ${nf.format(ecount)} edges: ${nf.format((etotal.toDouble / ecount).toLong)} nanoseconds.  Min: ${nf.format(emin.toLong)}  Max: ${nf.format(emax.toLong)}
+         |           Processed ${nf.format(obsCount) } obses. Avg write time for ${nf.format(ocount)} obses: ${nf.format((ototal.toDouble / ocount).toLong)} nanoseconds.  Min: ${nf.format(omin.toLong)}  Max: ${nf.format(omax.toLong)}""".stripMargin
+    )
+  }.recover{ case e => e.printStackTrace() }
+
 
 //  TODO: hypothesis: there are lots of remote calls being made in the cadets data. but why?
 
-  var lastRecv: AtomicLong = new AtomicLong(0)
-  var lastSent: AtomicLong = new AtomicLong(0)
-
-  var timeWaiting: AtomicLong = new AtomicLong(0)
-  var timeWorking: AtomicLong = new AtomicLong(0)
 
   def startWork(): Unit = if (shouldRecordDBWriteTimes) {
     val now = System.nanoTime()
@@ -337,6 +385,8 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 
 
   override def receive = {
+
+    case PrintStats => recordResults()
 
     // Run the query without specifying what the output type will be. This is the variant used by 'cmdline_query.py'
     case StringQuery(q, shouldParse) =>
@@ -387,26 +437,42 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 
 
     case Left(a: ADM) =>
-      if (shouldRecordDBWriteTimes) startWork()
       val s = sender()
-      writeAdm(a, Timeout(0.3 seconds))
-        .map(t => if (shouldRecordDBWriteTimes) nodeTimes.put(t, None) else t)
+      if (shouldRecordDBWriteTimes) startWork()
+      writeAdm(a, Timeout(5 seconds)) //0.3 seconds))
+        .map(t => if (shouldRecordDBWriteTimes) {
+          Try(nodeTimes.put(t, None)) // Not a big deal if it fails sometimes
+          nodeCount.incrementAndGet()
+        } else t)
         .recoveryMessage("Writing NODE failed at ID: {} for ADM Node: {}", a.uuid, a)
         .ackOnComplete(s)
 
     case Right(e: EdgeAdm2Adm) =>
-      if (shouldRecordDBWriteTimes) startWork()
       val s = sender()
-      writeAdmEdge(e, Timeout(0.5 seconds))
-        .map(t => if (shouldRecordDBWriteTimes) edgeTimes.put(t, None) else t)
+      if (shouldRecordDBWriteTimes) startWork()
+      writeAdmEdge(e, Timeout(5 seconds)) //0.5 seconds))
+        .map(t => if (shouldRecordDBWriteTimes) {
+          Try(edgeTimes.put(t, None)) // Not a big deal if it fails sometimes
+          edgeCount.incrementAndGet()
+        } else t)
         .recoveryMessage("Writing EDGE failed at IDs: {} and: {} with label: {}", e.src, e.tgt, e.label)
         .ackOnComplete(s)
 
     case PpmObservation(treeRootQid, treeName, hostName, extractedValues, collectedUuids, timestamps, sendNoveltiesFunc, observationCount) =>
-      if (shouldRecordDBWriteTimes) startWork()
       val s = sender()
-      implicit val timeout = Timeout(2 seconds)
+      var startTime = 0L
+      if (shouldRecordDBWriteTimes) {
+        startWork()
+        startTime = System.nanoTime()
+      }
+      implicit val timeout = Timeout(10 seconds)  //2 seconds)
       graphService.observe(treeRootQid, treeName, hostName, extractedValues, collectedUuids, timestamps, sendNoveltiesFunc, observationCount)
+        .map(u => if (shouldRecordDBWriteTimes) {
+          val t = System.nanoTime() - startTime
+          Try(obsTimes.put(t, None))
+          obsCount.incrementAndGet()
+        } else u)
+        .recoveryMessage("Writing PPM OBS failed at hostname: {} with tree name: {} for extracted values: {} with count: {}", hostName, treeName, extractedValues, observationCount)
         .ackOnComplete(s)
 
     case InitMsg => sender() ! Ack
@@ -421,6 +487,9 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 
   }
 }
+
+
+case object PrintStats
 
 case class WithSender[A](sender: ActorRef, message: A)
 
