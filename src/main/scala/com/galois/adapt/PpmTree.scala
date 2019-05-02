@@ -541,7 +541,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
       d => d._2._2.exists(p => sudoOrPowershellComparison(p.path)),
       List(
         d => List(d._1.eventType.toString),
-        d => List(d._3._2.map(_.path).getOrElse(d._3._1.uuid.rendered) + " : " + d._3._1.getClass.getSimpleName)
+        d => List(d._3._2.map(_.path).getOrElse("<no_name>") + " : " + d._3._1.getClass.getSimpleName)
       ),
       d => Set(NamespacedUuidDetails(d._1.uuid, Some(d._1.eventType.toString)),
         NamespacedUuidDetails(d._2._1.uuid, Some(d._2._2.map(_.path).getOrElse(d._2._1.uuid.rendered)), Some(d._2._1.cid)),

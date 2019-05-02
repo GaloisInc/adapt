@@ -246,9 +246,27 @@ object Application extends App {
   val sqidFile = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOFile-accumulator")(
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
-        val reconstructed = nodeComponents.toList.flatMap(nc =>
-          esoFileInstanceQueryable.fromNodeComponents(nc)
-        )
+        val reconstructed = nodeComponents.toList.flatMap(esoFileInstanceQueryable.fromNodeComponents)
+        val singleReconstructed = if (reconstructed.lengthCompare(1) > 0) {
+          val (subStrings, predStrings) = reconstructed.foldLeft(Set.empty[String] -> Set.empty[String]){ case ((subStrings, predStrings), eso) =>
+            (subStrings + eso.subject.path.path) -> (predStrings + eso.predicateObject.path.path)
+          }
+          val oldEso = reconstructed.head
+          val newPredPath = oldEso.predicateObject.path.copy(path = predStrings.toList.sorted.mkString(","))
+          newPredPath.qid = oldEso.predicateObject.path.qid
+          val newSubPath = oldEso.subject.path.copy(path = subStrings.toList.sorted.mkString(","))
+          newSubPath.qid = oldEso.subject.path.qid
+          val newPred = oldEso.predicateObject.copy(path = newPredPath)
+          newPred.qid = oldEso.predicateObject.qid
+          val newSub = oldEso.subject.copy(path = newSubPath)
+          newSub.qid = oldEso.subject.qid
+          val newEso: ESOFileInstance = oldEso.copy(predicateObject = newPred, subject = newSub)
+          newEso.qid = oldEso.qid
+          List(newEso)
+        } else reconstructed
+
+        if (singleReconstructed.lengthCompare(1) > 0) println(s"WARNING: expected the ESO observation to contain only one item: $reconstructed")
+
 
 //        if (reconstructed.lengthCompare(1) > 0) {
 //          val subjectPaths = reconstructed.map(eso => eso.subject.path.path).toSet
@@ -279,7 +297,7 @@ object Application extends App {
 
 //            }"
 //          )
-        StandingFetches.onESOFileMatch(reconstructed)
+        StandingFetches.onESOFileMatch(singleReconstructed)
     })
   ))
   val standingFetchFileActor = ActorRef.noSender
@@ -287,10 +305,26 @@ object Application extends App {
   val sqidSrcSnk = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOSrcSnk-accumulator")(
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
-        val reconstructed = nodeComponents.toList.flatMap(nc =>
-          esoSrcSinkInstanceQuerable.fromNodeComponents(nc)
-        )
-        StandingFetches.onESOSrcSinkMatch(reconstructed)
+        val reconstructed = nodeComponents.toList.flatMap(esoSrcSinkInstanceQuerable.fromNodeComponents)
+        val singleReconstructed = if (reconstructed.lengthCompare(1) > 0) {  // Combine subject names so that we get a consistent name for the process. SrcSink has not predicate object path.
+          val subStrings = reconstructed.foldLeft(Set.empty[String]) { case (subStrings, eso) =>
+            subStrings + eso.subject.path.path
+          }
+          val oldEso = reconstructed.head
+          val newSubPath = oldEso.subject.path.copy(path = subStrings.toList.sorted.mkString(","))
+          newSubPath.qid = oldEso.subject.path.qid
+          val newSub = oldEso.subject.copy(path = newSubPath)
+          newSub.qid = oldEso.subject.qid
+          reconstructed.map{oldEso =>
+            val newEso = oldEso.copy(subject = newSub)
+            newEso.qid = oldEso.qid
+            newEso
+          }.distinct // Remove duplicate entries since subject names have been unified.
+        } else reconstructed
+
+        if (singleReconstructed.lengthCompare(1) > 0) println(s"WARNING: expected the ESO observation to contain only one item: $reconstructed")
+
+        StandingFetches.onESOSrcSinkMatch(singleReconstructed)
     })
   ))
   val standingFetchSrcSnkActor = ActorRef.noSender
@@ -298,10 +332,25 @@ object Application extends App {
   val sqidNetwork = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESONetwork-accumulator")(
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
-        val reconstructed = nodeComponents.toList.flatMap(nc =>
-          esoNetworkInstanceQueryable.fromNodeComponents(nc)
-        )
-        StandingFetches.onESONetworkMatch(reconstructed)
+        val reconstructed = nodeComponents.toList.flatMap(esoNetworkInstanceQueryable.fromNodeComponents)
+        val singleReconstructed = if (reconstructed.lengthCompare(1) > 0) {  // Combine subject names so that we get a consistent name for the process. Do not combine network objects.
+          val subStrings = reconstructed.foldLeft(Set.empty[String]) { case (subStrings, eso) =>
+            subStrings + eso.subject.path.path
+          }
+          val oldEso = reconstructed.head
+          val newSubPath = oldEso.subject.path.copy(path = subStrings.toList.sorted.mkString(","))
+          newSubPath.qid = oldEso.subject.path.qid
+          val newSub = oldEso.subject.copy(path = newSubPath)
+          newSub.qid = oldEso.subject.qid
+          reconstructed.map{ oldEso =>
+            val newEso = oldEso.copy(subject = newSub)
+            newEso.qid = oldEso.qid
+            newEso
+          }.distinct // Remove duplicate entries since subject names have been unified.
+        } else reconstructed
+
+        // This _network_ ESO list is the only case where there could potentially be multiple items legitimately left in the list.
+        StandingFetches.onESONetworkMatch(singleReconstructed)
     })
   ))
   val standingFetchNetworkActor = ActorRef.noSender
@@ -309,10 +358,26 @@ object Application extends App {
   val sqidParentProcess = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ProcessParentage")(
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
-        val reconstructed = nodeComponents.toList.flatMap(nc =>
-          esoChildProcessInstanceQueryable.fromNodeComponents(nc)
-        )
-        StandingFetches.onESOProcessMatch(reconstructed)
+        val reconstructed = nodeComponents.toList.flatMap(esoChildProcessInstanceQueryable.fromNodeComponents)
+        val singleReconstructed = if (reconstructed.lengthCompare(1) > 0) {  // Combine subject names so that we get a consistent name for all processes.
+          val (childStrings, parentStrings) = reconstructed.foldLeft(Set.empty[String] -> Set.empty[String]) { case ((childStrings, parentStrings), eso) =>
+            (childStrings + eso.path.path) -> (parentStrings + eso.parentSubject.path.path)
+          }
+          val oldChild = reconstructed.head
+          val newChildPath = oldChild.path.copy(path = childStrings.toList.sorted.mkString(","))
+          newChildPath.qid = oldChild.path.qid
+          val oldParent = oldChild.parentSubject
+          val newParentPath = oldParent.path.copy(path = parentStrings.toList.sorted.mkString(","))
+          newParentPath.qid = oldParent.path.qid
+          val newParent = oldParent.copy(path = newParentPath)
+          newParent.qid = oldParent.qid
+          val newChild = oldChild.copy(path = newChildPath, parentSubject = newParent)
+          newChild.qid = oldChild.qid
+          List(newChild)
+        } else reconstructed
+
+        if (singleReconstructed.lengthCompare(1) > 0) println(s"WARNING: expected the ESO observation to contain only one item: $singleReconstructed")
+        StandingFetches.onESOProcessMatch(singleReconstructed)
     })
   ))
   val standingFetchProcessParentageActor = ActorRef.noSender
