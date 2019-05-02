@@ -512,8 +512,8 @@ object Application extends App {
     val standingFetchSink: ActorRef = RunnableGraph.fromGraph(GraphDSL.create(
       Source.actorRef[PpmObservation](quineConfig.ppmobservationbuffer,
 
-//        OverflowStrategy.dropNew
-        OverflowStrategy.fail
+        OverflowStrategy.dropNew
+//        OverflowStrategy.fail
 
     )
     ) { implicit b => standingFetchSource =>
@@ -523,10 +523,10 @@ object Application extends App {
 
       source.async
         .via(printCounter(host.hostName+" CDM", statusActor))
-        .via(debug.debugBuffer(s"[${host.hostName}]  0.) before ER", 100000)).async
+        .via(debug.debugBuffer(s"[${host.hostName}]  0.) before ER", 50000)).async
         .via(erMap(host.hostName).async).async
         .via(lruDedup)
-        .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB", 100000)).async
+        .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB", 50000)).async
         .via(printCounter(host.hostName+" ADM", statusActor)) ~> merge.in(0)
 
       standingFetchSource ~> merge.preferred
