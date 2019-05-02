@@ -447,8 +447,8 @@ object Application extends App {
     val standingFetchSink: ActorRef = RunnableGraph.fromGraph(GraphDSL.create(
       Source.actorRef[PpmObservation](quineConfig.ppmobservationbuffer,
 
-        OverflowStrategy.dropNew
-//        OverflowStrategy.fail
+//        OverflowStrategy.dropNew
+        OverflowStrategy.fail
 
     )
     ) { implicit b => standingFetchSource =>

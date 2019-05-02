@@ -309,8 +309,8 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       }
     edgeTimes =  // Not exactly correct because it is a set instead of a list, but close enough:
       new java.util.LinkedHashMap[Long, None.type](10000, 1F, true) {
-      override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
-    }
+        override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
+      }
     obsTimes =  // Not exactly correct because it is a set instead of a list, but close enough:
       new java.util.LinkedHashMap[Long, None.type](10000, 1F, true) {
         override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
