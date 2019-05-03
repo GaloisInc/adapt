@@ -133,8 +133,8 @@ case object AlarmEvent {
 
 sealed trait AlarmCategory
 
-case object Prioritized extends AlarmCategory {
-  override def toString = "prioritized"
+case object PrioritizedAlarm extends AlarmCategory {
+  override def toString = "prioritizedAlarm"
 }
 
 case object AggregatedAlarm extends AlarmCategory {
@@ -255,7 +255,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
         val prioritizedEvent: Future[Option[AlarmEvent]] = {
           PpmSummarizer.summarize(pd.processName, Some(pd.hostName), pd.pid).map { s =>
             if (s == TreeRepr.empty) None
-            else Some(AlarmEvent.fromBatchedAlarm(Prioritized, pd, s.readableString, alarmIDs, runID, System.currentTimeMillis))
+            else Some(AlarmEvent.fromBatchedAlarm(PrioritizedAlarm, pd, s.readableString, alarmIDs, runID, System.currentTimeMillis))
           }.recoverWith { case e => log.error(s"Summarizing: $pd failed with error: ${e.getMessage}"); Future.failed(e) }
         }
 
@@ -279,7 +279,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
           val prioritizedEvent: Future[Option[AlarmEvent]] = {
             PpmSummarizer.summarize(pd.processName, Some(pd.hostName), pd.pid).map { s =>
               if (s == TreeRepr.empty) None
-              else Some(AlarmEvent.fromBatchedAlarm(Prioritized, pd, s.readableString, alarmIDs, runID, System.currentTimeMillis))
+              else Some(AlarmEvent.fromBatchedAlarm(PrioritizedAlarm, pd, s.readableString, alarmIDs, runID, System.currentTimeMillis))
             }.recoverWith{ case e => log.error(s"Summarizing: $pd failed with error: ${e.getMessage}"); Future.failed(e)}
           }
 
