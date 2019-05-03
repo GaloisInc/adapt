@@ -122,6 +122,7 @@ case class PpmObservation(
 
 class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQueryProxyActor {
   val nf = NumberFormat.getInstance()
+  val hostName: String = self.path.elements.last
 
   implicit val service = graphService
 
@@ -358,7 +359,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
     }
 
     println(
-      s"""QuineDB-$idx: Work/wait ratio: ${timeWorking.toDouble / timeWaiting}         Work: ${nf.format(timeWorking)}  Wait: ${nf.format(timeWaiting)}
+      s"""$hostName: Work/wait ratio: ${timeWorking.toDouble / timeWaiting}         Work: ${nf.format(timeWorking)}  Wait: ${nf.format(timeWaiting)}
          |           Processed ${nf.format(nodeCount)} nodes. Avg write time for ${nf.format(ncount)} nodes: ${nf.format((ntotal.toDouble / ncount).toLong)} nanoseconds.  Min: ${nf.format(nmin.toLong)}  Max: ${nf.format(nmax.toLong)}
          |           Processed ${nf.format(edgeCount)} edges. Avg write time for ${nf.format(ecount)} edges: ${nf.format((etotal.toDouble / ecount).toLong)} nanoseconds.  Min: ${nf.format(emin.toLong)}  Max: ${nf.format(emax.toLong)}
          |           Processed ${nf.format(obsCount) } obses. Avg write time for ${nf.format(ocount)} obses: ${nf.format((ototal.toDouble / ocount).toLong)} nanoseconds.  Min: ${nf.format(omin.toLong)}  Max: ${nf.format(omax.toLong)}""".stripMargin
