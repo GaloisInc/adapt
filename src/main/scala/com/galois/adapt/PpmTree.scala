@@ -206,6 +206,7 @@ case class PpmDefinition[DataShape](
   }
 
   private def updateThreshold(percentile: Float): Unit = {
+    val defaultLP = Try(localProbAccumulator.firstKey).getOrElse(1F)
     val percentileOfTotal = percentile/100 * localProbCount
 
     var accLPCount = 0
@@ -217,7 +218,7 @@ case class PpmDefinition[DataShape](
         accLPCount += thisLPCount
         accLPCount <= percentileOfTotal
       }
-      .foldLeft(localProbAccumulator.firstKey())((_, newLast) => newLast.getKey)  // Apparently Scala iterators don't support
+      .foldLeft((defaultLP))((_, newLast) => newLast.getKey)  // Apparently Scala iterators don't support
 
     println(s"LP THRESHOLD LOG: $treeName     $hostName: $localProbCount novelties collected.")
     println(s"LP THRESHOLD LOG: $treeName     $hostName: $localProbThreshold is current local probability threshold.")
