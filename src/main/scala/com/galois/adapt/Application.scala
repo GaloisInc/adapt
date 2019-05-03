@@ -244,7 +244,7 @@ object Application extends App {
 
 
   val filePrefixesToDrop = List("/proc", """\windows\servicing\packages""")
-  
+
 
   val sqidFile = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOFile-accumulator")(
     resultHandler = Some({
@@ -300,10 +300,12 @@ object Application extends App {
 
 //            }"
 //          )
-        singleReconstructed.flatMap{ recon =>
-          if (filePrefixesToDrop.exists(filePrefix => recon.predicateObject.path.path.startsWith(filePrefix))) Nil else List(recon)
+        val filteredRecon = singleReconstructed.flatMap{ recon =>
+          if (filePrefixesToDrop.exists(filePrefix =>
+            recon.predicateObject.path.path.startsWith(filePrefix))) Nil
+          else List(recon)
         }
-        StandingFetches.onESOFileMatch(singleReconstructed)
+        StandingFetches.onESOFileMatch(filteredRecon)
     })
   ))
   val standingFetchFileActor = ActorRef.noSender
