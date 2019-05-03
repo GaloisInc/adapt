@@ -18,6 +18,8 @@ import com.galois.adapt.NoveltyDetection.PpmTreeNodeAlarm
 import spray.json._
 import java.io.{File, FileOutputStream, PrintWriter}
 
+import com.galois.adapt.adm.NamespacedUuid
+
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 //import spray.json.DefaultJsonProtocol._
 
@@ -28,13 +30,14 @@ import Application.system
 import ApiJsonProtocol._
 import com.galois.adapt.AdaptConfig.HostName
 
-case class ProcessDetails(processName: String, pid: Option[Int], hostName: HostName, dataTimestamps: Set[Long]) {
+case class ProcessDetails(processName: String, pid: Option[Int], hostName: HostName, dataTimestamps: Set[Long], uuid: NamespacedUuid) {
   def toJson: JsValue = {
     JsObject(
       "processName" -> JsString(processName),
       "pid" -> JsString(pid.toString),
       "hostName" -> JsString(hostName),
-      "dataTimestamps" -> JsArray(dataTimestamps.toList.map(x => JsNumber(x)).toVector)
+      "dataTimestamps" -> JsArray(dataTimestamps.toList.map(x => JsNumber(x)).toVector),
+      "uuid" -> JsString(uuid.rendered)
     )
   }
 }
@@ -53,7 +56,6 @@ case class DetailedAlarmEvent(processName: String, pid: String, hostName: HostNa
       "hostName" -> JsString(hostName),
       "referencedRawAlarms" -> JsArray(alarmIDs.map(JsNumber(_)).toVector),
       "details" -> JsString(details),
-      "alarmIDs" -> JsArray(alarmIDs.toList.map(x => JsNumber(x)).toVector),
       "dataTimestamps" -> JsArray(dataTimestamps.toList.map(x => JsNumber(x)).toVector),
       "emitTimestamp" -> JsNumber(this.emitTimestamp)
     )
@@ -131,21 +133,14 @@ case object AlarmEvent {
 
 sealed trait AlarmCategory
 
-case object ProcessActivity extends AlarmCategory {
-  override def toString = "processActivity"
+case object PrioritizedAlarm extends AlarmCategory {
+  override def toString = "prioritizedAlarm"
 }
 
-case object ProcessSummary extends AlarmCategory {
-  override def toString = "processSummary"
+case object AggregatedAlarm extends AlarmCategory {
+  override def toString = "aggregatedAlarm"
 }
 
-case object TopTwenty extends AlarmCategory {
-  override def toString = "topTwenty"
-}
-
-case object ProcessFiltered extends AlarmCategory {
-  override def toString = "processFiltered"
-}
 /*
 * Valid Messages for the AlarmReporterActor
 *
@@ -182,10 +177,9 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
   val numMostNovel = 20
   var alarmSummaryBuffer: List[AlarmEvent] = List.empty[AlarmEvent]
   //var processRefSet: Set[ProcessDetails] = Set.empty
-  var processRefSet: Map[ProcessDetails, Set[Long]] = Map.empty
+  var alarmProcessRefSet: Map[ProcessDetails, Set[(Long, String)]] = Map.empty[ProcessDetails, Set[(Long, String)]]
+  var noveltyProcessRefSet: Map[ProcessDetails, Set[(Long, String)]] = Map.empty[ProcessDetails, Set[(Long, String)]]
   var alarmCounter: Long = 0
-
-  var processInstanceCounter: Map[ProcessDetails, Int] = Map.empty
 
   def genAlarmID(): Long = {
     alarmCounter += 1
@@ -216,44 +210,91 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
 
   def generateSummaryAndSend(lastMessage: Boolean): Unit = {
 
-    val numProcessInstancesToTake = math.round(processInstanceCounter.size * AlarmReporter.percentProcessInstancesToTake / 100)
-    val minProcessInstanceCount = processInstanceCounter.toList.sortBy(-_._2).take(numProcessInstancesToTake).lastOption.map(_._2).getOrElse(0)
+    val numProcessInstancesSeen = (noveltyProcessRefSet.keySet ++ alarmProcessRefSet.keySet).size
 
-    val batchedMessages: List[Future[Option[AlarmEvent]]] = processRefSet.view.map { case (pd, alarmIDs) =>
+    // We take the ceiling so that we always return at least one prioritized process from the novelty process set.
+    // If we don't want this, use math.round instead.
+    val numProcessInstancesToTake = math.ceil(numProcessInstancesSeen * AlarmReporter.percentProcessInstancesToTake / 100).toInt
 
-      //Suppress empty summaries
-      val summaries: Future[Option[AlarmEvent]] = PpmSummarizer.summarize(pd.processName, Some(pd.hostName), pd.pid).map { s =>
-        if (s == TreeRepr.empty) None
-        else Some(AlarmEvent.fromBatchedAlarm(ProcessSummary, pd, s.readableString, alarmIDs, runID, System.currentTimeMillis))
-      }.recoverWith{ case e => log.error(s"Summarizing: $pd failed with error: ${e.getMessage}"); Future.failed(e)}
+    // For each tree that produced at least one alarm, we count the number alarms produced by that tree.
+    // Note that a single tree alarm may be counted twice (or more), if two (or more) processes were implicated in that single alarm.
+    val treeCountsForBatch = (alarmProcessRefSet.values ++ noveltyProcessRefSet.values)
+      .flatMap(alarmIdsAndTreeNames => alarmIdsAndTreeNames.toList.map(_._2))
+      .groupBy(identity)
+      .mapValues(_.size)
 
-      // Filter out process instance summaries that don't have a lot of activity
-      val filteredSummary: Future[Option[AlarmEvent]] = processInstanceCounter.getOrElse(pd, 0) match {
-        case cnt if cnt >= minProcessInstanceCount =>
-          summaries.map(_.map(x => AlarmEvent.changeCategory(x,ProcessFiltered)))
-        case _ => Future.successful(None)
-      }
+    // We take the top k process instances ranked in descending order by weight.
+    // Weight is defined to be the sum over all trees of the proportion of tree alarms raised per process instance.
+    val priorityProcessesFromNovelties = noveltyProcessRefSet.toList.map {
+      case (pd: ProcessDetails, alarmIdsAndTreeNames: Set[(Long, String)]) =>
+        val treeCounts = alarmIdsAndTreeNames.toList.map(_._2).groupBy(identity).mapValues(_.size)
+        val rankValue = treeCounts.map { case (tree: String, count: Int) =>
+          count * 1.0 / treeCountsForBatch.getOrElse(tree, 1)
+        }.sum
+      pd -> rankValue
+    }.sortBy(-_._2).take(numProcessInstancesToTake).map(_._1)
 
-      //it is OK to have empty process Activities
-      val completeTreeRepr: Future[Option[AlarmEvent]] = PpmSummarizer.fullTree(pd.processName, Some(pd.hostName), pd.pid).map { a =>
-        Some(AlarmEvent.fromBatchedAlarm(ProcessActivity, pd, a.withoutQNodes.readableString, alarmIDs, runID, System.currentTimeMillis))
-      }.recoverWith{ case e => log.error(s"Getting Full Tree for: $pd failed with error: ${e.getMessage}"); Future.failed(e)}
+    // Send all processes implicated by novelty trees to splunk as aggregated alarms.
+    val aggregatedAlarmEventsFromNovelties: List[Future[Option[AlarmEvent]]] = noveltyProcessRefSet.map { case (pd, alarmIDsAndTreeNames) =>
 
-      //Suppress empty summaries
-//      val mostNovel: Future[Option[AlarmEvent]] = PpmSummarizer.mostNovelActions(numMostNovel, pd.processName, pd.hostName, pd.pid).map { mn =>
-//        if (mn.isEmpty) None
-//        else Some(AlarmEvent.fromBatchedAlarm(TopTwenty, pd, mn.mkString("\n"), alarmIDs, runID, System.currentTimeMillis))
-//      }.recoverWith{ case e => log.error(s"Getting Top 20 for: $pd failed with error: ${e.getMessage}"); Future.failed(e)}
+      // Include alarmID references to alarm trees here too.
+      val alarmIDs: Set[Long] = alarmIDsAndTreeNames.map(_._1)
+        .union(alarmProcessRefSet.getOrElse(pd, Set.empty[(Long, String)]).map(_._1))
 
-      (summaries, filteredSummary, completeTreeRepr)
-    }.toList.flatMap(x => List(x._1, x._2, x._3))
+      Future.successful(Some(AlarmEvent.fromBatchedAlarm(AggregatedAlarm, pd, "", alarmIDs, runID, System.currentTimeMillis)))
+    }.toList
 
-    Future.sequence(batchedMessages).map(m => handleMessage(m.flatten, lastMessage)).onFailure {
-      case res => log.error(s"AlarmReporter: failed with $res.")
-    }
+    // Send only processes implicated by novelty trees that are highly ranked to as prioritized alarms to Splunk.
+    val priorityAlarmEventsFromNovelties: List[Future[Option[AlarmEvent]]] = noveltyProcessRefSet
+      .filterKeys(priorityProcessesFromNovelties.contains(_))
+      .map { case (pd, alarmIDsAndTreeNames) =>
+        // Include references to alarmIDs from alarm trees here too.
+        val alarmIDs: Set[Long] = alarmIDsAndTreeNames.map(_._1)
+          .union(alarmProcessRefSet.getOrElse(pd, Set.empty[(Long, String)]).map(_._1))
+
+        val prioritizedEvent: Future[Option[AlarmEvent]] = {
+          PpmSummarizer.summarize(pd.processName, Some(pd.hostName), pd.pid).map { s =>
+            if (s == TreeRepr.empty) None
+            else Some(AlarmEvent.fromBatchedAlarm(PrioritizedAlarm, pd, s.readableString, alarmIDs, runID, System.currentTimeMillis))
+          }.recoverWith { case e => log.error(s"Summarizing: $pd failed with error: ${e.getMessage}"); Future.failed(e) }
+        }
+
+        prioritizedEvent
+      }.toList
+
+    // Send all processes implicated from alarm trees to Splunk as `AggregatedAlarm`s and `Prioritized` alarms.
+    // Only include processes that we weren't already implicated by novelty trees.
+    val alarmEventsFromAlarms: List[Future[Option[AlarmEvent]]] = alarmProcessRefSet
+        .filterKeys(!priorityProcessesFromNovelties.contains(_))
+        .map { case (pd, alarmIDsAndTreeNames) =>
+
+          val alarmIDs: Set[Long] = alarmIDsAndTreeNames.map(_._1)
+            .union(alarmProcessRefSet.getOrElse(pd, Set.empty[(Long, String)]).map(_._1))
+
+          // Don't send two aggregated alarms for the same process
+          val aggregatedEvent = if (!noveltyProcessRefSet.contains(pd)) {
+            Future.successful(Some(AlarmEvent.fromBatchedAlarm(AggregatedAlarm, pd, "", alarmIDs, runID, System.currentTimeMillis)))
+          } else {Future.successful(None)}
+
+          val prioritizedEvent: Future[Option[AlarmEvent]] = {
+            PpmSummarizer.summarize(pd.processName, Some(pd.hostName), pd.pid).map { s =>
+              if (s == TreeRepr.empty) None
+              else Some(AlarmEvent.fromBatchedAlarm(PrioritizedAlarm, pd, s.readableString, alarmIDs, runID, System.currentTimeMillis))
+            }.recoverWith{ case e => log.error(s"Summarizing: $pd failed with error: ${e.getMessage}"); Future.failed(e)}
+          }
+
+          (aggregatedEvent, prioritizedEvent)
+        }.toList.flatMap( x => List(x._1, x._2))
+
+
+      Future.sequence(aggregatedAlarmEventsFromNovelties ++ priorityAlarmEventsFromNovelties ++ alarmEventsFromAlarms)
+        .map(m => handleMessage(m.flatten, lastMessage)).onFailure { case res =>
+          log.error(s"AlarmReporter: failed with $res.")
+        }
 
     //todo: deletes the set without checking if the reportSplunk succeeded. Add error handling above
-    processRefSet = Map.empty
+    noveltyProcessRefSet = Map.empty
+    alarmProcessRefSet = Map.empty
   }
 
   def flushConciseAlarms(lastMessage: Boolean): Unit = {
@@ -267,13 +308,17 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
 
     val alarmID = genAlarmID()
     val conciseAlarm: AlarmEvent = AlarmEvent.fromRawAlarm(alarmDetails, runID, alarmID)
+    val tree = alarmDetails.treeName
 
     //update vars
     alarmSummaryBuffer = conciseAlarm :: alarmSummaryBuffer
 
     alarmDetails.processDetailsSet.foreach { pd =>
-      processRefSet += (pd -> (processRefSet.getOrElse(pd, Set.empty[Long]) + alarmID))
-      processInstanceCounter += (pd -> (processInstanceCounter.getOrElse(pd, 0) + 1))
+      if (alarmDetails.shouldApplyThreshold) {
+        noveltyProcessRefSet += (pd -> (noveltyProcessRefSet.getOrElse(pd, Set.empty[(Long, String)]) + ((alarmID, tree))))
+      } else {
+        alarmProcessRefSet += (pd -> (alarmProcessRefSet.getOrElse(pd, Set.empty[(Long, String)]) + ((alarmID, tree)) ))
+      }
     }
 
     // is this a cleaner solution?
@@ -310,7 +355,8 @@ case class AlarmDetails(
   hostName: HostName,
   alarm: AnAlarm,
   processDetailsSet: Set[ProcessDetails],
-  localProbThreshold: Float
+  localProbThreshold: Float,
+  shouldApplyThreshold: Boolean
 )
 
 object AlarmReporter extends LazyLogging {
@@ -339,8 +385,8 @@ object AlarmReporter extends LazyLogging {
   system.registerOnTermination(scheduleDetailedMessages.cancel())
   system.registerOnTermination(scheduleConciseMessagesFlush.cancel())
 
-  def report(treeName: String, hostName: HostName, alarm: AnAlarm, processDetailsSet: Set[ProcessDetails], localProbThreshold: Float): Unit = {
+  def report(treeName: String, hostName: HostName, alarm: AnAlarm, processDetailsSet: Set[ProcessDetails], localProbThreshold: Float, shouldApplyThreshold: Boolean): Unit = {
     if (splunkConfig.enabled || consoleConfig.enabled || guiConfig.enabled)
-      alarmReporterActor ! AddConciseAlarm(AlarmDetails(treeName, hostName, alarm, processDetailsSet, localProbThreshold))
+      alarmReporterActor ! AddConciseAlarm(AlarmDetails(treeName, hostName, alarm, processDetailsSet, localProbThreshold, shouldApplyThreshold))
   }
 }
