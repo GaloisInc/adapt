@@ -243,6 +243,9 @@ object Application extends App {
 //  val predicateMultiSeen = new java.util.concurrent.ConcurrentHashMap[Set[String], None.type]()
 
 
+  val filePrefixesToDrop = List("/proc", """\windows\servicing\packages""")
+  
+
   val sqidFile = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOFile-accumulator")(
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
@@ -297,6 +300,9 @@ object Application extends App {
 
 //            }"
 //          )
+        singleReconstructed.flatMap{ recon =>
+          if (filePrefixesToDrop.exists(filePrefix => recon.predicateObject.path.path.startsWith(filePrefix))) Nil else List(recon)
+        }
         StandingFetches.onESOFileMatch(singleReconstructed)
     })
   ))
