@@ -217,7 +217,7 @@ case class PpmDefinition[DataShape](
         accLPCount += thisLPCount
         accLPCount <= percentileOfTotal
       }
-      .foldLeft(1F)((_, newLast) => newLast.getKey)  // Apparently Scala iterators don't support 
+      .foldLeft(localProbAccumulator.firstKey())((_, newLast) => newLast.getKey)  // Apparently Scala iterators don't support
 
     println(s"LP THRESHOLD LOG: $treeName     $hostName: $localProbCount novelties collected.")
     println(s"LP THRESHOLD LOG: $treeName     $hostName: $localProbThreshold is current local probability threshold.")
