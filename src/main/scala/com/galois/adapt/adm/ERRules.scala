@@ -62,10 +62,10 @@ object ERRules {
       val newRA = n.remoteAddress.map(AdmAddress.apply)
       (
         newN,
-        newLA.map(la => (EdgeAdm2Adm(newN.uuid, "localAddress", la.uuid), la)),
-        newRA.map(ra => (EdgeAdm2Adm(newN.uuid, "remoteAddress", ra.uuid), ra)),
-        newLP.filterNot(_.port == -1).map(lp => (EdgeAdm2Adm(newN.uuid, "localPort", lp.uuid), lp)),
-        newRP.filterNot(_.port == -1).map(rp => (EdgeAdm2Adm(newN.uuid, "remotePort", rp.uuid), rp))
+        newLA.map(la => (EdgeAdm2Adm(newN.uuid, "localAddressAdm", la.uuid), la)),
+        newRA.map(ra => (EdgeAdm2Adm(newN.uuid, "remoteAddressAdm", ra.uuid), ra)),
+        newLP.filterNot(_.port == -1).map(lp => (EdgeAdm2Adm(newN.uuid, "localPortAdm", lp.uuid), lp)),
+        newRP.filterNot(_.port == -1).map(rp => (EdgeAdm2Adm(newN.uuid, "remotePortAdm", rp.uuid), rp))
       )
     }
 
