@@ -318,7 +318,7 @@ case class PpmDefinition[DataShape](
     setNamespacedUuidDetails.filter { d =>
       d.pid.isDefined && d.name.isDefined
     }.map { d =>
-      ProcessDetails(d.name.get, d.pid, hostName, dataTimestamps)
+      ProcessDetails(d.name.get, d.pid, hostName, dataTimestamps, d.extendedUuid)
     }
   }
 
@@ -339,7 +339,7 @@ case class PpmDefinition[DataShape](
 
       val processDetails = getProcessDetails(setNamespacedUuidDetails, timestamps)
       //report the alarm
-      if (thresholdAllows) AlarmReporter.report(treeName, hostName, newAlarm, processDetails, localProbThreshold)
+      if (thresholdAllows) AlarmReporter.report(treeName, hostName, newAlarm, processDetails, localProbThreshold, shouldApplyThreshold)
     }
   }
 
