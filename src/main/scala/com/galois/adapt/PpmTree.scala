@@ -468,7 +468,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       d => Set(d._1.latestTimestampNanos,d._1.earliestTimestampNanos),
-      shouldApplyThreshold = false
+      shouldApplyThreshold = true
     )(graphService),
 
     PpmDefinition[ESO]( "FilesExecutedIshByProcesses", hostName,
@@ -534,7 +534,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       d => Set(d._1.latestTimestampNanos,d._1.earliestTimestampNanos),
-      shouldApplyThreshold = false
+      shouldApplyThreshold = true
     )(graphService),
 
     PpmDefinition[ESO]( "SudoIsAsSudoDoes", hostName,
