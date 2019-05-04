@@ -109,6 +109,44 @@ case class ESOFileInstance(eventType: EventType, earliestTimestampNanos: Long, l
 case class ESOSrcSnkInstance(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, hostName: String, subject: ESOSubject, predicateObject: ESOSrcSinkObject) extends NoConstantsDomainNode
 case class ESONetworkInstance(eventType: EventType, earliestTimestampNanos: Long, latestTimestampNanos: Long, hostName: String, subject: ESOSubject, predicateObject: ESONetFlowObject) extends NoConstantsDomainNode
 
+
+
+
+case class PpmNetflow(
+  localAddress: Option[String],
+  localPort: Option[Int],
+  remoteAddress: Option[String],
+  remotePort: Option[Int],
+  provider: String
+) extends NoConstantsDomainNode
+
+case class PpmLocalAddress(address: String, localAddressAdm: <--[PpmNetflow]) extends NoConstantsDomainNode
+
+case class PpmLocalPort(port: Int, localPortAdm: <--[PpmNetflow]) extends NoConstantsDomainNode
+
+case class PpmRemoteAddress(address: String, remoteAddressAdm: <--[PpmNetflow]) extends NoConstantsDomainNode
+
+case class PpmRemotePort(port: Int, remotePortAdm: <--[PpmNetflow]) extends NoConstantsDomainNode
+
+case class CommunicatingNetflows(
+  localAddress: Option[String],
+  localPort: Option[Int],
+  remoteAddress: Option[String],
+  remotePort: Option[Int],
+  provider: String,
+  localAddressAdm: PpmRemoteAddress,
+  localPortAdm: PpmRemotePort,
+  remoteAddressAdm: PpmLocalAddress,
+  remotePortAdm: PpmLocalPort
+) extends NoConstantsDomainNode {
+  def doesConverge: Boolean = remoteAddressAdm.localAddressAdm.target == remotePortAdm.localPortAdm.target
+  def otherNetflow: Option[PpmNetflow] = if (doesConverge) Some(remoteAddressAdm.localAddressAdm.target) else None
+}
+
+
+
+
+
 case class PpmObservation(
   treeRootQid: QuineId,
   treeName: String,
@@ -150,7 +188,9 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         "localPort" -> "Option[Int]",
         "remoteAddress" -> "Option[String]",
         "remotePort" -> "Option[Int]",
-        "path" -> "String"
+        "path" -> "String",
+        "address" -> "String",
+        "port" -> "Int"
       ),
       defaultTypeNames = Seq("Boolean", "Long", "Int", "List[Int]", "List[Long]", "String"),
       typeNameToPickleReader = Map(
@@ -222,6 +262,13 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   implicit val admHostInstance: Queryable[AdmHost] = cachedImplicit
   implicit val admSynthesizedInstance: Queryable[AdmSynthesized] = cachedImplicit
 
+  implicit val ppmNetflowInstance: Queryable[PpmNetflow] = cachedImplicit
+  implicit val ppmAddressInstance: Queryable[PpmLocalAddress] = cachedImplicit
+  implicit val ppmPortInstance: Queryable[PpmLocalPort] = cachedImplicit
+  implicit val communicatingNetflowInstance: Queryable[CommunicatingNetflows] = cachedImplicit
+
+
+
   def wrongFunc(x: Any): Unit = println("This is not the function you are looking for.")
 
 
@@ -239,13 +286,18 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 
       case anAdm: AdmSubject =>
         anAdm.create(Some(anAdm.uuid)).map { x =>
-            graphService.standingFetchWithBranch[ChildProcess](anAdm.uuid, Application.esoChildProcessInstanceBranch, Application.sqidParentProcess)(wrongFunc)
+          graphService.standingFetchWithBranch[ChildProcess](anAdm.uuid, Application.esoChildProcessInstanceBranch, Application.sqidParentProcess)(wrongFunc)
+          x
+        }
+
+      case anAdm: AdmNetFlowObject      =>
+        anAdm.create(Some(anAdm.uuid)).map { x =>
+//          graphService.standingFetchWithBranch[CommunicatingNetflows](anAdm.uuid, Application.esoCommunicatingNetflowsBranch, Application.sqidCommunicatingNetflows)(wrongFunc)
           x
         }
 
       case anAdm: AdmPrincipal          => anAdm.create(Some(anAdm.uuid))
       case anAdm: AdmFileObject         => anAdm.create(Some(anAdm.uuid))
-      case anAdm: AdmNetFlowObject      => anAdm.create(Some(anAdm.uuid))
       case anAdm: AdmPathNode           => anAdm.create(Some(anAdm.uuid))
       case anAdm: AdmPort               => anAdm.create(Some(anAdm.uuid))
       case anAdm: AdmAddress            => anAdm.create(Some(anAdm.uuid))

@@ -214,7 +214,7 @@ object Application extends App {
 
 
 //  val ppmManagerActors: Map[HostName, ActorRef] = ingestConfig.hosts.map { host: IngestHost =>
-//    val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows, graph).withDispatcher("adapt.ppm.manager-dispatcher")
+//    val props = Props(classOf[PpmManager], host.hostName, host.simpleTa1Name, host.isWindows, graph).withDispatcher(  ?  )
 //    val ref = system.actorOf(props, s"ppm-actor-${host.hostName}")
 //    host.hostName -> ref
 //  }.toMap // + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false, graph), s"ppm-actor-$hostNameForAllHosts"))
@@ -229,11 +229,13 @@ object Application extends App {
   val esoSrcSinkInstanceBranch = branchOf[ESOSrcSnkInstance]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
   val esoNetworkInstanceBranch = branchOf[ESONetworkInstance]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
   val esoChildProcessInstanceBranch = branchOf[ChildProcess]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
+  val esoCommunicatingNetflowsBranch = branchOf[CommunicatingNetflows]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
 
   val esoFileInstanceQueryable = implicitly[Queryable[ESOFileInstance]]
   val esoSrcSinkInstanceQuerable = implicitly[Queryable[ESOSrcSnkInstance]]
   val esoNetworkInstanceQueryable = implicitly[Queryable[ESONetworkInstance]]
   val esoChildProcessInstanceQueryable = implicitly[Queryable[ChildProcess]]
+  val esoCommunicatingNetflowsQueryable = implicitly[Queryable[CommunicatingNetflows]]
 
   val sqidHostPrefix = quineConfig.thishost.replace(".", "-")
 
@@ -244,6 +246,7 @@ object Application extends App {
 
 
   val filePrefixesToDrop = List("/proc", """\windows\servicing\packages""")
+  val processNamesToDrop = Set("/system/bin/app_process64")
 
 
   val sqidFile = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOFile-accumulator")(
@@ -270,39 +273,9 @@ object Application extends App {
 
         if (singleReconstructed.lengthCompare(1) > 0) println(s"WARNING: expected the ESO observation to contain only one item: $reconstructed")
 
-
-//        if (reconstructed.lengthCompare(1) > 0) {
-//          val subjectPaths = reconstructed.map(eso => eso.subject.path.path).toSet
-//          Option(subjectMultiSeen.putIfAbsent(subjectPaths, None)) match {
-//            case None => if (subjectPaths.size > 1) println(s"Subject Paths: $subjectPaths")
-//            case _ => ()
-//          }
-//          val predicatePaths = reconstructed.map(_.predicateObject.path.path).toSet
-//          Option(predicateMultiSeen.putIfAbsent(predicatePaths, None)) match {
-//            case None => if (predicatePaths.size > 1) println(s"File Paths: $predicatePaths")
-//            case _ => ()
-//          }
-//        }
-
-//        val size = nodeComponents.toList.map(_.flatValues().size).sum
-//          println(
-//            s"File NodeComponents stats = List size: ${nodeComponents.toList.size} Size: $size ${
-//            if (size > 20)
-//            s"\nBig: ${nodeComponents.map(_.flatValues().map(x =>
-//              x._1 -> x._2.left.map(q => graph.idProvider.customIdFromQid(q).get).right.map(p => new com.rrwright.quine.language.UnpickleOps(p.thisPickle).unpickleTry[String] -> p)
-//            ).mkString("\n")).mkString("\n\n")}"
-
-////            s"""BIG one's paths:
-////               |  Predicates:
-////               |${reconstructed.map(r => r.predicateObject.path.path -> graph.idProvider.customIdFromQid(r.predicateObject.qid.get).get).mkString("    ", "\n    ", "")}
-////               |  Subjects:
-////               |${reconstructed.map(r => r.subject.path.path -> graph.idProvider.customIdFromQid(r.subject.qid.get).get).mkString("    ", "\n    ", "")}""".stripMargin
-
-//            }"
-//          )
         val filteredRecon = singleReconstructed.flatMap{ recon =>
-          if (filePrefixesToDrop.exists(filePrefix =>
-            recon.predicateObject.path.path.startsWith(filePrefix))) Nil
+          if (filePrefixesToDrop.exists(filePrefix => recon.predicateObject.path.path.startsWith(filePrefix)) ||
+              processNamesToDrop.contains(recon.subject.path.path))  Nil
           else List(recon)
         }
         StandingFetches.onESOFileMatch(filteredRecon)
@@ -332,7 +305,11 @@ object Application extends App {
 
         if (singleReconstructed.lengthCompare(1) > 0) println(s"WARNING: expected the ESO observation to contain only one item: $reconstructed")
 
-        StandingFetches.onESOSrcSinkMatch(singleReconstructed)
+        val filteredRecon = singleReconstructed.flatMap{ recon =>
+          if (processNamesToDrop.contains(recon.subject.path.path))  Nil
+          else List(recon)
+        }
+        StandingFetches.onESOSrcSinkMatch(filteredRecon)
     })
   ))
   val standingFetchSrcSnkActor = ActorRef.noSender
@@ -390,11 +367,25 @@ object Application extends App {
   ))
   val standingFetchProcessParentageActor = ActorRef.noSender
 
+
+  val sqidCommunicatingNetflows = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_CommunicatingNetflows")(
+    resultHandler = Some({
+      case DomainNodeSubscriptionResultFetch(from, testBranch, assumedEdge, nodeComponents) =>
+        val reconstructed = nodeComponents.toList.flatMap(esoCommunicatingNetflowsQueryable.fromNodeComponents)
+        val matching = reconstructed.flatMap(r => r.otherNetflow.map(o => s"${r.localAddress.get}:${r.localPort.get} --> ${o.localAddress.get}:${o.localPort.get}    ${graph.idProvider.customIdFromQid(r.qid.get).get}  ${graph.idProvider.customIdFromQid(o.qid.get).get}"))
+        println(matching.mkString("\n"))
+        // StandingFetches.onCommunicatingNetflowsMatch(reconstructed)   // create undirected edge
+    })
+  ))
+  val standingFetchCommunicatingNetflowsActor = ActorRef.noSender
+
+
   graph.currentGraph.standingQueryActors = graph.currentGraph.standingQueryActors +
     (sqidFile.get -> standingFetchFileActor) +
     (sqidSrcSnk.get -> standingFetchSrcSnkActor) +
     (sqidNetwork.get -> standingFetchNetworkActor) +
-    (sqidParentProcess.get -> standingFetchProcessParentageActor)
+    (sqidParentProcess.get -> standingFetchProcessParentageActor) +
+    (sqidCommunicatingNetflows.get -> standingFetchCommunicatingNetflowsActor)
 
 
   val parallelism = quineConfig.quineactorparallelism

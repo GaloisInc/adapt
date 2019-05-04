@@ -117,7 +117,6 @@ case class PpmDefinition[DataShape](
 ) extends LazyLogging {
 
     implicit val ec: ExecutionContext = graphService.system.dispatchers.lookup("quine.actor.node-dispatcher")
-//  implicit val ec: ExecutionContext = graphService.system.dispatchers.lookup("adapt.ppm.manager-dispatcher")
 //  implicit val ec: ExecutionContext = context.dispatcher
 
   val basePath: String = ppmConfig.basedir + treeName + "-" + hostName
