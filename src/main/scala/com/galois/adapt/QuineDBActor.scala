@@ -139,7 +139,14 @@ case class CommunicatingNetflows(
   remoteAddressAdm: PpmLocalAddress,
   remotePortAdm: PpmLocalPort
 ) extends NoConstantsDomainNode {
-  def doesConverge: Boolean = remoteAddressAdm.localAddressAdm.target == remotePortAdm.localPortAdm.target
+
+  def doesConverge: Boolean = Set(
+    remoteAddressAdm.localAddressAdm.target,
+    remotePortAdm.localPortAdm.target,
+    localAddressAdm.remoteAddressAdm.target,
+    localPortAdm.remotePortAdm.target
+  ).size == 1
+
   def otherNetflow: Option[PpmNetflow] = if (doesConverge) Some(remoteAddressAdm.localAddressAdm.target) else None
 }
 
@@ -190,24 +197,28 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         "remotePort" -> "Option[Int]",
         "path" -> "String",
         "address" -> "String",
-        "port" -> "Int"
+        "port" -> "Int",
+        "cid" -> "Int",
+        "startTimestampNanos" -> "Long",
+        "latestNetflowRead" -> "LatestNetflowRead"
       ),
       defaultTypeNames = Seq("Boolean", "Long", "Int", "List[Int]", "List[Long]", "String"),
       typeNameToPickleReader = Map(
-        "Boolean"          -> PickleReader[Boolean],
-        "Long"             -> PickleReader[Long],
-        "Int"              -> PickleReader[Int],
-        "List[Long]"       -> PickleReader[List[Long]],
-        "List[Int]"        -> PickleReader[List[Int]],
-        "String"           -> PickleReader[String],
-        "FileObjectType"   -> PickleReader[FileObjectType],
-        "EventType"        -> PickleReader[EventType],
-        "Set[CdmUUID]"     -> PickleReader[Set[CdmUUID]],
-        "Option[Int]"      -> PickleReader[Option[Int]],
-        "Option[Long]"     -> PickleReader[Option[Long]],
-        "Option[String]"   -> PickleReader[Option[String]],
-        "Set[SubjectType]" -> PickleReader[Set[SubjectType]],
-        "SrcSinkType"      -> PickleReader[SrcSinkType]
+        "Boolean"           -> PickleReader[Boolean],
+        "Long"              -> PickleReader[Long],
+        "Int"               -> PickleReader[Int],
+        "List[Long]"        -> PickleReader[List[Long]],
+        "List[Int]"         -> PickleReader[List[Int]],
+        "String"            -> PickleReader[String],
+        "FileObjectType"    -> PickleReader[FileObjectType],
+        "EventType"         -> PickleReader[EventType],
+        "Set[CdmUUID]"      -> PickleReader[Set[CdmUUID]],
+        "Option[Int]"       -> PickleReader[Option[Int]],
+        "Option[Long]"      -> PickleReader[Option[Long]],
+        "Option[String]"    -> PickleReader[Option[String]],
+        "Set[SubjectType]"  -> PickleReader[Set[SubjectType]],
+        "SrcSinkType"       -> PickleReader[SrcSinkType],
+        "LatestNetflowRead" -> PickleReader[LatestNetflowRead]
       )
     ),
     labelKey = "type_of"
