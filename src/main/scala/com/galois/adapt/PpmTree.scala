@@ -205,6 +205,7 @@ case class PpmDefinition[DataShape](
   }
 
   private def updateThreshold(percentile: Float): Unit = {
+    val defaultLP = Try(localProbAccumulator.firstKey).getOrElse(1F)
     val percentileOfTotal = percentile/100 * localProbCount
 
     var accLPCount = 0
@@ -216,7 +217,7 @@ case class PpmDefinition[DataShape](
         accLPCount += thisLPCount
         accLPCount <= percentileOfTotal
       }
-      .foldLeft(1F)((_, newLast) => newLast.getKey)  // Apparently Scala iterators don't support 
+      .foldLeft((defaultLP))((_, newLast) => newLast.getKey)  // Apparently Scala iterators don't support
 
     println(s"LP THRESHOLD LOG: $treeName     $hostName: $localProbCount novelties collected.")
     println(s"LP THRESHOLD LOG: $treeName     $hostName: $localProbThreshold is current local probability threshold.")
@@ -317,7 +318,7 @@ case class PpmDefinition[DataShape](
     setNamespacedUuidDetails.filter { d =>
       d.pid.isDefined && d.name.isDefined
     }.map { d =>
-      ProcessDetails(d.name.get, d.pid, hostName, dataTimestamps)
+      ProcessDetails(d.name.get, d.pid, hostName, dataTimestamps, d.extendedUuid)
     }
   }
 
@@ -338,7 +339,7 @@ case class PpmDefinition[DataShape](
 
       val processDetails = getProcessDetails(setNamespacedUuidDetails, timestamps)
       //report the alarm
-      if (thresholdAllows) AlarmReporter.report(treeName, hostName, newAlarm, processDetails, localProbThreshold)
+      if (thresholdAllows) AlarmReporter.report(treeName, hostName, newAlarm, processDetails, localProbThreshold, shouldApplyThreshold)
     }
   }
 
@@ -467,7 +468,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       d => Set(d._1.latestTimestampNanos,d._1.earliestTimestampNanos),
-      shouldApplyThreshold = false
+      shouldApplyThreshold = true
     )(graphService),
 
     PpmDefinition[ESO]( "FilesExecutedIshByProcesses", hostName,
@@ -533,7 +534,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         d._2._2.map(a => NamespacedUuidDetails(a.uuid)).toSet ++
         d._3._2.map(a => NamespacedUuidDetails(a.uuid)).toSet,
       d => Set(d._1.latestTimestampNanos,d._1.earliestTimestampNanos),
-      shouldApplyThreshold = false
+      shouldApplyThreshold = true
     )(graphService),
 
     PpmDefinition[ESO]( "SudoIsAsSudoDoes", hostName,
