@@ -193,7 +193,6 @@ object Routes {
           } ~
           pathPrefix("summarize") {
             parameters('processName, 'hostName.as[String].?, 'pid.as[Int].?) { (processName, hostNameOpt, pidOpt) =>
-
               complete(
                 PpmSummarizer.summarize(processName, hostNameOpt, pidOpt).map(_.toString)
               )

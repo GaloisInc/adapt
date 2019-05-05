@@ -250,16 +250,12 @@ case object StandingFetches extends LazyLogging {
     }
   }
 
-  var seen = Set.empty[CommunicatingNetflows]
 
   def onCommunicatingNetflowsMatch(l: List[CommunicatingNetflows]): Unit = l.foreach { cn  =>
     cn.otherNetflow.foreach { other =>
-      if ( ! seen.contains(cn)) {
-        seen += cn
-        val matching = s"g.V([${cn.provider}_${graph.idProvider.customIdFromQid(cn.qid.get).get._1}, ${cn.otherNetflow.get.provider}_${graph.idProvider.customIdFromQid(cn.otherNetflow.get.qid.get).get._1}])"
-  //      val matching = cn.otherNetflow.map(o => s"${cn.localAddress.get}:${cn.localPort.get} --> ${o.localAddress.get}:${o.localPort.get}    ${graph.idProvider.customIdFromQid(cn.qid.get).get}  ${graph.idProvider.customIdFromQid(o.qid.get).get}")
-        println(matching)
-      }
+//        val matching = s"g.V([${cn.provider}_${graph.idProvider.customIdFromQid(cn.qid.get).get._1}, ${cn.otherNetflow.get.provider}_${graph.idProvider.customIdFromQid(cn.otherNetflow.get.qid.get).get._1}])"
+//  //      val matching = cn.otherNetflow.map(o => s"${cn.localAddress.get}:${cn.localPort.get} --> ${o.localAddress.get}:${o.localPort.get}    ${graph.idProvider.customIdFromQid(cn.qid.get).get}  ${graph.idProvider.customIdFromQid(o.qid.get).get}")
+//        println(matching)
       val addEdgeF = for {
         first <- cn.qid
         other <- cn.otherNetflow
