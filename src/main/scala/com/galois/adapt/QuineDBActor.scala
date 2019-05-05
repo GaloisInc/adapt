@@ -334,6 +334,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         }
 
       case anAdm: AdmSubject =>
+//        println(anAdm.uuid.rendered)
         anAdm.create(Some(anAdm.uuid)).map { x =>
           graphService.standingFetchWithBranch[ChildProcess](anAdm.uuid, Application.esoChildProcessInstanceBranch, Application.sqidParentProcess)(wrongFunc)
 //          graphService.standingFetchWithBranch[ProcessNetworkReadFromOtherProcess](anAdm.uuid, Application.processNetworkCommsBranch , Application.sqidProcessNetworkComms)(wrongFunc)
@@ -363,12 +364,17 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   }
 
   def writeAdmEdge(e: EdgeAdm2Adm, timeout: Timeout): Future[Long] = {
-    val src = AdmUuidProvider.customIdToQid(e.src)
-    val dest = AdmUuidProvider.customIdToQid(e.tgt)
-    val startNanos = System.nanoTime()
-    graphService.dumbOps.addEdge(src, dest, e.label)(timeout)
-      .map(_ => System.nanoTime() - startNanos)
-  }
+
+    val shouldSkip = e.label == "parentSubject" && e.src == e.tgt
+
+    if ( ! shouldSkip) {
+      val src = AdmUuidProvider.customIdToQid(e.src)
+      val dest = AdmUuidProvider.customIdToQid(e.tgt)
+      val startNanos = System.nanoTime()
+      graphService.dumbOps.addEdge(src, dest, e.label)(timeout)
+        .map(_ => System.nanoTime() - startNanos)
+    }
+
 
   def FutureTx[T](body: => T)(implicit ec: ExecutionContext): Future[T] = Future(body)
 
