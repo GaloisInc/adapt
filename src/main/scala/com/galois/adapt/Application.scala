@@ -230,12 +230,14 @@ object Application extends App {
   val esoNetworkInstanceBranch = branchOf[ESONetworkInstance]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
   val esoChildProcessInstanceBranch = branchOf[ChildProcess]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
   val esoCommunicatingNetflowsBranch = branchOf[CommunicatingNetflows]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
+  val processNetworkCommsBranch = branchOf[ProcessNetworkReadFromOtherProcess]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
 
   val esoFileInstanceQueryable = implicitly[Queryable[ESOFileInstance]]
   val esoSrcSinkInstanceQuerable = implicitly[Queryable[ESOSrcSnkInstance]]
   val esoNetworkInstanceQueryable = implicitly[Queryable[ESONetworkInstance]]
   val esoChildProcessInstanceQueryable = implicitly[Queryable[ChildProcess]]
   val esoCommunicatingNetflowsQueryable = implicitly[Queryable[CommunicatingNetflows]]
+  val processNetworkCommsQueryable = implicitly[Queryable[ProcessNetworkReadFromOtherProcess]]
 
   val sqidHostPrefix = quineConfig.thishost.replace(".", "-")
 
@@ -372,12 +374,52 @@ object Application extends App {
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, testBranch, assumedEdge, nodeComponents) =>
         val reconstructed = nodeComponents.toList.flatMap(esoCommunicatingNetflowsQueryable.fromNodeComponents)
-        val matching = reconstructed.flatMap(r => r.otherNetflow.map(o => s"${r.localAddress.get}:${r.localPort.get} --> ${o.localAddress.get}:${o.localPort.get}    ${graph.idProvider.customIdFromQid(r.qid.get).get}  ${graph.idProvider.customIdFromQid(o.qid.get).get}"))
-        println(matching.mkString("\n"))
-        // StandingFetches.onCommunicatingNetflowsMatch(reconstructed)   // create undirected edge
+        StandingFetches.onCommunicatingNetflowsMatch(reconstructed)
     })
   ))
   val standingFetchCommunicatingNetflowsActor = ActorRef.noSender
+
+  val sqidProcessNetworkComms = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ProcessNetworkComms")(
+    resultHandler = Some({
+      case DomainNodeSubscriptionResultFetch(from, testBranch, assumedEdge, nodeComponents) =>
+        val reconstructed = nodeComponents.toList.flatMap(processNetworkCommsQueryable.fromNodeComponents)
+        if (reconstructed.lengthCompare(1) >= 0) {
+          val (readProcNames, writeProcNames) = reconstructed.foldLeft(Set.empty[String] -> Set.empty[String]) { case ((readProcNames, writeProcNames), pnp) =>
+            (readProcNames + pnp.path.path) -> (writeProcNames + pnp.did_read.reciprocal_netflow.did_write.path.path)
+          }
+
+          val oldReadProc = reconstructed.head
+          val oldReadPath = oldReadProc.path
+          val oldReadNet = oldReadProc.did_read
+          val oldWriteNet = oldReadProc.did_read.reciprocal_netflow
+          val oldWriteProc = oldReadProc.did_read.reciprocal_netflow.did_write.target
+          val oldWritePath = oldReadProc.did_read.reciprocal_netflow.did_write.path
+
+          val newReadPath = oldReadPath.copy(path = readProcNames.toList.sorted.mkString(","))
+          newReadPath.qid = oldReadPath.qid
+
+          val newWritePath = oldWritePath.copy(path = writeProcNames.toList.sorted.mkString(","))
+          newWritePath.qid = oldWritePath.qid
+
+          val newWriteProc = oldWriteProc.copy(path = newWritePath)
+          newWriteProc.qid = oldWriteProc.qid
+
+          val newWriteNet = oldWriteNet.copy(did_write = newWriteProc)
+          newWriteNet.qid = oldWriteNet.qid
+
+          val newReadNet = oldReadNet.copy(reciprocal_netflow = newWriteNet)
+          newReadNet.qid = oldReadNet.qid
+
+          val newReadProc = oldReadProc.copy(path = newReadPath, did_read = newReadNet)
+          newReadProc.qid = oldReadProc.qid
+
+          val singleObservationList = List(newReadProc)
+
+          StandingFetches.onProcessNetworkCommsMatch(singleObservationList)
+        }
+    })
+  ))
+  val processNetworkCommsActor = ActorRef.noSender
 
 
   graph.currentGraph.standingQueryActors = graph.currentGraph.standingQueryActors +
@@ -385,7 +427,8 @@ object Application extends App {
     (sqidSrcSnk.get -> standingFetchSrcSnkActor) +
     (sqidNetwork.get -> standingFetchNetworkActor) +
     (sqidParentProcess.get -> standingFetchProcessParentageActor) +
-    (sqidCommunicatingNetflows.get -> standingFetchCommunicatingNetflowsActor)
+    (sqidCommunicatingNetflows.get -> standingFetchCommunicatingNetflowsActor) +
+    (sqidProcessNetworkComms.get -> processNetworkCommsActor)
 
 
   val parallelism = quineConfig.quineactorparallelism

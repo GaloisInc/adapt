@@ -152,6 +152,34 @@ case class CommunicatingNetflows(
 
 
 
+case class ProcessNetworkReadFromOtherProcess(
+  cid: Int,
+  subjectTypes: Set[SubjectType],
+  hostName: String,
+  path: AdmPathNode,
+  did_read: CommNetflow1
+) extends NoConstantsDomainNode
+
+case class CommNetflow1(
+  localAddress: Option[String],
+  localPort: Option[Int],
+  remoteAddress: Option[String],
+  remotePort: Option[Int],
+  provider: String,
+  reciprocal_netflow: CommNetflow2
+) extends NoConstantsDomainNode
+
+case class CommNetflow2(
+  localAddress: Option[String],
+  localPort: Option[Int],
+  remoteAddress: Option[String],
+  remotePort: Option[Int],
+  provider: String,
+  did_write: <--[NetCommSubject]
+) extends NoConstantsDomainNode
+
+case class NetCommSubject(cid: Int, subjectTypes: Set[SubjectType], path: AdmPathNode, hostName: String) extends NoConstantsDomainNode
+
 
 
 case class PpmObservation(
@@ -277,6 +305,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   implicit val ppmAddressInstance: Queryable[PpmLocalAddress] = cachedImplicit
   implicit val ppmPortInstance: Queryable[PpmLocalPort] = cachedImplicit
   implicit val communicatingNetflowInstance: Queryable[CommunicatingNetflows] = cachedImplicit
+  implicit val processNetflowCommsInstance: Queryable[ProcessNetworkReadFromOtherProcess] = cachedImplicit
 
 
 
@@ -298,12 +327,13 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       case anAdm: AdmSubject =>
         anAdm.create(Some(anAdm.uuid)).map { x =>
           graphService.standingFetchWithBranch[ChildProcess](anAdm.uuid, Application.esoChildProcessInstanceBranch, Application.sqidParentProcess)(wrongFunc)
+          graphService.standingFetchWithBranch[ProcessNetworkReadFromOtherProcess](anAdm.uuid, Application.processNetworkCommsBranch , Application.sqidProcessNetworkComms)(wrongFunc)
           x
         }
 
       case anAdm: AdmNetFlowObject      =>
         anAdm.create(Some(anAdm.uuid)).map { x =>
-//          graphService.standingFetchWithBranch[CommunicatingNetflows](anAdm.uuid, Application.esoCommunicatingNetflowsBranch, Application.sqidCommunicatingNetflows)(wrongFunc)
+          graphService.standingFetchWithBranch[CommunicatingNetflows](anAdm.uuid, Application.esoCommunicatingNetflowsBranch, Application.sqidCommunicatingNetflows)(wrongFunc)
           x
         }
 

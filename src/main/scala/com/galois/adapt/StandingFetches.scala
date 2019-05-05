@@ -12,6 +12,7 @@ import scala.util.Try
 import com.rrwright.quine.runtime.FutureRecoverWith
 import com.rrwright.quine.language.BoopickleScheme._
 import com.rrwright.quine.language._
+import com.rrwright.quine.language.EdgeDirections._
 import Application.{graph, ppmManagers}
 
 
@@ -67,11 +68,11 @@ case object StandingFetches extends LazyLogging {
       val objectCustomId = graph.idProvider.customIdFromQid(objectQid)
       val objWritersFut = graph.getNodeComponents(objectQid, objectWriterBranch, None).map { ncList =>
         ncList.flatMap { nc => objectWriterQueryable.fromNodeComponents(nc)
-          .collect{ case ow if ow.did_write.target.qid != eso.subject.qid => // Ignore matches when the subject is the same on each side.
+          .collect{ case ow if ow.did_write.qid != eso.subject.qid => // Ignore matches when the subject is the same on each side.
 
             // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
-            val s1 = PpmSubject(ow.did_write.target.cid, ow.did_write.target.subjectTypes, graph.idProvider.customIdFromQid(ow.did_write.target.qid.get).get)
-            val pn1 = ow.did_write.target.path
+            val s1 = PpmSubject(ow.did_write.cid, ow.did_write.subjectTypes, graph.idProvider.customIdFromQid(ow.did_write.qid.get).get)
+            val pn1 = ow.did_write.path
             val o = PpmFileObject(eso.predicateObject.fileObjectType, objectCustomId.get)
             val pno = eso.predicateObject.path
             val e = PpmEvent(eso.eventType, eso.earliestTimestampNanos, eso.latestTimestampNanos, graph.idProvider.customIdFromQid(eso.qid.get).get)
@@ -96,8 +97,8 @@ case object StandingFetches extends LazyLogging {
             .collect { case ow => // DONT'T ignore matches when the subject is the same on each side.
 
               // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
-              val s1 = PpmSubject(ow.did_execute.target.cid, ow.did_execute.target.subjectTypes, graph.idProvider.customIdFromQid(ow.did_execute.target.qid.get).get)
-              val pn1 = ow.did_execute.target.path
+              val s1 = PpmSubject(ow.did_execute.cid, ow.did_execute.subjectTypes, graph.idProvider.customIdFromQid(ow.did_execute.qid.get).get)
+              val pn1 = ow.did_execute.path
               val o = PpmFileObject(eso.predicateObject.fileObjectType, objectCustomId.get)
               val pno = eso.predicateObject.path
               val e = PpmEvent(eso.eventType, eso.earliestTimestampNanos, eso.latestTimestampNanos, graph.idProvider.customIdFromQid(eso.qid.get).get)
@@ -122,8 +123,8 @@ case object StandingFetches extends LazyLogging {
             .collect { case ow => // DON'T ignore matches when the subject is the same on each side.
 
               // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
-              val s1 = PpmSubject(ow.did_write.target.cid, ow.did_write.target.subjectTypes, graph.idProvider.customIdFromQid(ow.did_write.target.qid.get).get)
-              val pn1 = ow.did_write.target.path
+              val s1 = PpmSubject(ow.did_write.cid, ow.did_write.subjectTypes, graph.idProvider.customIdFromQid(ow.did_write.qid.get).get)
+              val pn1 = ow.did_write.path
               val o = PpmFileObject(eso.predicateObject.fileObjectType, objectCustomId.get)
               val pno = eso.predicateObject.path
               val e = PpmEvent(eso.eventType, eso.earliestTimestampNanos, eso.latestTimestampNanos, graph.idProvider.customIdFromQid(eso.qid.get).get)
@@ -176,11 +177,11 @@ case object StandingFetches extends LazyLogging {
       val objectCustomId = graph.idProvider.customIdFromQid(objectQid)
       val objWritersFut = graph.getNodeComponents(objectQid, objectWriterBranch, None).map { ncList =>
         ncList.flatMap { nc => objectWriterQueryable.fromNodeComponents(nc)
-          .collect{ case ow if ow.did_write.target.qid != eso.subject.qid => // Ignore matches when the subject is the same on each side.
+          .collect{ case ow if ow.did_write.qid != eso.subject.qid => // Ignore matches when the subject is the same on each side.
 
             // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
-            val s1 = PpmSubject(ow.did_write.target.cid, ow.did_write.target.subjectTypes, graph.idProvider.customIdFromQid(ow.did_write.target.qid.get).get)
-            val pn1 = ow.did_write.target.path
+            val s1 = PpmSubject(ow.did_write.cid, ow.did_write.subjectTypes, graph.idProvider.customIdFromQid(ow.did_write.qid.get).get)
+            val pn1 = ow.did_write.path
             val o = PpmNetFlowObject(eso.predicateObject.remotePort, eso.predicateObject.localPort, eso.predicateObject.remoteAddress, eso.predicateObject.localAddress, objectCustomId.get)
             val pno = None
             val e = PpmEvent(eso.eventType, eso.earliestTimestampNanos, eso.latestTimestampNanos, graph.idProvider.customIdFromQid(eso.qid.get).get)
@@ -217,11 +218,11 @@ case object StandingFetches extends LazyLogging {
       val objectCustomId = graph.idProvider.customIdFromQid(objectQid)
       val objWritersFut = graph.getNodeComponents(objectQid, objectWriterBranch, None).map { ncList =>
         ncList.flatMap { nc => objectWriterQueryable.fromNodeComponents(nc)
-          .collect{ case ow if ow.did_write.target.qid != eso.subject.qid => // Ignore matches when the subject is the same on each side.
+          .collect{ case ow if ow.did_write.qid != eso.subject.qid => // Ignore matches when the subject is the same on each side.
 
             // Combine the found SEO components with the current standingFetch'd matches ESO to form the results into the desired SEOES shape:
-            val s1 = PpmSubject(ow.did_write.target.cid, ow.did_write.target.subjectTypes, graph.idProvider.customIdFromQid(ow.did_write.target.qid.get).get)
-            val pn1 = ow.did_write.target.path
+            val s1 = PpmSubject(ow.did_write.cid, ow.did_write.subjectTypes, graph.idProvider.customIdFromQid(ow.did_write.qid.get).get)
+            val pn1 = ow.did_write.path
             val o = PpmSrcSinkObject(eso.predicateObject.srcSinkType, objectCustomId.get)
             val pno = None
             val e = PpmEvent(eso.eventType, eso.earliestTimestampNanos, eso.latestTimestampNanos, graph.idProvider.customIdFromQid(eso.qid.get).get)
@@ -249,10 +250,91 @@ case object StandingFetches extends LazyLogging {
     }
   }
 
+  var seen = Set.empty[CommunicatingNetflows]
+
+  def onCommunicatingNetflowsMatch(l: List[CommunicatingNetflows]): Unit = l.foreach { cn  =>
+    cn.otherNetflow.foreach { other =>
+      if ( ! seen.contains(cn)) {
+        seen += cn
+        val matching = s"g.V([${cn.provider}_${graph.idProvider.customIdFromQid(cn.qid.get).get._1}, ${cn.otherNetflow.get.provider}_${graph.idProvider.customIdFromQid(cn.otherNetflow.get.qid.get).get._1}])"
+  //      val matching = cn.otherNetflow.map(o => s"${cn.localAddress.get}:${cn.localPort.get} --> ${o.localAddress.get}:${o.localPort.get}    ${graph.idProvider.customIdFromQid(cn.qid.get).get}  ${graph.idProvider.customIdFromQid(o.qid.get).get}")
+        println(matching)
+      }
+      val addEdgeF = for {
+        first <- cn.qid
+        other <- cn.otherNetflow
+        second <- other.qid
+      } yield {
+        graph.dumbOps.addEdge(first, second, "reciprocal_netflow", isDirected = true) //.recover{ case e => e.printStackTrace()}
+        graph.dumbOps.addEdge(second, first, "reciprocal_netflow") //.recover{ case e => e.printStackTrace()}
+      }
+    }
+  }
 
 
+  def onProcessNetworkCommsMatch(l: List[ProcessNetworkReadFromOtherProcess]): Unit = {
+    // This will always be a list of size 1, done by the caller.
+    l.foreach { readerNet =>
+      for {
+        readerQid <- readerNet.qid
+        writerQid <- readerNet.did_read.reciprocal_netflow.did_write.qid
+        if readerQid != writerQid
+        readerUuid <- graph.idProvider.customIdFromQid(readerQid)
+        writerUuid <- graph.idProvider.customIdFromQid(writerQid)
+        readerNetflowQid <- readerNet.did_read.qid
+        readerNetflowUuid <- graph.idProvider.customIdFromQid(readerNetflowQid)
+        writerNetflowQid <- readerNet.did_read.reciprocal_netflow.did_write.qid
+        writerNetflowUuid <- graph.idProvider.customIdFromQid(writerNetflowQid)
+        readerPathQid <- readerNet.path.qid
+        readerPathUuid <- graph.idProvider.customIdFromQid(readerPathQid)
+        writerPathQid <- readerNet.did_read.reciprocal_netflow.did_write.path.qid
+        writedPathUuid <- graph.idProvider.customIdFromQid(writerPathQid)
+      } {
+        graph.dumbOps.addEdge(readerQid, writerQid, "did_read_over_network")
+
+        val writerPathName = readerNet.did_read.reciprocal_netflow.did_write.path.path
+        val readerPathName = readerNet.path.path
 
 
+        val readingNetflow = PpmNetFlowObject(readerNet.did_read.remotePort, readerNet.did_read.localPort, readerNet.did_read.remoteAddress, readerNet.did_read.localAddress, readerNetflowUuid)
+
+        val obs = RemoteNetworkProcessReadObservation(
+          readerPathName,
+          readerNet.hostName,
+          writerPathName,
+          readerNet.did_read.reciprocal_netflow.did_write.hostName,
+          readingNetflow,
+          Set(
+            NamespacedUuidDetails(readerUuid, Some(readerNet.path.path), Some(readerNet.cid)),
+            NamespacedUuidDetails(writerUuid, Some(readerNet.did_read.reciprocal_netflow.did_write.path.path), Some(readerNet.did_read.reciprocal_netflow.did_write.cid)),
+            NamespacedUuidDetails(readerNetflowUuid),
+            NamespacedUuidDetails(writerNetflowUuid),
+            NamespacedUuidDetails(readerPathUuid),
+            NamespacedUuidDetails(writedPathUuid)
+          ),
+          Set(System.nanoTime())
+        )
+
+        val query = s"g.V([${obs.relevantUuids.map(_.extendedUuid.rendered).mkString(", ")}])"
+        logger.info(s"Standing match: CrossHostProcessCommunication = ${readerNet.hostName}:$readerPathName <-- ${readerNet.did_read.reciprocal_netflow.did_write.hostName}:$writerPathName Q: " + query)
+
+        ppmManagers.get(readerNet.hostName).fold(logger.error(s"No PPM Actor with hostname: ${readerNet.hostName}")){ ppm =>
+//          println(s"OBSERVATION: $obs")
+          ppm.crossHostTree.observe(obs)
+        }
+      }
+    }
+  }
 
 
 }
+
+case class RemoteNetworkProcessReadObservation(
+  readingProcessName: String,
+  readingProcessHost: HostName,
+  writingProcessName: String,
+  writingProcessHost: HostName,
+  readingNetflow: PpmNetFlowObject,
+  relevantUuids: Set[NamespacedUuidDetails],
+  timestamps: Set[Long]
+)
