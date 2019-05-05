@@ -154,6 +154,49 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val uiNodeFormat = jsonFormat3(UINode)
   implicit val uiEdgeFormat = jsonFormat3(UIEdge)
 
+  implicit val rangeFormat = jsonFormat3(AdaptConfig.Range.apply)
+  implicit val fileIngestFormat = jsonFormat3(AdaptConfig.FileIngestUnit.apply)
+  implicit val kafkaTopicFormat = jsonFormat3(AdaptConfig.KafkaTopicIngestUnit.apply)
+  implicit val ingestUnitFormat = new RootJsonFormat[AdaptConfig.IngestUnit] {
+    override def write(iu: AdaptConfig.IngestUnit): JsValue = {
+      val JsObject(payload) = iu match {
+        case f: AdaptConfig.FileIngestUnit => fileIngestFormat.write(f)
+        case k: AdaptConfig.KafkaTopicIngestUnit => kafkaTopicFormat.write(k)
+      }
+      JsObject(payload + ("type" -> JsString(iu.productPrefix)))
+    }
+
+    override def read(p: JsValue): AdaptConfig.IngestUnit =
+      p.asJsObject.getFields("type") match {
+        case Seq(JsString("FileIngestUnit")) => fileIngestFormat.read(p)
+        case Seq(JsString("KafkaTopicIngestUnit")) => kafkaTopicFormat.read(p)
+      }
+  }
+
+  implicit val dataProvider = new RootJsonFormat[DataProvider] {
+    override def write(dp: DataProvider): JsValue = JsString(dp.toString)
+    
+    override def read(v: JsValue): DataProvider = v match {
+      case JsString("Clearscope") => Clearscope
+      case JsString("Trace") => Trace
+      case JsString("Cadets") => Cadets
+      case JsString("Theia") => Theia
+      case JsString("Faros") => Faros
+      case JsString("FiveDirections") => FiveDirections
+      case JsString("Marple") => Marple
+    }
+  }
+
+  implicit val linearIngestFormat = jsonFormat2(AdaptConfig.LinearIngest.apply)
+  implicit val ingestHostFormat = jsonFormat(
+    AdaptConfig.IngestHost.apply,
+    "ta1",
+    "hostName",
+    "parallel",
+    "startatoffset",
+    "loadlimit"
+  )
+
   val vertexTypeTuple = "type" -> JsString("vertex")
   val edgeTypeTuple   = "type" -> JsString("edge")
 

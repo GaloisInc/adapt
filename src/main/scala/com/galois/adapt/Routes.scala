@@ -122,6 +122,35 @@ object Routes {
             complete(
               (statusActor ? GetStats).mapTo[StatusReport]
             )
+          } ~
+          pathPrefix("ingest") {
+            path("listHosts"){
+              import ApiJsonProtocol.ingestHostFormat
+              complete(
+                AdaptConfig.ingestConfig.hosts
+              )
+            } ~
+            path("addHost"){
+              import ApiJsonProtocol.ingestHostFormat
+              parameters('host.as[AdaptConfig.IngestHost]) { host: AdaptConfig.IngestHost =>
+                complete {
+                  AdaptConfig.ingestConfig.hosts = host :: AdaptConfig.ingestConfig.hosts
+                  Application.runHostIngest(host)
+                  "Updated ingest host list"
+                }
+              }
+            } ~
+            path("removeHost"){
+              import ApiJsonProtocol.ingestHostFormat
+              parameters('hostName.as[AdaptConfig.HostName]) { hostName: AdaptConfig.HostName =>
+                complete {
+                  AdaptConfig.ingestConfig.hosts = AdaptConfig.ingestConfig.hosts.filter(_.hostName != hostName)
+                  Application.executeIngestHost(hostName)
+                  "Removed and killed host"
+                }
+              }
+
+            }
           }
       //    pathPrefix("ppm") {
       //      path("listTrees") {
