@@ -48,8 +48,9 @@ object AdaptConfig extends Utils {
     skipshutdown: SkipActorSystemShutdown = false
   )
 
+
   case class IngestConfig(
-      hosts: List[IngestHost],
+      var hosts: List[IngestHost],
       quitafteringest: Boolean,
       logduplicates: Boolean,
       produce: DataModelProduction
@@ -389,7 +390,7 @@ object AdaptConfig extends Utils {
     }
   }
 
-  sealed trait IngestUnit {
+  sealed trait IngestUnit extends Product {
     val namespace: Namespace
     val range: Range
 

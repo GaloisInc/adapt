@@ -152,10 +152,14 @@ object UuidRemapper {
       }
 
     val expandAdm = b.add(Flow[Timed[UuidRemapperInfo]])
-    val loopBack = b.add(MergePreferred[Timed[UuidRemapperInfo]](1))
-    val splitShards = b.add(Broadcast[Timed[UuidRemapperInfo]](numShards))
-    val mergeShards = b.add(Merge[Timed[UuidRemapperInfo]](numShards))
-    val decider = b.add(Partition[Timed[UuidRemapperInfo]](2, info => if (info.unwrap.remapped) 0 else 1))
+    val loopBack = b.add(MergePreferred[Timed[UuidRemapperInfo]](1, eagerComplete = true))
+    val splitShards = b.add(Broadcast[Timed[UuidRemapperInfo]](numShards, eagerCancel = true))
+    val mergeShards = b.add(Merge[Timed[UuidRemapperInfo]](numShards, eagerComplete = true))
+    val decider = b.add(new Partition[Timed[UuidRemapperInfo]](
+      outputPorts = 2,
+      info => if (info.unwrap.remapped) 0 else 1,
+      eagerCancel = true
+    ))
     val ret = b.add(Flow[Either[ADM, EdgeAdm2Adm]])
 
     loopBack.out ~> splitShards.in

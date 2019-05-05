@@ -585,6 +585,11 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
     case CompleteMsg =>
       println(s"Data loading complete: $idx")
       sender() ! Ack
+    
+    case Application.KillMe =>
+      println(s"Killing myself :(")
+      sender() ! Ack
+      context.stop(self)
 
     case msg => log.warning(s"Unknown message: $msg")
 

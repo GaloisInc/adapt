@@ -34,6 +34,7 @@ import com.rrwright.quine.language._
 import com.rrwright.quine.language.BoopickleScheme._
 import scala.collection.JavaConverters._
 import java.util.concurrent.ConcurrentHashMap
+import scala.concurrent.Promise
 
 
 object Application extends App {
@@ -133,7 +134,7 @@ object Application extends App {
 //          size
 //        }
 //      )(as),
-      TimelessMapDBMultimap("data/persistence-multimap_by_event.db")(as),
+      TimelessMapDBMultimap("data/persistence-multimap_by_event.db", shardCount = 14)(as),
 //    MapDBMultimap()(as),
 //    EmptyPersistor()(as),
     idProvider = AdmUuidProvider,
@@ -545,23 +546,39 @@ object Application extends App {
 
   println("Running Quine ingest.")
 
-  val cdmSources: Map[HostName, (IngestHost, Source[(Namespace,CDM20), NotUsed])] = ingestConfig.hosts.map { host: IngestHost =>
-    host.hostName -> (host, host.toCdmSource(ErrorHandler.print))
-  }.toMap
-  val hostSources = cdmSources.values.toSeq
   val debug = new StreamDebugger("stream-buffers|", 30 seconds, 10 seconds)
-  for ((host, source) <- hostSources) {
-    val standingFetchSink: ActorRef = RunnableGraph.fromGraph(GraphDSL.create(
-      Source.actorRef[PpmObservation](quineConfig.ppmobservationbuffer,
+  
+  object KillMe
 
+  val streamsRunning = collection.mutable.Map.empty[HostName, Promise[Option[KillMe.type]]]
+
+  // In the gallows sense of the word. ;)
+  def executeIngestHost(hostName: HostName): String = {
+    streamsRunning.remove(hostName) match {
+      case Some(dealWithTheDevil) =>
+        dealWithTheDevil.trySuccess(Some(KillMe))
+        "Removed the stream (the stream had no choice but to fulfill its promise to the devil)"
+
+      case None =>
+        "Couldn't find the host to 'execute'"
+    }
+  }
+
+  private var streamCount = new java.util.concurrent.atomic.AtomicLong(0L)
+  def runHostIngest(host: IngestHost): Unit = {
+    val source = host.toCdmSource(ErrorHandler.print)
+    val (standingFetchSink: ActorRef, dealWithTheDevil: Promise[Option[KillMe.type]]) = RunnableGraph.fromGraph(GraphDSL.create(
+      Source.actorRef[PpmObservation](quineConfig.ppmobservationbuffer,
         OverflowStrategy.dropNew
 //        OverflowStrategy.fail
-
-    )
-    ) { implicit b => standingFetchSource =>
+      ),
+      Source.maybe[KillMe.type]
+    )((s: ActorRef, d: Promise[Option[KillMe.type]]) => (s,d)) {
+      implicit b => (standingFetchSource, killSource) =>
       import GraphDSL.Implicits._
 
-      val merge = b.add(MergePreferred[Any](1, eagerComplete = true))
+      val killMerge         = b.add(MergePreferred[Any](1, eagerComplete = true))
+      val feedbackLoopMerge = b.add(MergePreferred[Any](1, eagerComplete = true))
 
       source.async
         .via(printCounter(host.hostName+" CDM", statusActor))
@@ -569,18 +586,25 @@ object Application extends App {
         .via(erMap(host.hostName).async).async
         .via(lruDedup)
         .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB", 50000)).async
-        .via(printCounter(host.hostName+" ADM", statusActor)) ~> merge.in(0)
+        .via(printCounter(host.hostName+" ADM", statusActor)) ~> feedbackLoopMerge.in(0)
 
-      standingFetchSource ~> merge.preferred
+      standingFetchSource ~> feedbackLoopMerge.preferred
 
-      merge.out.via(printCounter(host.hostName + " Quine", statusActor)) ~> quineSink(host.hostName).async
+      feedbackLoopMerge.out.via(printCounter(host.hostName + " Quine", statusActor)) ~> killMerge.in(0)
+      killSource ~> killMerge.preferred
 
+      killMerge.out ~> quineSink(host.hostName + "-" + streamCount.incrementAndGet()).async
+      
       ClosedShape
     }).run()
 
+    streamsRunning += (host.hostName -> dealWithTheDevil)
     standingFetchSinks += (host.hostName -> standingFetchSink)
   }
 
+
+  for (host <- ingestConfig.hosts)
+    runHostIngest(host)
 
 //  def addNewIngestStream(host: IngestHost): Unit = ???
 
