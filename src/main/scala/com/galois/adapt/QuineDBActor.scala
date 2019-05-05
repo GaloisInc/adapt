@@ -364,17 +364,17 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
   }
 
   def writeAdmEdge(e: EdgeAdm2Adm, timeout: Timeout): Future[Long] = {
+    val startNanos = System.nanoTime()
 
     val shouldSkip = e.label == "parentSubject" && e.src == e.tgt
 
     if ( ! shouldSkip) {
       val src = AdmUuidProvider.customIdToQid(e.src)
       val dest = AdmUuidProvider.customIdToQid(e.tgt)
-      val startNanos = System.nanoTime()
       graphService.dumbOps.addEdge(src, dest, e.label)(timeout)
         .map(_ => System.nanoTime() - startNanos)
-    }
-
+    } else Future.successful(System.nanoTime() - startNanos)
+  }
 
   def FutureTx[T](body: => T)(implicit ec: ExecutionContext): Future[T] = Future(body)
 
