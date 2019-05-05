@@ -230,14 +230,14 @@ object Application extends App {
   val esoSrcSinkInstanceBranch = branchOf[ESOSrcSnkInstance]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
   val esoNetworkInstanceBranch = branchOf[ESONetworkInstance]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
   val esoChildProcessInstanceBranch = branchOf[ChildProcess]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
-  val esoCommunicatingNetflowsBranch = branchOf[CommunicatingNetflows]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
+  val communicatingNetflowsBranch = branchOf[CommunicatingNetflows]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
   val processNetworkCommsBranch = branchOf[ProcessNetworkReadFromOtherProcess]().asInstanceOf[DomainGraphBranch[com.rrwright.quine.language.Create]]  // TODO: this is wrong; evidence that the `Create` requirement is wrong in so many places!
 
   val esoFileInstanceQueryable = implicitly[Queryable[ESOFileInstance]]
   val esoSrcSinkInstanceQuerable = implicitly[Queryable[ESOSrcSnkInstance]]
   val esoNetworkInstanceQueryable = implicitly[Queryable[ESONetworkInstance]]
   val esoChildProcessInstanceQueryable = implicitly[Queryable[ChildProcess]]
-  val esoCommunicatingNetflowsQueryable = implicitly[Queryable[CommunicatingNetflows]]
+  val communicatingNetflowsQueryable = implicitly[Queryable[CommunicatingNetflows]]
   val processNetworkCommsQueryable = implicitly[Queryable[ProcessNetworkReadFromOtherProcess]]
 
   val sqidHostPrefix = quineConfig.thishost.replace(".", "-")
@@ -374,7 +374,10 @@ object Application extends App {
   val sqidCommunicatingNetflows = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_CommunicatingNetflows")(
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, testBranch, assumedEdge, nodeComponents) =>
-        val reconstructed = nodeComponents.toList.flatMap(esoCommunicatingNetflowsQueryable.fromNodeComponents)
+        val reconstructed = nodeComponents.toList.flatMap(
+          communicatingNetflowsQueryable.fromNodeComponents
+        )
+//        println(s"CommunicatingNetflows nodeComponents matchSize: ${nodeComponents.size}  Reconstructed size: ${reconstructed.size}\n$reconstructed")
         StandingFetches.onCommunicatingNetflowsMatch(reconstructed)
     })
   ))
