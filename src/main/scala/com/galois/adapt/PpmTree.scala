@@ -246,7 +246,7 @@ case class PpmDefinition[DataShape](
   val someoneDequing = new AtomicBoolean(false)
   val queuedObservations = new java.util.concurrent.ConcurrentLinkedDeque[(List[ExtractedValue], Set[NamespacedUuidDetails], Set[Long], Int, ObservationId)]()
 
-  graphService.system.scheduler.schedule(10 seconds, 60 seconds)(println(s"Alec's lowerBoundQueueLength for: $hostName $treeName size: ${lowerBoundQueueLength.get()} (total emitted: $totalEmitted, total compressed: $totalCompressed)"))
+  graphService.system.scheduler.schedule(10 seconds, 60 seconds)(println(s"lowerBoundQueueLength for: $hostName $treeName size: ${lowerBoundQueueLength.get()} (total emitted: $totalEmitted, total compressed: $totalCompressed)"))
 
   /*
    *  If you observe something with a _different_ extracted value, you are responsible for emitting existing values
@@ -291,16 +291,21 @@ case class PpmDefinition[DataShape](
         }
 
         if (lowerBoundQueueLength.get() > 0) {
-          Application.standingFetchSinks(hostName) ! PpmObservation(
-            treeRootQid,
-            treeName,
-            hostName,
-            extractedValues,
-            uuidsNew,
-            timestampsNew,
-            (hostName: String, nov: Novelty[Set[NamespacedUuidDetails]]) => ppmManagers(hostName).novelty(nov),
-            countNew
-          )
+          for  {
+            sink <- Application.standingFetchSinks.get(hostName).orElse{ logger.error(s"Cannot find host tree for observation with host name: {}", hostName); None}
+            ppmMgr <- ppmManagers.get(hostName).orElse{ logger.error(s"Cannot find PPM manager for observation with host name: {}", hostName); None}
+          } {
+            sink ! PpmObservation(
+              treeRootQid,
+              treeName,
+              hostName,
+              extractedValues,
+              uuidsNew,
+              timestampsNew,
+              (hostName: String, nov: Novelty[Set[NamespacedUuidDetails]]) => ppmMgr.novelty(nov),
+              countNew
+            )
+          }
           totalEmitted += 1
         } else {
           queuedObservations.addLast((extracted, uuidsNew, timestampsNew, countNew, 0L))
@@ -708,115 +713,32 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
     def invert = CrossHostNetObs(sendRec.invert, remoteAddress, remotePort, localAddress, localPort)
   }
 
-// /* lazy val crossHostTrees = List(
-//
-//    new PpmDefinition[DataShape]("CrossHostProcessCommunication",
-//      d => netFlowTypes.contains(d._1.eventType) && (d._3._1 match {
-//        case AdmNetFlowObject(_,Some(_),Some(_),Some(_),Some(_),_) => true   // Ignore raw sockets. ...and other sockets.
+  val crossHostTree =
+    new PpmDefinition[RemoteNetworkProcessReadObservation]("CrossHostProcessCommunication", hostName,
+      d => true,
+//        d.readingNetflow match {
+//        case PpmNetFlowObject(Some(_),Some(_),Some(_),Some(_), _) => true   // Ignore raw sockets. ...and other sockets.
 //        case _ => false
-//      }),
-//      List(
-//        d => List(
-//          d._2._2.map(_.path).getOrElse("<<unknown_process>>")), // Sending process name
-//        d => List(
-//          d._2._2.map(_.path).getOrElse("<<unknown_process>>"),          // Receiving process name
-//          d._3._1.asInstanceOf[AdmNetFlowObject].localPort.get.toString  // Receiving port number
-//        )
-//      ),
-//      d => Set(
-//        NamespacedUuidDetails(d._1.uuid),
-//        NamespacedUuidDetails(d._2._1.uuid, d._2._2.map(_.path), Some(d._2._1.cid)),
-//        NamespacedUuidDetails(d._3._1.uuid, d._3._2.map(_.path))
-//      ) ++ d._2._2.map(n => NamespacedUuidDetails(n.uuid, Some(n.path), None)).toSet,
-////        ++ d._3._2.map(n => NamespacedUuidDetails(n.uuid, Some(n.path), None)).toSet,  // Don't need/will never be a path node from a netflow.
-//      d => Set(d._1.latestTimestampNanos),
-//      shouldApplyThreshold = false
-//    )(thisActor.context, context.self, hostName, graphService) with PartialPpm[CrossHostNetObs] {
-//
-////      implicit def partialMapJson: RootJsonFormat[(Set[String], (List[ExtractedValue], Set[NamespacedUuidDetails]))] = ???
-//
-//      val netFlowReadTypes = writeTypes.+(EVENT_CONNECT)
-//      val netFlowWriteTypes = readTypes.+(EVENT_ACCEPT)
-//
-//      val partialFilters = (
-//        (eso: PartialShape) => netFlowReadTypes.contains(eso._1.eventType),
-//        (eso: PartialShape) => netFlowWriteTypes.contains(eso._1.eventType)
-//      )
-//
-//      def getJoinCondition(observation: DataShape): Option[CrossHostNetObs] = Try {
-//        val nf = observation._3._1.asInstanceOf[AdmNetFlowObject]
-//        CrossHostNetObs(
-//          observation match {
-//            case t if partialFilters._1(t) => Sending
-//            case t if partialFilters._2(t) => Receiving
-//            case _ => ???
-//          },
-//          nf.localAddress.get,
-//          nf.localPort.get,
-//          nf.remoteAddress.get,
-//          nf.remotePort.get
-//        )
-//      }.toOption
-//
-//      var partialMap2 = Map.empty[HostName, mutable.Map[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]]]
-//
-//      override def observe(observation: PartialShape): Unit = if (incomingFilter(observation)) {
-//        getJoinCondition(observation) match {
-//          case None => log.error(s"Something unexpected passed the filter for CrossHostProcessCommunication: $observation")
-//          case Some(joinValue) =>
-//
-//            val existingThisHost = partialMap2.getOrElse(observation._1.hostName, mutable.Map.empty[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]])
-//            if ( ! partialMap2.contains(observation._2._1.hostName)) partialMap2 = partialMap2 + (observation._2._1.hostName -> existingThisHost)
-//            val existingOtherHosts = (partialMap2 - observation._1.hostName).values
-//              .foldLeft[Map[CrossHostNetObs, Map[List[ExtractedValue],Set[NamespacedUuidDetails]]]](Map.empty)(_ ++ _)
-//
-//            val previousSameDirObservations = existingThisHost.getOrElse(joinValue, Map.empty[List[ExtractedValue], Set[NamespacedUuidDetails]])
-//            val observedIds = uuidCollector(observation)
-//
-//            val sendRecOpt = joinValue.sendRec match {
-//              case Sending =>
-//                val theseDiscs = discriminators(0)(observation)
-//                val theseIds = previousSameDirObservations.get(theseDiscs).fold(observedIds) { previousIds => observedIds ++ previousIds }
-//                val thisSendObs = Map(theseDiscs -> theseIds)
-//                val allSendObs = previousSameDirObservations ++ thisSendObs
-//                existingThisHost(joinValue) = allSendObs  // Update mutable Map in place
-//                existingOtherHosts.get(joinValue.invert).map(thisSendObs -> _)
-//              case Receiving =>
-//                val theseDiscs = discriminators(1)(observation)
-//                val theseIds = previousSameDirObservations.get(theseDiscs).fold(observedIds) { previousIds => observedIds ++ previousIds }
-//                val thisRecObs = Map(theseDiscs -> theseIds)
-//                val allRecObs = previousSameDirObservations ++ thisRecObs
-//                existingThisHost(joinValue) = allRecObs  // Update mutable Map in place
-//                existingOtherHosts.get(joinValue.invert).map(_ -> thisRecObs)
-//            }
-//
-//            sendRecOpt.foreach { obs =>
-//              val combinedObs = for {
-//                o1 <- obs._1
-//                o2 <- obs._2
-//              } yield {
-//                o1._1 ++ o2._1 -> (o1._2 ++ o2._2)
-//              }
-//              combinedObs.foreach { case (extracted, ids) =>
-//                tree ! PpmNodeActorBeginObservation(
-//                  name,
-//                  arrangeExtracted(extracted), // Updated first, because Sending discriminators is first.
-//                  ids,
-//                  observation._1.latestTimestampNanos,
-//                  alarmFilter
-//                )
-//              }
-//            }
-//        }
-//      }
-//    }
-//  ).par
-//*/
+//      },
+      List(d =>
+        List(
+          d.writingProcessHost,
+          d.writingProcessName,
+          s"${d.readingProcessHost} : ${d.readingProcessName}",
+          d.readingNetflow.localPort.getOrElse("<no_port>").toString
+        )
+      ),
+      d => d.relevantUuids,
+      d => d.timestamps,
+      shouldApplyThreshold = true
+    )(graphService)
+
+
 
 
   val admPpmTrees =
     if (hostName == hostNameForAllHosts) Nil // crossHostTrees
-    else esoTrees ++ seoesTrees ++ oeseoTrees ++ ssTrees
+    else esoTrees ++ seoesTrees ++ oeseoTrees ++ ssTrees ++ List(crossHostTree)
 
   val ppmList = admPpmTrees
 
