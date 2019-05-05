@@ -249,6 +249,15 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         "LatestNetflowRead" -> PickleReader[LatestNetflowRead]
       )
     ),
+    customLiteralsParser = Some((
+      "[A-Za-z_]+".r,
+      (str: String) => {
+        EventType.from(str)      orElse
+        SubjectType.from(str)    orElse
+        FileObjectType.from(str) orElse
+        PrincipalType.from(str)
+      }
+    )),
     labelKey = "type_of"
   )(implicitly, Timeout(21.23456 seconds))
 
