@@ -499,8 +499,8 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 
     // Run the query without specifying what the output type will be. This is the variant used by 'cmdline_query.py'
     case StringQuery(q, shouldParse) =>
-      log.debug(s"Received string query: $q")
-      println(s"Received string query: $q")
+//      log.debug(s"Received string query: $q")
+//      println(s"Received string query: $q")
       sender() ! {
         gremlin.queryEither(q).map { resultsEither =>
           resultsEither.fold(qge => Failure(throw qge), Success(_)).map { results =>
@@ -515,8 +515,8 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 
     // Run a query that returns vertices
     case NodeQuery(q, shouldParse) =>
-      log.debug(s"Received node query: $q")
-      println(s"Received node query: $q")
+//      log.debug(s"Received node query: $q")
+//      println(s"Received node query: $q")
       sender() ! {
         // The Gremlin adapter for quine doesn't store much information on nodes, so we have to
         // actively go get that information
@@ -533,8 +533,8 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 
     // Run a query that returns edges
     case EdgeQuery(q, shouldParse) =>
-      log.debug(s"Received new edge query: $q")
-      println(s"Received new edge query: $q")
+//      log.debug(s"Received new edge query: $q")
+//      println(s"Received new edge query: $q")
       sender() ! {
         gremlin.queryEitherExpecting[com.rrwright.quine.gremlin.Edge](q).map { edgesEither =>
           edgesEither.fold(qge => Failure(throw qge), Success(_)).map { edges =>

@@ -17,9 +17,8 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Cancellable, Props}
 import com.galois.adapt.NoveltyDetection.PpmTreeNodeAlarm
 import spray.json._
 import java.io.{File, FileOutputStream, PrintWriter}
-
 import com.galois.adapt.adm.NamespacedUuid
-
+import com.galois.adapt.adm.AdmUUID
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 //import spray.json.DefaultJsonProtocol._
 
@@ -253,9 +252,8 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
           .union(alarmProcessRefSet.getOrElse(pd, Set.empty[(Long, String)]).map(_._1))
 
         val prioritizedEvent: Future[Option[AlarmEvent]] = {
-          PpmSummarizer.summarize(pd.processName, Some(pd.hostName), pd.pid).map { s =>
-            if (s == TreeRepr.empty) None
-            else Some(AlarmEvent.fromBatchedAlarm(PrioritizedAlarm, pd, s.readableString, alarmIDs, runID, System.currentTimeMillis))
+          PpmSummarizer.summarize(AdmUUID(pd.uuid.uuid, pd.uuid.namespace) /*pd.processName, Some(pd.hostName), pd.pid*/).map { s =>
+            Some(AlarmEvent.fromBatchedAlarm(PrioritizedAlarm, pd, s, alarmIDs, runID, System.currentTimeMillis))
           }.recoverWith { case e => log.error(s"Summarizing: $pd failed with error: ${e.getMessage}"); Future.failed(e) }
         }
 
@@ -277,9 +275,8 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
           } else {Future.successful(None)}
 
           val prioritizedEvent: Future[Option[AlarmEvent]] = {
-            PpmSummarizer.summarize(pd.processName, Some(pd.hostName), pd.pid).map { s =>
-              if (s == TreeRepr.empty) None
-              else Some(AlarmEvent.fromBatchedAlarm(PrioritizedAlarm, pd, s.readableString, alarmIDs, runID, System.currentTimeMillis))
+            PpmSummarizer.summarize(AdmUUID(pd.uuid.uuid, pd.uuid.namespace) /*pd.processName, Some(pd.hostName), pd.pid*/).map { s =>
+              Some(AlarmEvent.fromBatchedAlarm(PrioritizedAlarm, pd, s, alarmIDs, runID, System.currentTimeMillis))
             }.recoverWith{ case e => log.error(s"Summarizing: $pd failed with error: ${e.getMessage}"); Future.failed(e)}
           }
 

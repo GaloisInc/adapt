@@ -220,26 +220,26 @@ object Routes {
               ).toMap[String, (Int, Int)]
             )
           } ~
-          pathPrefix("summarize") {
-            parameters('processName, 'hostName.as[String].?, 'pid.as[Int].?) { (processName, hostNameOpt, pidOpt) =>
-              complete(
-                PpmSummarizer.summarize(processName, hostNameOpt, pidOpt).map(_.toString)
-              )
-            } ~
-            path(Segment / Segment / IntNumber) { (processName, hostName, pid) =>
-              complete(
-                PpmSummarizer.summarize(processName, Some(hostName), Some(pid)).map(_.toString)
-              )
-            } ~
-            path(Segment) { processName =>
-              complete(
-                PpmSummarizer.summarize(processName, None, None).map(_.toString)
-              )
-            } ~
-            complete(
-              PpmSummarizer.summarizableProcesses.map(_.toString)
-            )
-          } ~
+//          pathPrefix("summarize") {
+//            parameters('processName, 'hostName.as[String].?, 'pid.as[Int].?) { (processName, hostNameOpt, pidOpt) =>
+//              complete(
+//                PpmSummarizer.summarize(processName, hostNameOpt, pidOpt).map(_.toString)
+//              )
+//            } ~
+//            path(Segment / Segment / IntNumber) { (processName, hostName, pid) =>
+//              complete(
+//                PpmSummarizer.summarize(processName, Some(hostName), Some(pid)).map(_.toString)
+//              )
+//            } ~
+//            path(Segment) { processName =>
+//              complete(
+//                PpmSummarizer.summarize(processName, None, None).map(_.toString)
+//              )
+//            } ~
+//            complete(
+//              PpmSummarizer.summarizableProcesses.map(_.toString)
+//            )
+//          } ~
           pathPrefix("ppm") {
             pathPrefix("saveTrees") {
               path(Segment) { hostName =>
