@@ -66,6 +66,7 @@ From that link, here are the possible filter types, and their fields. Note this 
     final case class Or(disjuncts: List[Filter]) extends Filter
     final case class And(conjuncts: List[Filter]) extends Filter
     final case class Not(negated: Filter) extends Filter
+    final case class EventTimeBound(lower: Option[Long], upper: Option[Long]) extends Filter
 </pre>
 
 </body>

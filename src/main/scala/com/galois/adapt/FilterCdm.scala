@@ -16,6 +16,7 @@ object FilterCdm {
   final case class Or(disjuncts: List[Filter]) extends Filter
   final case class And(conjuncts: List[Filter]) extends Filter
   final case class Not(negated: Filter) extends Filter
+  final case class EventTimeBound(lower: Option[Long], upper: Option[Long]) extends Filter
 
   // Convert the filter function AST into a Scala function
   def compile(filter: Filter): Filterable => Boolean = filter match {
@@ -45,6 +46,24 @@ object FilterCdm {
     case Not(negated) =>
       val negatedPredicate = compile(negated)
       cdm => !negatedPredicate(cdm)
+
+    case EventTimeBound(None, None) =>
+      _ => true
+    case EventTimeBound(Some(lower), None) =>
+      {
+        case e: cdm20.Event => lower < e.timestampNanos
+        case _ => true
+      }
+    case EventTimeBound(None, Some(upper)) =>
+      {
+        case e: cdm20.Event => upper > e.timestampNanos
+        case _ => true
+      }
+    case EventTimeBound(Some(lower), Some(upper)) =>
+      {
+        case e: cdm20.Event => lower < e.timestampNanos && upper > e.timestampNanos
+        case _ => true
+      }
   }
 
   // JSON serialization/deserialization for filter function ASTs
@@ -57,6 +76,7 @@ object FilterCdm {
         case or: Or => orFormat.write(or)
         case and: And => andFormat.write(and)
         case not: Not => notFormat.write(not)
+        case e: EventTimeBound => eventTimeBoundFormat.write(e)
       }
       JsObject(payload + ("type" -> JsString(filter.productPrefix)))
     }
@@ -87,6 +107,7 @@ object FilterCdm {
   val orFormat: RootJsonFormat[Or] = jsonFormat1(Or.apply)
   val andFormat: RootJsonFormat[And] = jsonFormat1(And.apply)
   val notFormat: RootJsonFormat[Not] = jsonFormat1(Not.apply)
+  val eventTimeBoundFormat: RootJsonFormat[EventTimeBound] = jsonFormat2(EventTimeBound.apply)
 }
 
 
