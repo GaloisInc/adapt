@@ -73,7 +73,7 @@ object NoveltyDetection {
   type Filter[DataShape] = DataShape => Boolean
 
   type Alarm = List[PpmTreeNodeAlarm]  // (Key, localProbability, globalProbability, count, siblingPop, parentCount, depthOfLocalProbabilityCalculation)
-  case class PpmTreeNodeAlarm(key: String, localProb: Float, globalProb: Float, count: Int, siblingPop: Int, parentCount: Int, depthOfLocalProbabilityCalculation: Int)
+  case class PpmTreeNodeAlarm(key: String, localProb: Float, globalProb: Float, count: Long, siblingPop: Long, parentCount: Long, depthOfLocalProbabilityCalculation: Int)
 
   val writeTypes = Set[EventType](EVENT_WRITE, EVENT_SENDMSG, EVENT_SENDTO, EVENT_CREATE_OBJECT, EVENT_FLOWS_TO)
   val readTypes = Set[EventType](EVENT_READ, EVENT_RECVMSG, EVENT_RECVFROM)
@@ -767,16 +767,16 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
   var didReceiveInit = false
   var didReceiveComplete = false
 
-  def alarmFromProbabilityData(probabilityData: List[(ExtractedValue, Int, Int)]): Alarm = {
-    val (_, parentCount, siblingCount) = probabilityData.takeWhile(_._2 > 1).lastOption.getOrElse("", 1, 1) // First novel node with default for first observation
+  def alarmFromProbabilityData(probabilityData: List[(ExtractedValue, Long, Long)]): Alarm = {
+    val (_, parentCount, siblingCount) = probabilityData.takeWhile(_._2 > 1L).lastOption.getOrElse("", 1L, 1L) // First novel node with default for first observation
     val alarmLocalProbability = siblingCount.toFloat / (parentCount + siblingCount) // Alarm local prob is a function of the first novel node
-    val treeObservationCount = probabilityData.headOption.map(_._2).getOrElse(1) //
+    val treeObservationCount = probabilityData.headOption.map(_._2).getOrElse(1L) //
     val lastAlarmListIndex = if (probabilityData.size < 2) 0 else  probabilityData.size - 2
 
     val alarm = probabilityData.iterator.sliding(2).zipWithIndex.map {
       case (extractedPair, depth) =>
-        val (ev, parentCount, siblingCount) = extractedPair.headOption.getOrElse(("", 1, 1))
-        val (_, count, _) = extractedPair.lift(1).getOrElse(("", 1, 1))
+        val (ev, parentCount, siblingCount) = extractedPair.headOption.getOrElse(("", 1L, 1L))
+        val (_, count, _) = extractedPair.lift(1).getOrElse(("", 1L, 1L))
         if (depth == lastAlarmListIndex)
           PpmTreeNodeAlarm(ev, alarmLocalProbability, count.toFloat/treeObservationCount, count, siblingCount, parentCount, depth + 1)
         else
@@ -1060,7 +1060,7 @@ case class UiDataContainer(rating: Option[Int], key: String, dataTime: Long, obs
 case object UiDataContainer { def empty = UiDataContainer(None, "", 0L, 0L, 1F, Set.empty) }
 
 
-case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalProb: Float, count: Int, children: Set[TreeRepr]) extends Serializable {
+case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalProb: Float, count: Long, children: Set[TreeRepr]) extends Serializable {
   def get(keys: ExtractedValue*): Option[TreeRepr] = keys.toList match {
     case Nil => Some(this)
     case x :: Nil => this.children.find(_.key == x)
@@ -1072,9 +1072,9 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
 
   def apply(keys: ExtractedValue*): TreeRepr = get(keys:_*).get
 
-  def nodeCount: Int = if (children.isEmpty) 1 else children.foldLeft(1)((a,b) => a + b.nodeCount)
+  def nodeCount: Long = if (children.isEmpty) 1 else children.foldLeft(1L)((a,b) => a + b.nodeCount)
 
-  def leafCount: Int = if (children.isEmpty) 1 else children.foldLeft(0)((a,b) => a + b.leafCount)
+  def leafCount: Long = if (children.isEmpty) 1 else children.foldLeft(0L)((a,b) => a + b.leafCount)
 
   override def toString: String = toString(0)
   def toString(passedDepth: Int): String = {
@@ -1092,7 +1092,7 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
     s"${(0 until (4 * passedDepth)).map(_ => " ").mkString("") + (if (children.isEmpty) s"- ${count} count${if (count == 1) "" else "s"} of:" else "with:")} $key" ::
       children.toList.sortBy(r => 1F - r.localProb).flatMap(_.simpleStrings(passedDepth + 1))
 
-  def toFlat: List[(Int, ExtractedValue, Float, Float, Int)] = (depth, key, localProb, globalProb, count) :: children.toList.flatMap(_.toFlat)
+  def toFlat: List[(Int, ExtractedValue, Float, Float, Long)] = (depth, key, localProb, globalProb, count) :: children.toList.flatMap(_.toFlat)
 
   def writeToFile(filePath: String): Unit = {
     val settings = new CsvWriterSettings
@@ -1109,8 +1109,8 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
   type LocalProb = Float
   type GlobalProb = Float
 
-  def leafNodes: List[(List[ExtractedValue], LocalProb, GlobalProb, Int)] = {
-    def leafNodesRec(children: Set[TreeRepr], nameAcc: List[ExtractedValue] = Nil): List[(List[ExtractedValue], LocalProb, GlobalProb, Int)] =
+  def leafNodes: List[(List[ExtractedValue], LocalProb, GlobalProb, Long)] = {
+    def leafNodesRec(children: Set[TreeRepr], nameAcc: List[ExtractedValue] = Nil): List[(List[ExtractedValue], LocalProb, GlobalProb, Long)] =
       children.toList.flatMap {
         case TreeRepr(_, nextKey, lp, gp, cnt, c) if c.isEmpty => List((nameAcc :+ nextKey, lp, gp, cnt))
         case next => leafNodesRec(next.children, nameAcc :+ next.key)
@@ -1156,11 +1156,11 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
     renormalizeProbabilities(this)
   }
 
-  type PpmElement = (List[ExtractedValue], LocalProb, GlobalProb, Int)
+  type PpmElement = (List[ExtractedValue], LocalProb, GlobalProb, Long)
 
   def extractMostNovel: (PpmElement, TreeRepr) = {
     def findMostNovel(repr: TreeRepr): PpmElement = repr.leafNodes.minBy(_._2)
-    def subtractMostNovel(repr: TreeRepr, key: List[ExtractedValue], decrement: Int): TreeRepr = key match {
+    def subtractMostNovel(repr: TreeRepr, key: List[ExtractedValue], decrement: Long): TreeRepr = key match {
       case thisKey :: childKey :: remainderKeys if repr.key == thisKey =>
         require(repr.count >= decrement, s"Cannot decrement a count past zero at key: $thisKey  Attempted: ${repr.count} - $decrement")
         require(repr.children.exists(_.key == childKey), s"They key: $childKey is not a child key of: $thisKey")
@@ -1224,7 +1224,7 @@ case object TreeRepr {
   type Depth = Int
   type LocalProb = Float
   type GlobalProb = Float
-  type ObservationCount = Int
+  type ObservationCount = Long
   type CSVRow = (Depth, ExtractedValue, LocalProb, GlobalProb, ObservationCount)
 
   def fromFlat(repr: List[CSVRow]): TreeRepr = {
