@@ -78,6 +78,9 @@ trait DBQueryProxyActor extends Actor with ActorLogging {
         }
       }
 
+    case RawQuery(q) =>
+      sender() ! Future(Query.run[java.lang.Object](q, graph, namespaces)).flatMap(Future.fromTry)
+
     // Write a batch of CDM to the DB
     case WriteCdmToDB(cdms) =>
       DBNodeableTx(cdms).getOrElse(log.error(s"Failure writing to DB with CDMs: $cdms"))
@@ -126,6 +129,7 @@ sealed trait RestQuery { val query: String }
 case class NodeQuery(query: String, shouldReturnJson: Boolean = true) extends RestQuery
 case class EdgeQuery(query: String, shouldReturnJson: Boolean = true) extends RestQuery
 case class StringQuery(query: String, shouldReturnJson: Boolean = false) extends RestQuery
+case class RawQuery(query: String) extends RestQuery
 case class CypherQuery(query: String, shouldReturnJson: Boolean = true) extends RestQuery
 
 case class EdgesForNodes(nodeIdList: Seq[Int])
