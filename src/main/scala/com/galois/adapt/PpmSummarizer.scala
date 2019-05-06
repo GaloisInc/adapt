@@ -183,7 +183,7 @@ object PpmSummarizer {
     //  cadets_6709fef0-ffe7-3e84-91d2-65de4770dd74   did_write  did_execute
 
     val pidQuery = s"g.V(${processUuid.rendered}).values('cid')"
-    val pidResults = (Application.uiDBInterface ? NodeQuery(pidQuery, shouldReturnJson = false))
+    val pidResults = (Application.uiDBInterface ? RawQuery(pidQuery))
       .mapTo[Future[Stream[Any]]].flatten.map {
       _.flatMap {
         case s: Int => List(s)
@@ -192,7 +192,7 @@ object PpmSummarizer {
     }
 
     val thisProcessNameQuery = s"g.V(${processUuid.rendered}).out('path').values('path').limit(20)"
-    val thisProcessNameResults = (Application.uiDBInterface ? NodeQuery(thisProcessNameQuery, shouldReturnJson = false))
+    val thisProcessNameResults = (Application.uiDBInterface ? RawQuery(thisProcessNameQuery))
       .mapTo[Future[Stream[Any]]].flatten.map {
       _.flatMap {
         case s: String => List(s)
@@ -201,7 +201,7 @@ object PpmSummarizer {
     }
 
     val parentSubjectQuery = s"g.V(${processUuid.rendered}).out('parentSubject').out('path').values('path').limit(20)"
-    val parentSubjectResults = (Application.uiDBInterface ? NodeQuery(thisProcessNameQuery, shouldReturnJson = false))
+    val parentSubjectResults = (Application.uiDBInterface ? RawQuery(thisProcessNameQuery))
       .mapTo[Future[Stream[Any]]].flatten.map {
         _.flatMap {
           case s: String => List(s)
@@ -210,7 +210,7 @@ object PpmSummarizer {
       }
 
     val childSubjectsQuery = s"g.V(${processUuid.rendered}).in('parentSubject').out('path').values('path').limit(100)"
-    val childSubjectNamesResults = (Application.uiDBInterface ? NodeQuery(childSubjectsQuery, shouldReturnJson = false))
+    val childSubjectNamesResults = (Application.uiDBInterface ? RawQuery(childSubjectsQuery))
       .mapTo[Future[Stream[Any]]].flatten.map {
       _.flatMap {
         case s: String => List(s)
@@ -219,7 +219,7 @@ object PpmSummarizer {
     }
 
     val writingFileQuery = s"g.V(${processUuid.rendered}).out('did_write').out('path').values('path').limit(100)"
-    val writingFileResults = (Application.uiDBInterface ? NodeQuery(writingFileQuery, shouldReturnJson = false))
+    val writingFileResults = (Application.uiDBInterface ? RawQuery(writingFileQuery))
       .mapTo[Future[Stream[Any]]].flatten.map {
       _.flatMap {
         case s: String => List(s)
@@ -228,7 +228,7 @@ object PpmSummarizer {
     }
 
     val readingFileQuery = s"g.V(${processUuid.rendered}).out('did_read').out('path').values('path').limit(100)"
-    val readingFileResults = (Application.uiDBInterface ? NodeQuery(readingFileQuery, shouldReturnJson = false))
+    val readingFileResults = (Application.uiDBInterface ? RawQuery(readingFileQuery))
       .mapTo[Future[Stream[Any]]].flatten.map {
       _.flatMap {
         case s: String => List(s)
@@ -237,10 +237,10 @@ object PpmSummarizer {
     }
 
     val writingNetFlowQuery = s"g.V(${processUuid.rendered}).out('did_write').valueMap('remoteAddress', 'remotePort').limit(100)"
-    val writingNetFlowResults = (Application.uiDBInterface ? NodeQuery(writingNetFlowQuery, shouldReturnJson = false))
+    val writingNetFlowResults = (Application.uiDBInterface ? RawQuery(writingNetFlowQuery))
       .mapTo[Future[Stream[Map[String, Any]]]].flatten.map { stream =>
         stream.flatMap {
-          case m: Map[String, Option[Any]] => for {
+          case m: Map[String, Option[Any]] @unchecked => for {
             remoteAddressOpt <- m.get("remoteAddress")
             remotePortOpt <- m.get("remotePort")
           } yield {
@@ -251,10 +251,10 @@ object PpmSummarizer {
       }
 
     val readingNetFlowQuery = s"g.V(${processUuid.rendered}).out('did_read').valueMap('remoteAddress', 'remotePort').limit(100)"
-    val readingNetFlowResults = (Application.uiDBInterface ? NodeQuery(readingNetFlowQuery, shouldReturnJson = false))
+    val readingNetFlowResults = (Application.uiDBInterface ? RawQuery(readingNetFlowQuery))
       .mapTo[Future[Stream[Map[String, Any]]]].flatten.map { stream =>
         stream.flatMap {
-          case m: Map[String, Option[Any]] => for {
+          case m: Map[String, Option[Any]] @unchecked => for {
             remoteAddressOpt <- m.get("remoteAddress")
             remotePortOpt <- m.get("remotePort")
           } yield {
@@ -266,10 +266,10 @@ object PpmSummarizer {
 
 
     val wroteOverNetflowToProcessQuery = s"g.V(${processUuid.rendered}).in('did_read_over_network').as('proc').id().as('id').select('proc').out('path').values('path').as('pth').select('id','path').limit(100)"
-    val wroteOverNetflowToProcessResults = (Application.uiDBInterface ? NodeQuery(wroteOverNetflowToProcessQuery, shouldReturnJson = false))
+    val wroteOverNetflowToProcessResults = (Application.uiDBInterface ? RawQuery(wroteOverNetflowToProcessQuery))
       .mapTo[Future[Stream[Any]]].flatten.map { stream =>
       val uniquePairs = stream.flatMap {
-        case m: Map[String, Any] => for {
+        case m: Map[String, Any] @unchecked => for {
           id <- m.get("id")
           procPath <- m.get("path")
         } yield { id.asInstanceOf[AdmUUID].rendered -> procPath.toString }
@@ -279,10 +279,10 @@ object PpmSummarizer {
     }
 
     val readOverNetflowFromProcessQuery = s"g.V(${processUuid.rendered}).out('did_read_over_network').as('proc').id().as('id').select('proc').out('path').values('path').as('pth').select('id','path').limit(100)"
-    val readOverNetflowFromProcessResults = (Application.uiDBInterface ? NodeQuery(readOverNetflowFromProcessQuery, shouldReturnJson = false))
+    val readOverNetflowFromProcessResults = (Application.uiDBInterface ? RawQuery(readOverNetflowFromProcessQuery))
       .mapTo[Future[Stream[Any]]].flatten.map { stream =>
         val uniquePairs = stream.flatMap {
-          case m: Map[String, Any] => for {
+          case m: Map[String, Any] @unchecked => for {
             id <- m.get("id")
             procPath <- m.get("path")
           } yield { id.asInstanceOf[AdmUUID].rendered -> procPath.toString }

@@ -334,7 +334,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         }
 
       case anAdm: AdmSubject =>
-        println(anAdm.uuid.rendered)
+//        println(anAdm.uuid.rendered)
         anAdm.create(Some(anAdm.uuid)).map { x =>
           graphService.standingFetchWithBranch[ChildProcess](anAdm.uuid, Application.esoChildProcessInstanceBranch, Application.sqidParentProcess)(wrongFunc)
 //          graphService.standingFetchWithBranch[ProcessNetworkReadFromOtherProcess](anAdm.uuid, Application.processNetworkCommsBranch , Application.sqidProcessNetworkComms)(wrongFunc)
