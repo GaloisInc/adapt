@@ -457,7 +457,18 @@ package object adm {
     provider: String
   ) extends ADM with DBWritable with DomainNode {
 
-    val uuid = AdmUUID(DeterministicUUID(localAddress.toString + localPort.toString + remoteAddress.toString + remotePort.toString), provider)
+    val uuid = AdmUUID({
+        val detUuidOpt = for {
+          la <- localAddress
+          lp <- localPort
+          ra <- remoteAddress
+          rp <- remotePort
+        } yield DeterministicUUID(la + lp + ra + rp)
+
+        detUuidOpt.getOrElse(DeterministicUUID(originalCdmUuids.toList.sorted.map(_.uuid)))
+      },
+      provider
+    )
 
     def getHostName: Option[HostName] = None
 
