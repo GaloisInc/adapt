@@ -129,7 +129,7 @@ case class PpmDefinition[DataShape](
 
   val treeRootQid = new QuineId(graphService.idProvider.customIdToBytes(AdmUUID(UUID.nameUUIDFromBytes(treeName.getBytes), s"${hostName}_$treeName")))
 
-  println(s"\nTree: $treeName on host: $hostName maps to (hostIdx, localShardIdx): ${graphService.idProvider.qidDistribution(treeRootQid)}\n")
+//  println(s"\nTree: $treeName on host: $hostName maps to (hostIdx, localShardIdx): ${graphService.idProvider.qidDistribution(treeRootQid)}\n")
 
   private val startingState =
     if (ppmConfig.shouldloadppmtrees)
