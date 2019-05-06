@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
     <title>Adapt Suspicion Rankings</title>
-    <script type="text/javascript" src="javascripts/jquery.3.1.0.min.js"></script>
+    <script type="text/javascript" src="javascripts/jquery-3.3.1.min.js"></script>
     <meta charset="UTF-8">
     <title>CDM Filter</title>
 
     <script type="text/javascript">
         function getFilter() {
-            $.getJSON("/api/getCdmFilter", function(filter) {
+            var hostname = document.getElementById("hostname").value
+            $.getJSON("/query/getCdmFilter?hostName=" + hostname, function(filter) {
                 if (filter == null) {
                     document.getElementById("filter").value = "";
                 } else {
@@ -19,14 +20,16 @@
         }
 
         function putFilter() {
+            var hostname = document.getElementById("hostname").value
             var filter = document.getElementById("filter").value;
             if (filter == "") {
-                $.post("/api/clearCdmFilter", {}, function(reply) {
+                $.post("/api/clearCdmFilter", {"hostName": hostname}, function(reply) {
                     alert("Response: " + reply);
                 })
             } else {
                 var filter_json = JSON.parse(filter)
-                $.post("/api/setCdmFilter", {"filter": JSON.stringify(filter_json)}, function(reply) {
+                var data = {"filter": JSON.stringify(filter_json), "hostName": hostname}
+                $.post("/api/setCdmFilter", data, function(reply) {
                     alert("Response: " + reply);
                 })
             }
@@ -46,6 +49,7 @@ This is the interface for setting a coarse-grain CDM filter. To clear any existi
     }
 </pre>
 
+Hostname: <textarea rows="1" cols="25" id="hostname">somehost</textarea> <br/>
 <textarea rows="4" cols="50" id="filter"></textarea> <br/>
 <button onclick="getFilter()">Get filter</button>
 <button onclick="putFilter()">Put filter</button>
