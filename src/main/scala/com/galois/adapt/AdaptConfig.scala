@@ -322,7 +322,9 @@ object AdaptConfig extends Utils {
 
 
     def toCdmSource(handler: ErrorHandler = ErrorHandler.print): Source[(Namespace,CDM20), NotUsed] = {
-      val linearized = parallel.foldLeft(Source.empty[(Namespace,CDM20)])((acc, li: LinearIngest) => acc.merge(li.toCdmSource(handler, updateHost _)))
+      val linearized = parallel
+        .foldLeft(Source.empty[(Namespace,CDM20)])((acc, li: LinearIngest) => acc.merge(li.toCdmSource(handler, updateHost _)))
+        .via(FlowComponents.printCounter(hostName+" RAW-CDM", Application.statusActor, every = 1000000))
       val offsetApplied = startatoffset.fold(linearized){offset => println(s"Starting at offset: $offset"); linearized.drop(offset)}
       val limitApplied = loadlimit.fold(offsetApplied){limit => offsetApplied.take(limit)} //.take(loadlimit.getOrElse(Long.MaxValue))
       selectHost match {
