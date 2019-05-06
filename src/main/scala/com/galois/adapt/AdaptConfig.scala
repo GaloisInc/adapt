@@ -335,7 +335,11 @@ object AdaptConfig extends Utils {
             .filter { case (_, cdm: CDM20) => filter.fold(true)(applyFilter(cdm, _)) }
             .statefulMapConcat { () =>
               var hosts = collection.mutable.Map.empty[java.util.UUID, Int]
-              def isOurHost(uuid: java.util.UUID): Boolean = hosts.getOrElseUpdate(uuid, hosts.size) == num
+              def isOurHost(uuid: java.util.UUID): Boolean = hosts.getOrElseUpdate(uuid, {
+                if (hosts.size == num)
+                  println(s"Found the beginning of host $hostName (with CDM UUID $uuid)")
+                hosts.size
+              }) == num
 
               {
                 case r @ (_, c: cdm20.Subject) => if (isOurHost(c.host)) List(r) else List.empty
@@ -351,6 +355,9 @@ object AdaptConfig extends Utils {
                 case r @ (_, c: cdm20.SrcSinkObject) => if (isOurHost(c.host)) List(r) else List.empty
                 case r @ (_, c: cdm20.TimeMarker) => if (isOurHost(c.host)) List(r) else List.empty
                 case r @ (_, c: cdm20.UnitDependency) => if (isOurHost(c.host)) List(r) else List.empty
+                case r @ (_, c: cdm20.Host) =>
+                  println(s"Found Host object $c")
+                  List(r)
                 case r => List(r)
               }
             }
