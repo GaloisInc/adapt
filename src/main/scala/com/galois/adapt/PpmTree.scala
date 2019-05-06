@@ -139,8 +139,16 @@ case class PpmDefinition[DataShape](
 
   private val trainingDataUsed: Boolean =
     if (ppmConfig.shouldloadppmtrees) {
-      implicit val timeout = Timeout(10 minutes)
-      startingState.foreach(t => graphService.initializeTree(treeRootQid, treeName, hostName, t.toQuineRepr))
+      implicit val timeout = Timeout(30 minutes)
+      startingState.foreach(t =>
+        concurrent.Await.ready(
+          graphService.initializeTree(treeRootQid, treeName, hostName, t.toQuineRepr),
+          timeout.duration
+        ).onComplete {
+          case Success(s) => println(s"Initialized tree $treeName on host: $hostName in Quine")
+          case Failure(f) => println(s"FAILED to initialize tree $treeName on host: $hostName in Quine")
+        }
+      )
       true
     }
     else false
