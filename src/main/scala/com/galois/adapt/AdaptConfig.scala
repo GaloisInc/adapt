@@ -299,7 +299,9 @@ object AdaptConfig extends Utils {
     parallel: List[LinearIngest],
 
     startatoffset: Option[Long] = None,
-    loadlimit: Option[Long] = None
+    loadlimit: Option[Long] = None,
+
+    selectHost: Option[Int] = None // keep only data from the "i-th" host seen in the stream
   ) {
     var filterAst: Option[Filter] = None
     private var filter: Option[Filterable => Boolean] = filterAst.map(FilterCdm.compile)
@@ -323,7 +325,36 @@ object AdaptConfig extends Utils {
       val linearized = parallel.foldLeft(Source.empty[(Namespace,CDM20)])((acc, li: LinearIngest) => acc.merge(li.toCdmSource(handler, updateHost _)))
       val offsetApplied = startatoffset.fold(linearized){offset => println(s"Starting at offset: $offset"); linearized.drop(offset)}
       val limitApplied = loadlimit.fold(offsetApplied){limit => offsetApplied.take(limit)} //.take(loadlimit.getOrElse(Long.MaxValue))
-      limitApplied.filter { case (_, cdm: CDM20) => filter.fold(true)(applyFilter(cdm, _)) }
+      selectHost match {
+        case None =>
+          limitApplied
+            .filter { case (_, cdm: CDM20) => filter.fold(true)(applyFilter(cdm, _)) }
+
+        case Some(num) =>
+          limitApplied
+            .filter { case (_, cdm: CDM20) => filter.fold(true)(applyFilter(cdm, _)) }
+            .statefulMapConcat { () =>
+              var hosts = collection.mutable.Map.empty[java.util.UUID, Int]
+              def isOurHost(uuid: java.util.UUID): Boolean = hosts.getOrElseUpdate(uuid, hosts.size) == num
+
+              {
+                case r @ (_, c: cdm20.Subject) => if (isOurHost(c.host)) List(r) else List.empty
+                case r @ (_, c: cdm20.Event) => if (isOurHost(c.host)) List(r) else List.empty
+                case r @ (_, c: cdm20.FileObject) => if (isOurHost(c.host)) List(r) else List.empty
+                case r @ (_, c: cdm20.NetFlowObject) => if (isOurHost(c.host)) List(r) else List.empty
+                case r @ (_, c: cdm20.IpcObject) => if (isOurHost(c.host)) List(r) else List.empty
+                case r @ (_, c: cdm20.MemoryObject) => if (isOurHost(c.host)) List(r) else List.empty
+                case r @ (_, c: cdm20.PacketSocketObject) => if (isOurHost(c.host)) List(r) else List.empty
+                case r @ (_, c: cdm20.Principal) => if (isOurHost(c.host)) List(r) else List.empty
+                case r @ (_, c: cdm20.ProvenanceTagNode) => if (isOurHost(c.host)) List(r) else List.empty
+                case r @ (_, c: cdm20.RegistryKeyObject) => if (isOurHost(c.host)) List(r) else List.empty
+                case r @ (_, c: cdm20.SrcSinkObject) => if (isOurHost(c.host)) List(r) else List.empty
+                case r @ (_, c: cdm20.TimeMarker) => if (isOurHost(c.host)) List(r) else List.empty
+                case r @ (_, c: cdm20.UnitDependency) => if (isOurHost(c.host)) List(r) else List.empty
+                case r => List(r)
+              }
+            }
+      }
     }
 
     def updateHost(is: DataProvider): Unit = ta1 match {
