@@ -194,7 +194,8 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
     "hostName",
     "parallel",
     "startatoffset",
-    "loadlimit"
+    "loadlimit",
+    "selectHost"
   )
 
   val vertexTypeTuple = "type" -> JsString("vertex")
