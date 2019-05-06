@@ -337,13 +337,15 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 //        println(anAdm.uuid.rendered)
         anAdm.create(Some(anAdm.uuid)).map { x =>
           graphService.standingFetchWithBranch[ChildProcess](anAdm.uuid, Application.esoChildProcessInstanceBranch, Application.sqidParentProcess)(wrongFunc)
-//          graphService.standingFetchWithBranch[ProcessNetworkReadFromOtherProcess](anAdm.uuid, Application.processNetworkCommsBranch , Application.sqidProcessNetworkComms)(wrongFunc)
+          graphService.standingFetchWithBranch[ProcessNetworkReadFromOtherProcess](anAdm.uuid, Application.processNetworkCommsBranch , Application.sqidProcessNetworkComms)(wrongFunc)
           x
         }
 
       case anAdm: AdmNetFlowObject      =>
         anAdm.create(Some(anAdm.uuid)).map { x =>
 //          graphService.standingFetchWithBranch[CommunicatingNetflows](anAdm.uuid, Application.communicatingNetflowsBranch, Application.sqidCommunicatingNetflows)(wrongFunc)
+
+          StandingFetches.proactiveAddReciprocalEdge(anAdm)  // Choosing not to wait on/sequence the future returned here.
           x
         }
 

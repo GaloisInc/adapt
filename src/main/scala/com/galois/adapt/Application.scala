@@ -371,17 +371,17 @@ object Application extends App {
   val standingFetchProcessParentageActor = ActorRef.noSender
 
 
-  val sqidCommunicatingNetflows = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_CommunicatingNetflows")(
-    resultHandler = Some({
-      case DomainNodeSubscriptionResultFetch(from, testBranch, assumedEdge, nodeComponents) =>
-        val reconstructed = nodeComponents.toList.flatMap(
-          communicatingNetflowsQueryable.fromNodeComponents
-        )
-//        println(s"CommunicatingNetflows nodeComponents matchSize: ${nodeComponents.size}  Reconstructed size: ${reconstructed.size}\n$reconstructed")
-        StandingFetches.onCommunicatingNetflowsMatch(reconstructed)
-    })
-  ))
-  val standingFetchCommunicatingNetflowsActor = ActorRef.noSender
+//  val sqidCommunicatingNetflows = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_CommunicatingNetflows")(
+//    resultHandler = Some({
+//      case DomainNodeSubscriptionResultFetch(from, testBranch, assumedEdge, nodeComponents) =>
+//        val reconstructed = nodeComponents.toList.flatMap(
+//          communicatingNetflowsQueryable.fromNodeComponents
+//        )
+////        println(s"CommunicatingNetflows nodeComponents matchSize: ${nodeComponents.size}  Reconstructed size: ${reconstructed.size}\n$reconstructed")
+//        StandingFetches.onCommunicatingNetflowsMatch(reconstructed)
+//    })
+//  ))
+//  val standingFetchCommunicatingNetflowsActor = ActorRef.noSender
 
   val sqidProcessNetworkComms = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ProcessNetworkComms")(
     resultHandler = Some({
@@ -431,7 +431,7 @@ object Application extends App {
     (sqidSrcSnk.get -> standingFetchSrcSnkActor) +
     (sqidNetwork.get -> standingFetchNetworkActor) +
     (sqidParentProcess.get -> standingFetchProcessParentageActor) +
-    (sqidCommunicatingNetflows.get -> standingFetchCommunicatingNetflowsActor) +
+//    (sqidCommunicatingNetflows.get -> standingFetchCommunicatingNetflowsActor) +
     (sqidProcessNetworkComms.get -> processNetworkCommsActor)
 
 
