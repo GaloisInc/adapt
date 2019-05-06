@@ -119,7 +119,7 @@ case class PpmDefinition[DataShape](
     implicit val ec: ExecutionContext = graphService.system.dispatchers.lookup("quine.actor.node-dispatcher")
 //  implicit val ec: ExecutionContext = context.dispatcher
 
-  val basePath: String = ppmConfig.basedir + treeName + "-" + hostName
+  val basePath: String = ppmConfig.basedir + treeName + "-" + hostName.split("-").head
 
   val inputFilePath  = basePath + ppmConfig.loadfilesuffix + ".csv"
   val outputFilePath = basePath + ppmConfig.savefilesuffix + ".csv"
