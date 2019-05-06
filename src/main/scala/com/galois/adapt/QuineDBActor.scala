@@ -497,6 +497,9 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
 
     case PrintStats => recordResults()
 
+    case RawQuery(q) =>
+      sender() ! gremlin.query(q).map(_.toStream)
+
     // Run the query without specifying what the output type will be. This is the variant used by 'cmdline_query.py'
     case StringQuery(q, shouldParse) =>
 //      log.debug(s"Received string query: $q")
