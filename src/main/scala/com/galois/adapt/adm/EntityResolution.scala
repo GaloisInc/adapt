@@ -99,7 +99,7 @@ object EntityResolution {
         case (_, cdm: PacketSocketObject) => cdm.uuid != badUuid
         case (_, cdm: NetFlowObject) => cdm.uuid != badUuid
         case (_, cdm: MemoryObject) => cdm.uuid != badUuid
-        case (_, cdm: SrcSinkObject) => cdm.uuid != badUuid
+        case (_, cdm: SrcSinkObject) => cdm.uuid != badUuid && cdm.srcSinkType != SRCSINK_UNKNOWN
         case (_, cdm: Event) => cdm.uuid != badUuid && goodEventTypes.contains(cdm.eventType)
         case _ => true
       }
