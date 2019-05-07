@@ -6,7 +6,7 @@ import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWr
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm20._
-import java.io.{BufferedWriter, File, FileWriter, PrintWriter}
+import java.io._
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.util.UUID
@@ -257,7 +257,7 @@ case class PpmDefinition[DataShape](
   val alarmPw: PrintWriter = {
     val outputFile = new File(outputAlarmFilePath)
     if ( ! outputFile.exists) outputFile.createNewFile()
-    new PrintWriter(outputFile)
+    new PrintWriter(new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile, true))))
   }
 
   // Flush all alarms in the buffer to the file
@@ -389,13 +389,13 @@ case class PpmDefinition[DataShape](
 
   def getRepr(implicit timeout: Timeout): Future[TreeRepr] = graphService.getTreeRepr(hostName, treeName, List()).map(r => TreeRepr.fromQuine(r.repr))
 
-  Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
-    override def run(): Unit = if  (!AdaptConfig.skipshutdown) {
-      flushAlarms()
-    }
-  }))
+  def saveAlarmsAsync(): Future[Unit] = Future {
+    println(s"Started flushing Alarms for: $treeName...")
+    flushAlarms()
+    println(s"Finished flushing Alarms for: $treeName")
+  }
 
-  def saveStateAsync(): Future[Unit] = {
+  def saveTreesAsync(): Future[Unit] = {
 //    val now = System.currentTimeMillis
 //    val expectedSaveCostMillis = 1000  // Allow repeated saving in subsequent attempts if total save time took no longer than this time.
     if ( ! isCurrentlySaving.get() /*&& lastSaveCompleteMillis.get() + saveEveryAndNoMoreThan - expectedSaveCostMillis <= now*/ ) {
@@ -407,10 +407,6 @@ case class PpmDefinition[DataShape](
         repr.writeToFile(outputFilePath)
         println(s"Finished saving TreeRepr for: $treeName")
       }
-
-      println(s"Started flushing Alarms for: $treeName...")
-      flushAlarms()
-      println(s"Finished flushing Alarms for: $treeName")
 
       treeWriteF.transform(
         _ => {
@@ -776,7 +772,10 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
 
   def saveTrees(): Future[Unit] = {
-    ppmList.foldLeft(Future.successful(()))((acc, ppmTree) => acc.flatMap(_ => ppmTree.saveStateAsync()))
+    ppmList.foldLeft(Future.successful(()))((acc, ppmTree) => acc.flatMap(_ => ppmTree.saveTreesAsync()))
+  }
+  def saveAlarms(): Future[Unit] = {
+    ppmList.foldLeft(Future.successful(()))((acc, ppmTree) => acc.flatMap(_ => ppmTree.saveAlarmsAsync()))
   }
 
   def ppm(name: String): Option[PpmDefinition[_]] = ppmList.find(_.treeName == name)
