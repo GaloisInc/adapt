@@ -249,7 +249,7 @@ object Application extends App {
 
 
   val filePrefixesToDrop = List("/proc", """\windows\servicing\packages""")
-  val processNamesToDrop = Set("/system/bin/app_process64", "/usr/bin/pulseaudio")
+  val processNamesToDrop = Set("/system/bin/app_process64", "/usr/bin/pulseaudio", "fuzzyflakes")
 
 
   val crossHostDisabled = collection.mutable.Set[HostName]()
