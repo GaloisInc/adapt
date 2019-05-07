@@ -252,6 +252,8 @@ object Application extends App {
   val processNamesToDrop = Set("/system/bin/app_process64")
 
 
+  val crossHostDisabled = collection.mutable.Set[HostName]()
+
   val sqidFile = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOFile-accumulator")(
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>

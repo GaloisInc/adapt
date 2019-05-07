@@ -157,6 +157,13 @@ object Routes {
             complete(
               graph.snapshotInMemoryNodes()(Timeout(9 minutes))
             )
+          } ~
+          path("getCrossHostNetflowStatus") {
+            parameters('hostName.as[AdaptConfig.HostName]) { hostName: AdaptConfig.HostName =>
+              complete {
+                s"$hostName is ${if (Application.crossHostDisabled.contains(hostName)) "disabled" else "enabled"}"
+              }
+            }
           }
       //    pathPrefix("ppm") {
       //      path("listTrees") {
@@ -350,6 +357,19 @@ object Routes {
                 Try(ingestConfig.hosts.find(_.hostName == hostName).get).flatMap(_.setFilter(None)) match {
                   case Failure(e) => StatusCodes.BadRequest -> s"Failed to clear filter: ${e.toString}"
                   case Success(f) => StatusCodes.Created -> s"CDM filter cleared"
+                }
+              }
+            }
+          } ~
+          pathPrefix("setCrossHostNetflowStatus") {
+            formField('hostName.as[String], 'enabled.as[Boolean]) { (hostName: HostName, enabled: Boolean) =>
+              complete {
+                if (enabled) {
+                  Application.crossHostDisabled -= hostName
+                  StatusCodes.Created -> s"Cross host trees enabled for '$hostName'"
+                } else {
+                  Application.crossHostDisabled += hostName
+                  StatusCodes.Created -> s"Cross host trees disabled for '$hostName'"
                 }
               }
             }
