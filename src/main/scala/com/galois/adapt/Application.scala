@@ -461,7 +461,7 @@ object Application extends App {
 
   def startWebServer(dbActor: ActorRef): Http.ServerBinding = {
     println(s"Starting the web server at: http://${runtimeConfig.webinterface}:${runtimeConfig.port}")
-    val route = Routes.mainRoute(dbActor, statusActor, ppmManagers)
+    val route = Routes.mainRoute(dbActor, statusActor, ppmManagers, graph)
     val httpServer = Http().bindAndHandle(route, runtimeConfig.webinterface, runtimeConfig.port)
     Await.result(httpServer, 10 seconds)
   }
