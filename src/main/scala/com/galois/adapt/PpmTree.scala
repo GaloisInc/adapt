@@ -14,6 +14,7 @@ import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListMap}
 
 import scala.collection.concurrent.{Map => ConcurrentMap}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong, AtomicReference}
+import java.util.function.UnaryOperator
 
 import scala.collection.JavaConverters._
 import akka.pattern.ask
@@ -35,6 +36,7 @@ import com.rrwright.quine.runtime.GraphService
 import com.rrwright.quine.runtime.Novelty
 
 import scala.annotation.tailrec
+import scala.collection.mutable.ListBuffer
 
 
 //type AnAlarm = (List[String], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
@@ -153,31 +155,27 @@ case class PpmDefinition[DataShape](
     }
     else false
 
+  type AlarmBuffer = ListBuffer[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]
+  var alarmQueue: AtomicReference[AlarmBuffer]
+    = new AtomicReference(new ListBuffer)
 
-  var alarms: ConcurrentMap[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])] =
-    new ConcurrentHashMap[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])]().asScala
-  if (ppmConfig.shouldloadalarms) {
-    Try {
-      val content = new String(Files.readAllBytes(new File(inputAlarmFilePath).toPath), StandardCharsets.UTF_8)
-      content.parseJson.convertTo[List[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]]
-    } match {
-      case Success(as) =>
-        alarms ++= as
-      case Failure(e) =>
-        println(s"FAILED to load alarms for tree: $treeName  on host: $hostName. Starting with no alarms.")
-        e.printStackTrace()
-    }
-  }
 
   // ConcurrentSkipListMap because is concurrent _and_ sorted
   // If there are more than 2,147,483,647 alarms with a given LP; then need Long.
   var localProbAccumulator = new ConcurrentSkipListMap[Float,Int](Ordering[Float])
   if (ppmConfig.shouldloadlocalprobabilitiesfromalarms && shouldApplyThreshold) {
     val noveltyLPs =
-      Try {
+      Try({
+        val noveltyLPsBuilder = collection.mutable.Map.empty[Float, Int]
+        for (line <- scala.io.Source.fromFile(inputAlarmFilePath).getLines) {
+          val (_, (_, _, alarm, _, _)) = line.parseJson.convertTo[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]
+          noveltyLPsBuilder += alarm.last.localProb -> (noveltyLPsBuilder.getOrElse(alarm.last.localProb, 0) + 1)
+        }
+        noveltyLPsBuilder.toMap
+      }).orElse(Try({
         val content = new String(Files.readAllBytes(new File(inputAlarmFilePath).toPath), StandardCharsets.UTF_8)
         content.parseJson.convertTo[List[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].map(_._2._3.last.localProb).groupBy(identity).mapValues(_.size)
-      } match {
+      })) match {
         case Success(lps) =>
           println(s"Successfully loaded local probability alarms for tree: $treeName on host: $hostName.")
           lps
@@ -240,6 +238,38 @@ case class PpmDefinition[DataShape](
       graphService.system.scheduler.schedule(computeAlarmLpThresholdIntervalMinutes minutes,
         computeAlarmLpThresholdIntervalMinutes minutes)(updateThreshold(alarmPercentile))
     }
+  }
+
+  // Add an alarm to the buffer and flush the buffer if it is to big
+  def putAlarm(extractedValues: List[ExtractedValue], info: (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])): Unit = {
+    val sizeEstimate = alarmQueue.updateAndGet(new UnaryOperator[AlarmBuffer] {
+      def apply(buf: AlarmBuffer): AlarmBuffer = {
+        buf += (extractedValues -> info)
+      }
+    }).length
+
+    if (sizeEstimate > 50) {
+      flushAlarms()
+    }
+  }
+
+  // Alarms get written to here
+  val alarmPw: PrintWriter = {
+    val outputFile = new File(outputAlarmFilePath)
+    if ( ! outputFile.exists) outputFile.createNewFile()
+    new PrintWriter(outputFile)
+  }
+
+  // Flush all alarms in the buffer to the file
+  def flushAlarms(): Unit = {
+    alarmQueue.updateAndGet(new UnaryOperator[AlarmBuffer] {
+      def apply(buf: AlarmBuffer): AlarmBuffer = {
+        buf.foreach { a => alarmPw.println(a.toJson.compactPrint )}
+        alarmPw.flush()
+        buf.clear()
+        buf
+      }
+    })
   }
 
 //  def recordNovelty(hostname: String, treeName: String, novelty: Novelty[_]): Unit = Try {
@@ -344,7 +374,7 @@ case class PpmDefinition[DataShape](
     val newAlarm = AnAlarm(key,alarmDetails)
 //      alarms = alarms + AnAlarm.unapply(newAlarm).get
     val x = AnAlarm.unapply(newAlarm).get
-    alarms.put(x._1, x._2)
+    putAlarm(x._1, x._2)
 
     def thresholdAllows: Boolean = alarm.lastOption.forall( (i: PpmTreeNodeAlarm) => ! ((i.localProb > localProbThreshold) && shouldApplyThreshold) )
 
@@ -372,12 +402,9 @@ case class PpmDefinition[DataShape](
         println(s"Finished saving TreeRepr for: $treeName")
       }
 
-      println(s"Started saving Alarms for: $treeName...")
-      val content = alarms.toList.toJson.prettyPrint
-      val outputFile = new File(outputAlarmFilePath)
-      if ( ! outputFile.exists) outputFile.createNewFile()
-      Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
-      println(s"Finished saving Alarms for: $treeName")
+      println(s"Started flushing Alarms for: $treeName...")
+      flushAlarms()
+      println(s"Finished flushing Alarms for: $treeName")
 
       treeWriteF.transform(
         _ => {
