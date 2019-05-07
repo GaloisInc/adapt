@@ -638,7 +638,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         NamespacedUuidDetails(d._3._2._1.uuid, Some(d._3._2._2.map(_.path).getOrElse(d._3._2._1.uuid.rendered)), Some(d._3._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid)),
       d => Set(d._3._1.earliestTimestampNanos,d._3._1.latestTimestampNanos),
-      shouldApplyThreshold = false
+      shouldApplyThreshold = true
     )(graphService),
 
     new PpmDefinition[SEOES]("FilesWrittenThenExecuted", hostName,
@@ -657,7 +657,7 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
         NamespacedUuidDetails(d._3._2._1.uuid, Some(d._3._2._2.map(_.path).getOrElse(d._3._2._1.uuid.rendered)), Some(d._3._2._1.cid)),
         NamespacedUuidDetails(d._3._1.uuid)),
       d => Set(d._3._1.earliestTimestampNanos,d._3._1.latestTimestampNanos),
-      shouldApplyThreshold = false
+      shouldApplyThreshold = true
     )(graphService),
 
     new PpmDefinition[SEOES]("CommunicationPathThroughObject", hostName,
