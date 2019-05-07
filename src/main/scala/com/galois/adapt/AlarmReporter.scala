@@ -47,9 +47,10 @@ trait AlarmEventData {
   def toJson: JsValue
 }
 
-case class DetailedAlarmEvent(processName: String, pid: String, hostName: HostName, details: String, alarmIDs: Set[Long], dataTimestamps: Set[Long], emitTimestamp: Long) extends AlarmEventData {
+case class DetailedAlarmEvent(processName: String, pid: String, hostName: HostName, details: String, alarmIDs: Set[Long], dataTimestamps: Set[Long], emitTimestamp: Long, uuid: NamespacedUuid) extends AlarmEventData {
   def toJson: JsValue = {
     JsObject(
+      "uuids_query" -> JsString(s"g.V(${uuid.rendered})"),
       "processName" -> JsString(processName),
       "pid" -> JsString(pid),
       "hostName" -> JsString(hostName),
@@ -76,6 +77,7 @@ case class ConciseAlarmEvent(
     val delim = "∫"
 
     JsObject(
+      "uuids_query" -> JsString(s"g.V(${processDetails.map(_.uuid.rendered).mkString(",")})"),
       "hostName" -> JsString(this.hostName),
       "tree" -> JsString(this.treeInfo),
       "shortSummary" -> JsString(this.key.reduce(_ + s" $delim " + _)),
@@ -121,7 +123,7 @@ case object AlarmEvent {
   def fromBatchedAlarm(alarmCategory: AlarmCategory, pd: ProcessDetails, details: String, alarmIDs: Set[Long], runID: String, emitTimestamp: Long): AlarmEvent = {
 
     AlarmEvent(
-      DetailedAlarmEvent(pd.processName, pd.pid.getOrElse("None").toString, pd.hostName, details, alarmIDs, pd.dataTimestamps, emitTimestamp),
+      DetailedAlarmEvent(pd.processName, pd.pid.getOrElse("None").toString, pd.hostName, details, alarmIDs, pd.dataTimestamps, emitTimestamp, pd.uuid),
       AlarmEventMetaData(runID, alarmCategory.toString))
   }
 

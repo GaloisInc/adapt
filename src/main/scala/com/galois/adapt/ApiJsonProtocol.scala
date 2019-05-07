@@ -184,6 +184,8 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
       case JsString("Faros") => Faros
       case JsString("FiveDirections") => FiveDirections
       case JsString("Marple") => Marple
+      case JsString(s) => spray.json.serializationError(s"Not a valid provider name: $s")
+      case j => spray.json.serializationError(s"Not a valid provider; expected string, got: $j")
     }
   }
 
