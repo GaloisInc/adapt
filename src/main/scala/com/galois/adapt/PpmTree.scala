@@ -6,7 +6,7 @@ import com.univocity.parsers.csv.{CsvParser, CsvParserSettings, CsvWriter, CsvWr
 import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.adm._
 import com.galois.adapt.cdm20._
-import java.io.{BufferedWriter, File, FileWriter, PrintWriter}
+import java.io._
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.util.UUID
@@ -14,6 +14,7 @@ import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListMap}
 
 import scala.collection.concurrent.{Map => ConcurrentMap}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong, AtomicReference}
+import java.util.function.UnaryOperator
 
 import scala.collection.JavaConverters._
 import akka.pattern.ask
@@ -35,6 +36,7 @@ import com.rrwright.quine.runtime.GraphService
 import com.rrwright.quine.runtime.Novelty
 
 import scala.annotation.tailrec
+import scala.collection.mutable.ListBuffer
 
 
 //type AnAlarm = (List[String], (Long, Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))
@@ -73,7 +75,7 @@ object NoveltyDetection {
   type Filter[DataShape] = DataShape => Boolean
 
   type Alarm = List[PpmTreeNodeAlarm]  // (Key, localProbability, globalProbability, count, siblingPop, parentCount, depthOfLocalProbabilityCalculation)
-  case class PpmTreeNodeAlarm(key: String, localProb: Float, globalProb: Float, count: Int, siblingPop: Int, parentCount: Int, depthOfLocalProbabilityCalculation: Int)
+  case class PpmTreeNodeAlarm(key: String, localProb: Float, globalProb: Float, count: Long, siblingPop: Long, parentCount: Long, depthOfLocalProbabilityCalculation: Int)
 
   val writeTypes = Set[EventType](EVENT_WRITE, EVENT_SENDMSG, EVENT_SENDTO, EVENT_CREATE_OBJECT, EVENT_FLOWS_TO)
   val readTypes = Set[EventType](EVENT_READ, EVENT_RECVMSG, EVENT_RECVFROM)
@@ -139,37 +141,41 @@ case class PpmDefinition[DataShape](
 
   private val trainingDataUsed: Boolean =
     if (ppmConfig.shouldloadppmtrees) {
-      implicit val timeout = Timeout(10 minutes)
-      startingState.foreach(t => graphService.initializeTree(treeRootQid, treeName, hostName, t.toQuineRepr))
+      implicit val timeout = Timeout(30 minutes)
+      startingState.foreach(t =>
+        concurrent.Await.ready(
+          graphService.initializeTree(treeRootQid, treeName, hostName, t.toQuineRepr),
+          timeout.duration
+        ).onComplete {
+          case Success(s) => println(s"Initialized tree $treeName on host: $hostName in Quine")
+          case Failure(f) => println(s"FAILED to initialize tree $treeName on host: $hostName in Quine")
+        }
+      )
       true
     }
     else false
 
+  type AlarmBuffer = ListBuffer[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]
+  var alarmQueue: AtomicReference[AlarmBuffer]
+    = new AtomicReference(new ListBuffer)
 
-  var alarms: ConcurrentMap[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])] =
-    new ConcurrentHashMap[List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])]().asScala
-  if (ppmConfig.shouldloadalarms) {
-    Try {
-      val content = new String(Files.readAllBytes(new File(inputAlarmFilePath).toPath), StandardCharsets.UTF_8)
-      content.parseJson.convertTo[List[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]]
-    } match {
-      case Success(as) =>
-        alarms ++= as
-      case Failure(e) =>
-        println(s"FAILED to load alarms for tree: $treeName  on host: $hostName. Starting with no alarms.")
-        e.printStackTrace()
-    }
-  }
 
   // ConcurrentSkipListMap because is concurrent _and_ sorted
   // If there are more than 2,147,483,647 alarms with a given LP; then need Long.
   var localProbAccumulator = new ConcurrentSkipListMap[Float,Int](Ordering[Float])
   if (ppmConfig.shouldloadlocalprobabilitiesfromalarms && shouldApplyThreshold) {
     val noveltyLPs =
-      Try {
+      Try({
+        val noveltyLPsBuilder = collection.mutable.Map.empty[Float, Int]
+        for (line <- scala.io.Source.fromFile(inputAlarmFilePath).getLines) {
+          val (_, (_, _, alarm, _, _)) = line.parseJson.convertTo[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]
+          noveltyLPsBuilder += alarm.last.localProb -> (noveltyLPsBuilder.getOrElse(alarm.last.localProb, 0) + 1)
+        }
+        noveltyLPsBuilder.toMap
+      }).orElse(Try({
         val content = new String(Files.readAllBytes(new File(inputAlarmFilePath).toPath), StandardCharsets.UTF_8)
         content.parseJson.convertTo[List[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]].map(_._2._3.last.localProb).groupBy(identity).mapValues(_.size)
-      } match {
+      })) match {
         case Success(lps) =>
           println(s"Successfully loaded local probability alarms for tree: $treeName on host: $hostName.")
           lps
@@ -232,6 +238,38 @@ case class PpmDefinition[DataShape](
       graphService.system.scheduler.schedule(computeAlarmLpThresholdIntervalMinutes minutes,
         computeAlarmLpThresholdIntervalMinutes minutes)(updateThreshold(alarmPercentile))
     }
+  }
+
+  // Add an alarm to the buffer and flush the buffer if it is to big
+  def putAlarm(extractedValues: List[ExtractedValue], info: (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])): Unit = {
+    val sizeEstimate = alarmQueue.updateAndGet(new UnaryOperator[AlarmBuffer] {
+      def apply(buf: AlarmBuffer): AlarmBuffer = {
+        buf += (extractedValues -> info)
+      }
+    }).length
+
+    if (sizeEstimate > 50) {
+      flushAlarms()
+    }
+  }
+
+  // Alarms get written to here
+  val alarmPw: PrintWriter = {
+    val outputFile = new File(outputAlarmFilePath)
+    if ( ! outputFile.exists) outputFile.createNewFile()
+    new PrintWriter(new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile, true))))
+  }
+
+  // Flush all alarms in the buffer to the file
+  def flushAlarms(): Unit = {
+    alarmQueue.updateAndGet(new UnaryOperator[AlarmBuffer] {
+      def apply(buf: AlarmBuffer): AlarmBuffer = {
+        buf.foreach { a => alarmPw.println(a.toJson.compactPrint )}
+        alarmPw.flush()
+        buf.clear()
+        buf
+      }
+    })
   }
 
 //  def recordNovelty(hostname: String, treeName: String, novelty: Novelty[_]): Unit = Try {
@@ -331,35 +369,19 @@ case class PpmDefinition[DataShape](
     case (alarm, setNamespacedUuidDetails, timestamps) =>
 
     val key: List[ExtractedValue] = alarm.map(_.key)
-    if (alarms contains key) adapt.Application.statusActor ! IncrementAlarmDuplicateCount
-    else {
 
-      val alarmDetails = (timestamps, System.currentTimeMillis, alarm, setNamespacedUuidDetails, Map.empty[String,Int])
-      val newAlarm = AnAlarm(key,alarmDetails)
+    val alarmDetails = (timestamps, System.currentTimeMillis, alarm, setNamespacedUuidDetails, Map.empty[String,Int])
+    val newAlarm = AnAlarm(key,alarmDetails)
 //      alarms = alarms + AnAlarm.unapply(newAlarm).get
-      val x = AnAlarm.unapply(newAlarm).get
-      alarms.put(x._1, x._2)
+    val x = AnAlarm.unapply(newAlarm).get
+    putAlarm(x._1, x._2)
 
-      def thresholdAllows: Boolean = alarm.lastOption.forall( (i: PpmTreeNodeAlarm) => ! ((i.localProb > localProbThreshold) && shouldApplyThreshold) )
+    def thresholdAllows: Boolean = alarm.lastOption.forall( (i: PpmTreeNodeAlarm) => ! ((i.localProb > localProbThreshold) && shouldApplyThreshold) )
 
-      val processDetails = getProcessDetails(setNamespacedUuidDetails, timestamps)
-      //report the alarm
-      if (thresholdAllows) AlarmReporter.report(treeName, hostName, newAlarm, processDetails, localProbThreshold, shouldApplyThreshold)
-    }
+    val processDetails = getProcessDetails(setNamespacedUuidDetails, timestamps)
+    //report the alarm
+    if (thresholdAllows) AlarmReporter.report(treeName, hostName, newAlarm, processDetails, localProbThreshold, shouldApplyThreshold)
   }
-
-  def setAlarmRating(key: List[ExtractedValue], rating: Option[Int], namespace: String): Boolean = alarms.get(key)
-    .map { a =>
-      rating match {
-        case Some(number) => // set the alarm rating in this namespace
-//        alarms = alarms + (key -> a.copy (_5 = a._5 + (namespace -> number) ) ); true
-          alarms += key -> a.copy(_5 = a._5 + (namespace -> number))
-        case None => // Unset the alarm rating.
-//        alarms = alarms + (key -> a.copy (_5 = a._5 - namespace) ); true
-          alarms += key -> a.copy(_5 = a._5 - namespace)
-      }
-    }
-    .nonEmpty
 
   val saveEveryAndNoMoreThan = 3600L * 1000L //ppmConfig.saveintervalseconds.getOrElse(0L) * 1000  // convert seconds to milliseconds
   val lastSaveCompleteMillis = new AtomicLong(0L)
@@ -367,7 +389,13 @@ case class PpmDefinition[DataShape](
 
   def getRepr(implicit timeout: Timeout): Future[TreeRepr] = graphService.getTreeRepr(hostName, treeName, List()).map(r => TreeRepr.fromQuine(r.repr))
 
-  def saveStateAsync(): Future[Unit] = {
+  def saveAlarmsAsync(): Future[Unit] = Future {
+    println(s"Started flushing Alarms for: $treeName...")
+    flushAlarms()
+    println(s"Finished flushing Alarms for: $treeName")
+  }
+
+  def saveTreesAsync(): Future[Unit] = {
 //    val now = System.currentTimeMillis
 //    val expectedSaveCostMillis = 1000  // Allow repeated saving in subsequent attempts if total save time took no longer than this time.
     if ( ! isCurrentlySaving.get() /*&& lastSaveCompleteMillis.get() + saveEveryAndNoMoreThan - expectedSaveCostMillis <= now*/ ) {
@@ -379,13 +407,6 @@ case class PpmDefinition[DataShape](
         repr.writeToFile(outputFilePath)
         println(s"Finished saving TreeRepr for: $treeName")
       }
-
-      println(s"Started saving Alarms for: $treeName...")
-      val content = alarms.toList.toJson.prettyPrint
-      val outputFile = new File(outputAlarmFilePath)
-      if ( ! outputFile.exists) outputFile.createNewFile()
-      Files.write(outputFile.toPath, content.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING)
-      println(s"Finished saving Alarms for: $treeName")
 
       treeWriteF.transform(
         _ => {
@@ -751,7 +772,10 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
 
 
   def saveTrees(): Future[Unit] = {
-    ppmList.foldLeft(Future.successful(()))((acc, ppmTree) => acc.flatMap(_ => ppmTree.saveStateAsync()))
+    ppmList.foldLeft(Future.successful(()))((acc, ppmTree) => acc.flatMap(_ => ppmTree.saveTreesAsync()))
+  }
+  def saveAlarms(): Future[Unit] = {
+    ppmList.foldLeft(Future.successful(()))((acc, ppmTree) => acc.flatMap(_ => ppmTree.saveAlarmsAsync()))
   }
 
   def ppm(name: String): Option[PpmDefinition[_]] = ppmList.find(_.treeName == name)
@@ -759,16 +783,16 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
   var didReceiveInit = false
   var didReceiveComplete = false
 
-  def alarmFromProbabilityData(probabilityData: List[(ExtractedValue, Int, Int)]): Alarm = {
-    val (_, parentCount, siblingCount) = probabilityData.takeWhile(_._2 > 1).lastOption.getOrElse("", 1, 1) // First novel node with default for first observation
+  def alarmFromProbabilityData(probabilityData: List[(ExtractedValue, Long, Long)]): Alarm = {
+    val (_, parentCount, siblingCount) = probabilityData.takeWhile(_._2 > 1L).lastOption.getOrElse("", 1L, 1L) // First novel node with default for first observation
     val alarmLocalProbability = siblingCount.toFloat / (parentCount + siblingCount) // Alarm local prob is a function of the first novel node
-    val treeObservationCount = probabilityData.headOption.map(_._2).getOrElse(1) //
+    val treeObservationCount = probabilityData.headOption.map(_._2).getOrElse(1L) //
     val lastAlarmListIndex = if (probabilityData.size < 2) 0 else  probabilityData.size - 2
 
     val alarm = probabilityData.iterator.sliding(2).zipWithIndex.map {
       case (extractedPair, depth) =>
-        val (ev, parentCount, siblingCount) = extractedPair.headOption.getOrElse(("", 1, 1))
-        val (_, count, _) = extractedPair.lift(1).getOrElse(("", 1, 1))
+        val (ev, parentCount, siblingCount) = extractedPair.headOption.getOrElse(("", 1L, 1L))
+        val (_, count, _) = extractedPair.lift(1).getOrElse(("", 1L, 1L))
         if (depth == lastAlarmListIndex)
           PpmTreeNodeAlarm(ev, alarmLocalProbability, count.toFloat/treeObservationCount, count, siblingCount, parentCount, depth + 1)
         else
@@ -972,21 +996,6 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
     ppm(treeName).map(d =>
       graphService.getTreeRepr(hostName, treeName, startingKey).map(r => PpmNodeActorGetTreeReprResult(TreeRepr.fromQuine(r.repr)))
     ).getOrElse(Future.failed(new NoSuchElementException(s"No tree found with name $treeName")))
-
-  def ppmTreeAlarmQuery(treeName: String, queryPath: List[ExtractedValue], namespace: String, startAtTime: Long = 0L, forwardFromStartTime: Boolean = true, resultSizeLimit: Option[Int] = None, excludeRatingBelow: Option[Int] = None): PpmTreeAlarmResult = {
-    val resultOpt = ppm(treeName).map( tree =>
-      if (queryPath.isEmpty) tree.alarms.values.map(a => a.copy(_5 = a._5.get(namespace))).toList
-      else tree.alarms.collect{ case (k,v) if k.startsWith(queryPath) => v.copy(_5 = v._5.get(namespace))}.toList
-    ).map { r =>
-      val filteredResults = r.filter { case (dataTimestamps, observationMillis, alarm, uuids, ratingOpt) =>
-        (if (forwardFromStartTime) dataTimestamps.min >= startAtTime else dataTimestamps.max <= startAtTime) &&
-          excludeRatingBelow.forall(test => ratingOpt.forall(given => given >= test))
-      }
-      val sortedResults = filteredResults.sortBy[Long](i => if (forwardFromStartTime) i._1.min else Long.MaxValue - i._1.max)
-      resultSizeLimit.fold(sortedResults)(limit => sortedResults.take(limit))
-    }
-    PpmTreeAlarmResult(resultOpt)
-  }
 }
 
 case object ListPpmTrees
@@ -1052,7 +1061,7 @@ case class UiDataContainer(rating: Option[Int], key: String, dataTime: Long, obs
 case object UiDataContainer { def empty = UiDataContainer(None, "", 0L, 0L, 1F, Set.empty) }
 
 
-case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalProb: Float, count: Int, children: Set[TreeRepr]) extends Serializable {
+case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalProb: Float, count: Long, children: Set[TreeRepr]) extends Serializable {
   def get(keys: ExtractedValue*): Option[TreeRepr] = keys.toList match {
     case Nil => Some(this)
     case x :: Nil => this.children.find(_.key == x)
@@ -1064,9 +1073,9 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
 
   def apply(keys: ExtractedValue*): TreeRepr = get(keys:_*).get
 
-  def nodeCount: Int = if (children.isEmpty) 1 else children.foldLeft(1)((a,b) => a + b.nodeCount)
+  def nodeCount: Long = if (children.isEmpty) 1 else children.foldLeft(1L)((a,b) => a + b.nodeCount)
 
-  def leafCount: Int = if (children.isEmpty) 1 else children.foldLeft(0)((a,b) => a + b.leafCount)
+  def leafCount: Long = if (children.isEmpty) 1 else children.foldLeft(0L)((a,b) => a + b.leafCount)
 
   override def toString: String = toString(0)
   def toString(passedDepth: Int): String = {
@@ -1084,7 +1093,7 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
     s"${(0 until (4 * passedDepth)).map(_ => " ").mkString("") + (if (children.isEmpty) s"- ${count} count${if (count == 1) "" else "s"} of:" else "with:")} $key" ::
       children.toList.sortBy(r => 1F - r.localProb).flatMap(_.simpleStrings(passedDepth + 1))
 
-  def toFlat: List[(Int, ExtractedValue, Float, Float, Int)] = (depth, key, localProb, globalProb, count) :: children.toList.flatMap(_.toFlat)
+  def toFlat: List[(Int, ExtractedValue, Float, Float, Long)] = (depth, key, localProb, globalProb, count) :: children.toList.flatMap(_.toFlat)
 
   def writeToFile(filePath: String): Unit = {
     val settings = new CsvWriterSettings
@@ -1101,8 +1110,8 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
   type LocalProb = Float
   type GlobalProb = Float
 
-  def leafNodes: List[(List[ExtractedValue], LocalProb, GlobalProb, Int)] = {
-    def leafNodesRec(children: Set[TreeRepr], nameAcc: List[ExtractedValue] = Nil): List[(List[ExtractedValue], LocalProb, GlobalProb, Int)] =
+  def leafNodes: List[(List[ExtractedValue], LocalProb, GlobalProb, Long)] = {
+    def leafNodesRec(children: Set[TreeRepr], nameAcc: List[ExtractedValue] = Nil): List[(List[ExtractedValue], LocalProb, GlobalProb, Long)] =
       children.toList.flatMap {
         case TreeRepr(_, nextKey, lp, gp, cnt, c) if c.isEmpty => List((nameAcc :+ nextKey, lp, gp, cnt))
         case next => leafNodesRec(next.children, nameAcc :+ next.key)
@@ -1148,11 +1157,11 @@ case class TreeRepr(depth: Int, key: ExtractedValue, localProb: Float, globalPro
     renormalizeProbabilities(this)
   }
 
-  type PpmElement = (List[ExtractedValue], LocalProb, GlobalProb, Int)
+  type PpmElement = (List[ExtractedValue], LocalProb, GlobalProb, Long)
 
   def extractMostNovel: (PpmElement, TreeRepr) = {
     def findMostNovel(repr: TreeRepr): PpmElement = repr.leafNodes.minBy(_._2)
-    def subtractMostNovel(repr: TreeRepr, key: List[ExtractedValue], decrement: Int): TreeRepr = key match {
+    def subtractMostNovel(repr: TreeRepr, key: List[ExtractedValue], decrement: Long): TreeRepr = key match {
       case thisKey :: childKey :: remainderKeys if repr.key == thisKey =>
         require(repr.count >= decrement, s"Cannot decrement a count past zero at key: $thisKey  Attempted: ${repr.count} - $decrement")
         require(repr.children.exists(_.key == childKey), s"They key: $childKey is not a child key of: $thisKey")
@@ -1216,7 +1225,7 @@ case object TreeRepr {
   type Depth = Int
   type LocalProb = Float
   type GlobalProb = Float
-  type ObservationCount = Int
+  type ObservationCount = Long
   type CSVRow = (Depth, ExtractedValue, LocalProb, GlobalProb, ObservationCount)
 
   def fromFlat(repr: List[CSVRow]): TreeRepr = {

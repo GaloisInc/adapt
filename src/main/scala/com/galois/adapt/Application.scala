@@ -624,6 +624,15 @@ object Application extends App {
 
       implicit val executionContext: ExecutionContext = system.dispatchers.lookup("quine.actor.node-dispatcher")
 
+      val alarmsF = if (ppmConfig.shouldsavealarms) {
+        println(s"Flushing alarms to disk...")
+        ppmManagers.values.toList.foldLeft(Future.successful( () ))((a, b) =>
+          a.flatMap(_ => b.saveAlarms()) // (b ? SaveTrees(true)).mapTo[Ack.type]))
+        )
+      } else {
+        Future.successful( Ack )
+      }
+
       val saveF = if (ppmConfig.shouldsaveppmtrees) {
         println(s"Saving PPM trees to disk...")
         ppmManagers.values.toList.foldLeft(Future.successful( () ))((a, b) =>
@@ -633,10 +642,10 @@ object Application extends App {
         Future.successful( Ack )
       }
 
-      val shutdownF = saveF.flatMap { _ =>
+      val shutdownF = alarmsF.flatMap(_ => saveF.flatMap { _ =>
         println("Shutting down the actor system")
         system.terminate()
-      }.flatMap(_ => Future { mapProxy.closeSync() })
+      }.flatMap(_ => Future { mapProxy.closeSync() }))
 
       Await.result(shutdownF, timeout.duration)
     }
