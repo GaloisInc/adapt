@@ -236,7 +236,7 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
         val rankValue = treeCounts.map { case (tree: String, count: Int) =>
           count * 1.0 / treeCountsForBatch.getOrElse(tree, 1)
         }.sum
-      pd -> rankValue
+      pn -> rankValue
     }.sortBy(-_._2).take(numProcessInstancesToTake).map(_._1)
 
     // Send all processes implicated by novelty trees to splunk as aggregated alarms.
