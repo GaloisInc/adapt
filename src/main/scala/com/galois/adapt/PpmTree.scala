@@ -339,35 +339,19 @@ case class PpmDefinition[DataShape](
     case (alarm, setNamespacedUuidDetails, timestamps) =>
 
     val key: List[ExtractedValue] = alarm.map(_.key)
-    if (alarms contains key) adapt.Application.statusActor ! IncrementAlarmDuplicateCount
-    else {
 
-      val alarmDetails = (timestamps, System.currentTimeMillis, alarm, setNamespacedUuidDetails, Map.empty[String,Int])
-      val newAlarm = AnAlarm(key,alarmDetails)
+    val alarmDetails = (timestamps, System.currentTimeMillis, alarm, setNamespacedUuidDetails, Map.empty[String,Int])
+    val newAlarm = AnAlarm(key,alarmDetails)
 //      alarms = alarms + AnAlarm.unapply(newAlarm).get
-      val x = AnAlarm.unapply(newAlarm).get
-      alarms.put(x._1, x._2)
+    val x = AnAlarm.unapply(newAlarm).get
+    alarms.put(x._1, x._2)
 
-      def thresholdAllows: Boolean = alarm.lastOption.forall( (i: PpmTreeNodeAlarm) => ! ((i.localProb > localProbThreshold) && shouldApplyThreshold) )
+    def thresholdAllows: Boolean = alarm.lastOption.forall( (i: PpmTreeNodeAlarm) => ! ((i.localProb > localProbThreshold) && shouldApplyThreshold) )
 
-      val processDetails = getProcessDetails(setNamespacedUuidDetails, timestamps)
-      //report the alarm
-      if (thresholdAllows) AlarmReporter.report(treeName, hostName, newAlarm, processDetails, localProbThreshold, shouldApplyThreshold)
-    }
+    val processDetails = getProcessDetails(setNamespacedUuidDetails, timestamps)
+    //report the alarm
+    if (thresholdAllows) AlarmReporter.report(treeName, hostName, newAlarm, processDetails, localProbThreshold, shouldApplyThreshold)
   }
-
-  def setAlarmRating(key: List[ExtractedValue], rating: Option[Int], namespace: String): Boolean = alarms.get(key)
-    .map { a =>
-      rating match {
-        case Some(number) => // set the alarm rating in this namespace
-//        alarms = alarms + (key -> a.copy (_5 = a._5 + (namespace -> number) ) ); true
-          alarms += key -> a.copy(_5 = a._5 + (namespace -> number))
-        case None => // Unset the alarm rating.
-//        alarms = alarms + (key -> a.copy (_5 = a._5 - namespace) ); true
-          alarms += key -> a.copy(_5 = a._5 - namespace)
-      }
-    }
-    .nonEmpty
 
   val saveEveryAndNoMoreThan = 3600L * 1000L //ppmConfig.saveintervalseconds.getOrElse(0L) * 1000  // convert seconds to milliseconds
   val lastSaveCompleteMillis = new AtomicLong(0L)
@@ -980,21 +964,6 @@ class PpmManager(hostName: HostName, source: String, isWindows: Boolean, graphSe
     ppm(treeName).map(d =>
       graphService.getTreeRepr(hostName, treeName, startingKey).map(r => PpmNodeActorGetTreeReprResult(TreeRepr.fromQuine(r.repr)))
     ).getOrElse(Future.failed(new NoSuchElementException(s"No tree found with name $treeName")))
-
-  def ppmTreeAlarmQuery(treeName: String, queryPath: List[ExtractedValue], namespace: String, startAtTime: Long = 0L, forwardFromStartTime: Boolean = true, resultSizeLimit: Option[Int] = None, excludeRatingBelow: Option[Int] = None): PpmTreeAlarmResult = {
-    val resultOpt = ppm(treeName).map( tree =>
-      if (queryPath.isEmpty) tree.alarms.values.map(a => a.copy(_5 = a._5.get(namespace))).toList
-      else tree.alarms.collect{ case (k,v) if k.startsWith(queryPath) => v.copy(_5 = v._5.get(namespace))}.toList
-    ).map { r =>
-      val filteredResults = r.filter { case (dataTimestamps, observationMillis, alarm, uuids, ratingOpt) =>
-        (if (forwardFromStartTime) dataTimestamps.min >= startAtTime else dataTimestamps.max <= startAtTime) &&
-          excludeRatingBelow.forall(test => ratingOpt.forall(given => given >= test))
-      }
-      val sortedResults = filteredResults.sortBy[Long](i => if (forwardFromStartTime) i._1.min else Long.MaxValue - i._1.max)
-      resultSizeLimit.fold(sortedResults)(limit => sortedResults.take(limit))
-    }
-    PpmTreeAlarmResult(resultOpt)
-  }
 }
 
 case object ListPpmTrees
