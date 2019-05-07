@@ -587,10 +587,10 @@ object Application extends App {
 
       source.async
         .via(printCounter(host.hostName+" CDM", statusActor))
-        .via(debug.debugBuffer(s"[${host.hostName}]  0.) before ER", 50000)).async
+        .via(debug.debugBuffer(s"[${host.hostName}]  0.) before ER", 10000)).async
         .via(erMap(host.hostName).async).async
         .via(lruDedup)
-        .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB", 50000)).async
+        .via(debug.debugBuffer(s"[${host.hostName}]  1.) after ER / before DB", 10000)).async
         .via(printCounter(host.hostName+" ADM", statusActor)) ~> feedbackLoopMerge.in(0)
 
       standingFetchSource ~> feedbackLoopMerge.preferred
