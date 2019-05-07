@@ -6,6 +6,7 @@ import com.galois.adapt.NoveltyDetection._
 import com.galois.adapt.PpmSummarizer.AbstractionOne
 import com.galois.adapt.cdm20._
 import com.typesafe.scalalogging.LazyLogging
+
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.util.Try
@@ -14,6 +15,7 @@ import com.rrwright.quine.language.BoopickleScheme._
 import com.rrwright.quine.language._
 import com.rrwright.quine.language.EdgeDirections._
 import Application.{graph, ppmManagers}
+import com.galois.adapt.adm.{AdmNetFlowObject, AdmUUID}
 
 
 case object StandingFetches extends LazyLogging {
@@ -251,21 +253,56 @@ case object StandingFetches extends LazyLogging {
   }
 
 
-  def onCommunicatingNetflowsMatch(l: List[CommunicatingNetflows]): Unit = l.foreach { cn  =>
-    cn.otherNetflow.foreach { other =>
-//        val matching = s"g.V([${cn.provider}_${graph.idProvider.customIdFromQid(cn.qid.get).get._1}, ${cn.otherNetflow.get.provider}_${graph.idProvider.customIdFromQid(cn.otherNetflow.get.qid.get).get._1}])"
-//  //      val matching = cn.otherNetflow.map(o => s"${cn.localAddress.get}:${cn.localPort.get} --> ${o.localAddress.get}:${o.localPort.get}    ${graph.idProvider.customIdFromQid(cn.qid.get).get}  ${graph.idProvider.customIdFromQid(o.qid.get).get}")
-//        println(matching)
-      val addEdgeF = for {
-        first <- cn.qid
-        other <- cn.otherNetflow
-        second <- other.qid
-      } yield {
-        graph.dumbOps.addEdge(first, second, "reciprocal_netflow", isDirected = true) //.recover{ case e => e.printStackTrace()}
-        graph.dumbOps.addEdge(second, first, "reciprocal_netflow") //.recover{ case e => e.printStackTrace()}
+//  def onCommunicatingNetflowsMatch(l: List[CommunicatingNetflows]): Unit = l.foreach { cn  =>
+//    cn.otherNetflow.foreach { other =>
+////        val matching = s"g.V([${cn.provider}_${graph.idProvider.customIdFromQid(cn.qid.get).get._1}, ${cn.otherNetflow.get.provider}_${graph.idProvider.customIdFromQid(cn.otherNetflow.get.qid.get).get._1}])"
+////  //      val matching = cn.otherNetflow.map(o => s"${cn.localAddress.get}:${cn.localPort.get} --> ${o.localAddress.get}:${o.localPort.get}    ${graph.idProvider.customIdFromQid(cn.qid.get).get}  ${graph.idProvider.customIdFromQid(o.qid.get).get}")
+////        println(matching)
+//      val addEdgeF = for {
+//        first <- cn.qid
+//        other <- cn.otherNetflow
+//        second <- other.qid
+//      } yield {
+//        graph.dumbOps.addEdge(first, second, "reciprocal_netflow", isDirected = true) //.recover{ case e => e.printStackTrace()}
+//        graph.dumbOps.addEdge(second, first, "reciprocal_netflow") //.recover{ case e => e.printStackTrace()}
+//      }
+//    }
+//  }
+
+  import akka.pattern.ask
+  def addReciprocalNetflowByQuery(id: AdmUUID): Future[Boolean] = {
+    val q = s"g.V(${id.rendered}).as('start').out('localPortAdm').in('remotePortAdm').as('portother').out('localPortAdm').in('remotePortAdm').as('portend').eqToVar('start').out('localAddressAdm').in('remoteAddressAdm').as('addyother').out('localAddressAdm').in('remoteAddressAdm').as('addyend').eqToVar('start').select('portother').eqToVar('addyother').id()"
+    (Application.uiDBInterface ? RawQuery(q)).mapTo[Future[Stream[AdmUUID]]].flatten.map{ idList =>
+      idList.toList match {
+        case exactlyOne :: Nil =>
+          graph.dumbOps.addEdge(graph.idProvider.customIdToQid(id), graph.idProvider.customIdToQid(exactlyOne), "reciprocal_netflow", isDirected = true) //.recover{ case e => e.printStackTrace()}
+          graph.dumbOps.addEdge(graph.idProvider.customIdToQid(exactlyOne), graph.idProvider.customIdToQid(id), "reciprocal_netflow")
+          true
+        case _ => false
       }
     }
   }
+
+  def proactiveAddReciprocalEdge(anAdm: AdmNetFlowObject): Future[Unit] = {
+    for {
+      la <- anAdm.localAddress
+      lp <- anAdm.localPort
+      ra <- anAdm.remoteAddress
+      rp <- anAdm.remotePort
+    } yield {
+      val hostList = AdaptConfig.ingestConfig.hosts.map(_.hostName)
+      Future.sequence(
+        hostList.map{ h =>
+          val otherId = AdmUUID(DeterministicUUID(ra, rp, la, lp), h)  // Invert local and remote to define the _other_ netflow.
+          val qid = Application.graph.idProvider.customIdToQid(anAdm.uuid)
+          val other = Application.graph.idProvider.customIdToQid(otherId)
+          val a = Application.graph.dumbOps.addEdge(qid, other, "reciprocal_netflow")
+          val b = Application.graph.dumbOps.addEdge(other, qid, "reciprocal_netflow")
+          a.flatMap(_ => b)
+        }
+      ).map(_ => () )
+    }
+  }.getOrElse(Future.successful( () ))
 
 
   def onProcessNetworkCommsMatch(l: List[ProcessNetworkReadFromOtherProcess]): Unit = {

@@ -710,7 +710,7 @@ var predicates = [
     }, {
         name : "Other Host Connection",
         is_relevant : function(n) {return n.db_label === "AdmNetFlowObject"},
-        floating_query : ".as('start').out('localPortAdm').in('remotePortAdm').as('portother').out('localPortAdm').in('remotePortAdm').as('portend').has('start',eq('portend')).out('localAddressAdm').in('remoteAddressAdm').as('addyother').out('localAddressAdm').in('remoteAddressAdm').as('addyend').has('start',eq('addyend')).where('portother', eq('addyother')).select('portother')"
+        floating_query : ".as('start').out('localPortAdm').in('remotePortAdm').as('portother').out('localPortAdm').in('remotePortAdm').as('portend').eqToVar('start').out('localAddressAdm').in('remoteAddressAdm').as('addyother').out('localAddressAdm').in('remoteAddressAdm').as('addyend').eqToVar('start').select('portother').eqToVar('addyother')"
     }, {
         name : "Reciprocal NetFlow",
         is_relevant : function(n) {return n.db_label === "AdmNetFlowObject"},

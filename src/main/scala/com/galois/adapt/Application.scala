@@ -252,6 +252,8 @@ object Application extends App {
   val processNamesToDrop = Set("/system/bin/app_process64")
 
 
+  val crossHostDisabled = collection.mutable.Set[HostName]()
+
   val sqidFile = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOFile-accumulator")(
     resultHandler = Some({
       case DomainNodeSubscriptionResultFetch(from, branch, assumedEdge, nodeComponents) =>
@@ -371,17 +373,17 @@ object Application extends App {
   val standingFetchProcessParentageActor = ActorRef.noSender
 
 
-  val sqidCommunicatingNetflows = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_CommunicatingNetflows")(
-    resultHandler = Some({
-      case DomainNodeSubscriptionResultFetch(from, testBranch, assumedEdge, nodeComponents) =>
-        val reconstructed = nodeComponents.toList.flatMap(
-          communicatingNetflowsQueryable.fromNodeComponents
-        )
-//        println(s"CommunicatingNetflows nodeComponents matchSize: ${nodeComponents.size}  Reconstructed size: ${reconstructed.size}\n$reconstructed")
-        StandingFetches.onCommunicatingNetflowsMatch(reconstructed)
-    })
-  ))
-  val standingFetchCommunicatingNetflowsActor = ActorRef.noSender
+//  val sqidCommunicatingNetflows = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_CommunicatingNetflows")(
+//    resultHandler = Some({
+//      case DomainNodeSubscriptionResultFetch(from, testBranch, assumedEdge, nodeComponents) =>
+//        val reconstructed = nodeComponents.toList.flatMap(
+//          communicatingNetflowsQueryable.fromNodeComponents
+//        )
+////        println(s"CommunicatingNetflows nodeComponents matchSize: ${nodeComponents.size}  Reconstructed size: ${reconstructed.size}\n$reconstructed")
+//        StandingFetches.onCommunicatingNetflowsMatch(reconstructed)
+//    })
+//  ))
+//  val standingFetchCommunicatingNetflowsActor = ActorRef.noSender
 
   val sqidProcessNetworkComms = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ProcessNetworkComms")(
     resultHandler = Some({
@@ -431,7 +433,7 @@ object Application extends App {
     (sqidSrcSnk.get -> standingFetchSrcSnkActor) +
     (sqidNetwork.get -> standingFetchNetworkActor) +
     (sqidParentProcess.get -> standingFetchProcessParentageActor) +
-    (sqidCommunicatingNetflows.get -> standingFetchCommunicatingNetflowsActor) +
+//    (sqidCommunicatingNetflows.get -> standingFetchCommunicatingNetflowsActor) +
     (sqidProcessNetworkComms.get -> processNetworkCommsActor)
 
 
@@ -461,7 +463,7 @@ object Application extends App {
 
   def startWebServer(dbActor: ActorRef): Http.ServerBinding = {
     println(s"Starting the web server at: http://${runtimeConfig.webinterface}:${runtimeConfig.port}")
-    val route = Routes.mainRoute(dbActor, statusActor, ppmManagers)
+    val route = Routes.mainRoute(dbActor, statusActor, ppmManagers, graph)
     val httpServer = Http().bindAndHandle(route, runtimeConfig.webinterface, runtimeConfig.port)
     Await.result(httpServer, 10 seconds)
   }

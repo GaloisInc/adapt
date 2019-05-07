@@ -13,7 +13,7 @@ import com.galois.adapt.AdaptConfig.{HostName, ingestConfig}
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.AlmostMap
 import com.galois.adapt.adm.{AdmUUID, CdmUUID}
-
+import com.rrwright.quine.runtime.GraphService
 import scala.collection.parallel.ParMap
 //import akka.http.scaladsl.marshalling._
 import akka.http.scaladsl.server.Directives._
@@ -71,7 +71,8 @@ object Routes {
   def mainRoute(
     dbActor: ActorRef,
     statusActor: ActorRef,
-    ppmManagers: Map[HostName, PpmManager]
+    ppmManagers: Map[HostName, PpmManager],
+    graph: GraphService[_]
   )(implicit system: ActorSystem, materializer: Materializer) = {
 
     implicit val ec: ExecutionContext = system.dispatchers.lookup("quine.actor.node-dispatcher")
@@ -150,6 +151,18 @@ object Routes {
                 }
               }
 
+            }
+          } ~
+          path("saveNodeSnapshots") {
+            complete(
+              graph.snapshotInMemoryNodes()(Timeout(9 minutes))
+            )
+          } ~
+          path("getCrossHostNetflowStatus") {
+            parameters('hostName.as[AdaptConfig.HostName]) { hostName: AdaptConfig.HostName =>
+              complete {
+                s"$hostName is ${if (Application.crossHostDisabled.contains(hostName)) "disabled" else "enabled"}"
+              }
             }
           }
       //    pathPrefix("ppm") {
@@ -237,10 +250,6 @@ object Routes {
 
               )
             }
-//            ~
-//            complete(
-//              PpmSummarizer.summarizableProcesses.map(_.toString)
-//            )
           } ~
           pathPrefix("ppm") {
             pathPrefix("saveTrees") {
@@ -273,37 +282,6 @@ object Routes {
 //                ).map(_.toMap)
               )
             }
-//          Not used:
-//            path("setRatings") {
-//              implicit def makeHostName(s: String): HostName = HostName(s)
-//              parameter('rating.as(validRating), 'namespace ? "adapt", 'hostName, 'pathsPerTree.as[Map[String, List[String]]]) { setRatings }
-//            } ~
-//            pathPrefix(Segment) { treeName =>
-//              path(Segment) { hostName =>
-//                parameter('query.as[String].?, 'namespace ? "adapt", 'startTime ? 0L, 'forwardFromStartTime ? true, 'resultSizeLimit.as[Int].?, 'excludeRatingBelow.as[Int].?) {
-//                  (queryString, namespace, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow) =>
-//                    val query = queryString.map(_.split("∫", -1)).getOrElse(Array.empty[String]).toList
-//                    import ApiJsonProtocol._
-//  //                  parameter('hostName.as[String]) { hostName =>
-//                      complete {
-//                        (ppmActors(hostName) ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow))
-//                          .mapTo[PpmTreeAlarmResult]
-//                          .map(t => List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
-//                      }
-//  //                  }
-//  //                  ~
-//  //                  complete {
-//  //                    Future.sequence(
-//  //                      ppmActors.map { case (hostName, ppmRef) =>
-//  //                        (ppmRef ? PpmTreeAlarmQuery(treeName, query, namespace.toLowerCase, startTime, forwardFromStartTime, resultSizeLimit, excludeRatingBelow))
-//  //                        .mapTo[PpmTreeAlarmResult]
-//  //                        .map(t => hostName -> List(UiTreeFolder(treeName, true, UiDataContainer.empty, t.toUiTree.toSet)))
-//  //                      }
-//  //                    )
-//  //                  }
-//                }
-//              }
-//            }
           } ~
           pathPrefix("getCdmFilter") {
             parameters('hostName.as[String]) { hostName =>
@@ -382,65 +360,19 @@ object Routes {
                 }
               }
             }
-//          } ~
-//          pathPrefix("ppm") {
-//            path(Segment / "setRating") { treeName =>
-//              parameters('query.as[String], 'rating.as(validRating), 'namespace ? "adapt", 'hostName) { (queryString, rating, namespace, hostName) =>
-//                complete {
-//                  val query = queryString.split("∫", -1).toList
-//                  (ppmActors(hostName) ? SetPpmRatings(treeName, List(query), rating, namespace.toLowerCase)).mapTo[Option[List[Boolean]]].map {
-//                    case Some(l) if l.forall(x => x) => StatusCodes.Created -> s"Rating for $queryString set to: $rating"
-//                    case Some(l) => StatusCodes.NotFound -> s"Could not find key for $queryString"
-//                    case None => StatusCodes.BadRequest -> s"Could not find tree: $treeName"
-//                  }
-//                }
-//              }
-//            } ~
-//            path("setRatings") {
-//              formFields('rating.as(validRating), 'namespace ? "adapt", 'hostName, 'pathsPerTree.as[Map[String, List[String]]]) { (rating, namespace, hostName, pathsPerTree) =>
-//                setRatings(rating, namespace, hostName, pathsPerTree)
-//              }
-//            } ~
-//            path("setRatingsMap") {
-//              formFieldMap { params: Map[String, String] =>
-//                params.get("rating") match {
-//                  case Some(x @ ("0" | "1" | "2" | "3" | "4" | "5")) =>
-//                    val rating = x.toInt
-//                    val namespace: String = params.getOrElse("namespace", "adapt")
-//                    val hostName: String = params("hostName")
-//                    Try {
-//                      val json = params("pathsPerTree").parseJson
-//                      implicitly[RootJsonFormat[Map[String,List[String]]]].read(json)
-//                    } match {
-//                        case Failure(e) => complete { StatusCodes.ImATeapot -> s"No pathsPerTree ${e.getMessage}" }
-//                        case Success(pathsPerTree: Map[String,List[String]]) => setRatings(rating, namespace, hostName, pathsPerTree)
-//                    }
-//                  case r => complete { StatusCodes.ImATeapot -> s"Invalid rating $r" }
-//                }
-//              }
-//            }
-//          } ~
-//          pathPrefix("makeTheiaQuery") {
-//            formFieldMap { fields =>
-//              complete {
-//                Try(
-//                  MakeTheiaQuery(
-//                    fields("type").toLowerCase match {
-//                      case "backward" | "backwards" => TheiaQueryType.BACKWARD
-//                      case "forward" | "forwards" => TheiaQueryType.FORWARD
-//                      case "point_to_point" | "pointtopoint" | "ptp" => TheiaQueryType.POINT_TO_POINT
-//                    },
-//                    fields.get("sourceId").map(UUID.fromString),
-//                    fields.get("sinkId").map(UUID.fromString),
-//                    fields.get("startTimestamp").map(_.toLong),
-//                    fields.get("endTimestamp").map(_.toLong)
-//                  )
-//                ).map(q =>
-//                  // TODO: Come on... fix this.
-//                  (ppmActor.get ? q).mapTo[Future[String]].flatMap(identity)
-//                )
-//              }
-//            }
+          } ~
+          pathPrefix("setCrossHostNetflowStatus") {
+            formField('hostName.as[String], 'enabled.as[Boolean]) { (hostName: HostName, enabled: Boolean) =>
+              complete {
+                if (enabled) {
+                  Application.crossHostDisabled -= hostName
+                  StatusCodes.Created -> s"Cross host trees enabled for '$hostName'"
+                } else {
+                  Application.crossHostDisabled += hostName
+                  StatusCodes.Created -> s"Cross host trees disabled for '$hostName'"
+                }
+              }
+            }
           }
         } ~
         pathPrefix("query") {

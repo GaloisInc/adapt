@@ -5,6 +5,7 @@ import java.util
 import java.util.{Arrays, Comparator, UUID}
 
 import com.galois.adapt.AdaptConfig.HostName
+import com.galois.adapt.adm.AdmUUID
 import com.galois.adapt.cdm20._
 import org.mapdb.{DataInput2, DataOutput2, Serializer}
 import org.mapdb.serializer.GroupSerializer
@@ -12,11 +13,9 @@ import org.mapdb.serializer.GroupSerializer
 import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
 import scala.language.implicitConversions
-
 import com.rrwright.quine.language._
 import shapeless._
 import shapeless.record.Record
-
 import com.github.blemale.scaffeine.{Cache, Scaffeine}
 
 // TODO: convert `toMap` to use Shapeless. It is _begging_ to be done with shapeless
@@ -463,7 +462,7 @@ package object adm {
           lp <- localPort
           ra <- remoteAddress
           rp <- remotePort
-        } yield DeterministicUUID(la + lp + ra + rp)
+        } yield DeterministicUUID(la, lp, ra, rp)
 
         detUuidOpt.getOrElse(DeterministicUUID(originalCdmUuids.toList.sorted.map(_.uuid)))
       },
@@ -768,4 +767,6 @@ object DeterministicUUID {
     UUID.nameUUIDFromBytes(byteBuffer.array())
   }
 
+  def apply(localAddress: String, localPort: Int, remoteAddress: String, remotePort: Int): UUID =
+    DeterministicUUID(localAddress + localPort + remoteAddress + remotePort)
 }
