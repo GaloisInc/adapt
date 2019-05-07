@@ -389,6 +389,12 @@ case class PpmDefinition[DataShape](
 
   def getRepr(implicit timeout: Timeout): Future[TreeRepr] = graphService.getTreeRepr(hostName, treeName, List()).map(r => TreeRepr.fromQuine(r.repr))
 
+  Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
+    override def run(): Unit = if  (!AdaptConfig.skipshutdown) {
+      flushAlarms()
+    }
+  }))
+
   def saveStateAsync(): Future[Unit] = {
 //    val now = System.currentTimeMillis
 //    val expectedSaveCostMillis = 1000  // Allow repeated saving in subsequent attempts if total save time took no longer than this time.
