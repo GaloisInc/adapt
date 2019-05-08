@@ -191,7 +191,7 @@ object PpmSummarizer {
       }.headOption
     }
 
-    val thisProcessNameQuery = s"g.V(${processUuid.rendered}).out('path').values('path').limit(20)"
+    val thisProcessNameQuery = s"g.V(${processUuid.rendered}).outLimit('path', 20).values('path').limit(20)"
     def thisProcessNameResults = (Application.uiDBInterface ? RawQuery(thisProcessNameQuery))
       .mapTo[Future[Stream[Any]]].flatten.map {
       _.flatMap {
@@ -200,7 +200,7 @@ object PpmSummarizer {
       }.toSet
     }
 
-    val parentSubjectQuery = s"g.V(${processUuid.rendered}).out('parentSubject').out('path').values('path').limit(20)"
+    val parentSubjectQuery = s"g.V(${processUuid.rendered}).outLimit('parentSubject', 1).outLimit('path', 20).values('path').limit(20)"
     def parentSubjectResults = (Application.uiDBInterface ? RawQuery(thisProcessNameQuery))
       .mapTo[Future[Stream[Any]]].flatten.map {
         _.flatMap {
@@ -209,7 +209,7 @@ object PpmSummarizer {
         }.toSet
       }
 
-    val childSubjectsQuery = s"g.V(${processUuid.rendered}).in('parentSubject').out('path').values('path').limit(100)"
+    val childSubjectsQuery = s"g.V(${processUuid.rendered}).inLimit('parentSubject', 100).outLimit('path', 10).values('path').limit(100)"
     def childSubjectNamesResults = (Application.uiDBInterface ? RawQuery(childSubjectsQuery))
       .mapTo[Future[Stream[Any]]].flatten.map {
       _.flatMap {
@@ -218,7 +218,7 @@ object PpmSummarizer {
       }.toSet
     }
 
-    val writingFileQuery = s"g.V(${processUuid.rendered}).out('did_write').out('path').values('path').limit(100)"
+    val writingFileQuery = s"g.V(${processUuid.rendered}).outLimit('did_write', 100).outLimit('path', 10).values('path').limit(100)"
     def writingFileResults = (Application.uiDBInterface ? RawQuery(writingFileQuery))
       .mapTo[Future[Stream[Any]]].flatten.map {
       _.flatMap {
@@ -227,7 +227,7 @@ object PpmSummarizer {
       }.toSet
     }
 
-    val readingFileQuery = s"g.V(${processUuid.rendered}).out('did_read').out('path').values('path').limit(100)"
+    val readingFileQuery = s"g.V(${processUuid.rendered}).outLimit('did_read', 100).outLimit('path', 10).values('path').limit(100)"
     def readingFileResults = (Application.uiDBInterface ? RawQuery(readingFileQuery))
       .mapTo[Future[Stream[Any]]].flatten.map {
       _.flatMap {
@@ -236,7 +236,7 @@ object PpmSummarizer {
       }.toSet
     }
 
-    val writingNetFlowQuery = s"g.V(${processUuid.rendered}).out('did_write').valueMap('remoteAddress', 'remotePort').limit(100)"
+    val writingNetFlowQuery = s"g.V(${processUuid.rendered}).outLimit('did_write', 100).valueMap('remoteAddress', 'remotePort').limit(100)"
     def writingNetFlowResults = (Application.uiDBInterface ? RawQuery(writingNetFlowQuery))
       .mapTo[Future[Stream[Map[String, Any]]]].flatten.map { stream =>
         stream.flatMap {
@@ -250,7 +250,7 @@ object PpmSummarizer {
         }.toList
       }
 
-    val readingNetFlowQuery = s"g.V(${processUuid.rendered}).out('did_read').valueMap('remoteAddress', 'remotePort').limit(100)"
+    val readingNetFlowQuery = s"g.V(${processUuid.rendered}).outLimit('did_read', 100).valueMap('remoteAddress', 'remotePort').limit(100)"
     def readingNetFlowResults = (Application.uiDBInterface ? RawQuery(readingNetFlowQuery))
       .mapTo[Future[Stream[Map[String, Any]]]].flatten.map { stream =>
         stream.flatMap {
@@ -265,7 +265,7 @@ object PpmSummarizer {
       }
 
 
-    val wroteOverNetflowToProcessQuery = s"g.V(${processUuid.rendered}).in('did_read_over_network').as('proc').id().as('id').select('proc').out('path').values('path').as('pth').select('id','path').limit(100)"
+    val wroteOverNetflowToProcessQuery = s"g.V(${processUuid.rendered}).inLimit('did_read_over_network', 100).as('proc').id().as('id').select('proc').outLimit('path', 10).values('path').as('pth').select('id','path').limit(100)"
     def wroteOverNetflowToProcessResults = (Application.uiDBInterface ? RawQuery(wroteOverNetflowToProcessQuery))
       .mapTo[Future[Stream[Any]]].flatten.map { stream =>
       val uniquePairs = stream.flatMap {
@@ -278,7 +278,7 @@ object PpmSummarizer {
       uniquePairs.toSet[(String, String)].groupBy(_._1).mapValues(_.map(_._2).toList.sorted.mkString(",")).toList  // Goal: List( "id.rendered" -> "multiple,process,names,as,one,string" )
     }
 
-    val readOverNetflowFromProcessQuery = s"g.V(${processUuid.rendered}).out('did_read_over_network').as('proc').id().as('id').select('proc').out('path').values('path').as('pth').select('id','path').limit(100)"
+    val readOverNetflowFromProcessQuery = s"g.V(${processUuid.rendered}).outLimit('did_read_over_network', 100).as('proc').id().as('id').select('proc').outLimit('path', 10).values('path').as('pth').select('id','path').limit(100)"
     def readOverNetflowFromProcessResults = (Application.uiDBInterface ? RawQuery(readOverNetflowFromProcessQuery))
       .mapTo[Future[Stream[Any]]].flatten.map { stream =>
         val uniquePairs = stream.flatMap {
