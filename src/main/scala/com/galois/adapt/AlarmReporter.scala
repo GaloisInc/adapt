@@ -292,8 +292,9 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
 
 
       Future.sequence(aggregatedAlarmEventsFromNovelties ++ priorityAlarmEventsFromNovelties ++ alarmEventsFromAlarms)
-        .map(m => handleMessage(m.flatten, lastMessage)).onFailure { case res =>
+        .map(m => handleMessage(m.flatten, lastMessage)).recoverWith { case res =>
           log.error(s"AlarmReporter: failed with $res.")
+          Future.failed(res)
         }
 
     //todo: deletes the set without checking if the reportSplunk succeeded. Add error handling above

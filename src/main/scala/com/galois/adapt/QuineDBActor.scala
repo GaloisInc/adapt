@@ -259,7 +259,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       }
     )),
     labelKey = "type_of"
-  )(implicitly, Timeout(21.23456 seconds))
+  )(implicitly, Timeout(180.98765 seconds))
 
 
   implicit class FutureAckOnComplete(f: Future[_]) extends AnyRef {
