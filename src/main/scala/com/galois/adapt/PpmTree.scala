@@ -284,7 +284,7 @@ case class PpmDefinition[DataShape](
   val someoneDequing = new AtomicBoolean(false)
   val queuedObservations = new java.util.concurrent.ConcurrentLinkedDeque[(List[ExtractedValue], Set[NamespacedUuidDetails], Set[Long], Int, ObservationId)]()
 
-  graphService.system.scheduler.schedule(10 seconds, 60 seconds)(println(s"lowerBoundQueueLength for: $hostName $treeName size: ${lowerBoundQueueLength.get()} (total emitted: $totalEmitted, total compressed: $totalCompressed)"))
+  graphService.system.scheduler.schedule(10 seconds, 10 minutes)(println(s"lowerBoundQueueLength for: $hostName $treeName size: ${lowerBoundQueueLength.get()} (total emitted: $totalEmitted, total compressed: $totalCompressed)"))
 
   /*
    *  If you observe something with a _different_ extracted value, you are responsible for emitting existing values
