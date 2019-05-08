@@ -252,7 +252,7 @@ object Application extends App {
   val processNamesToDrop = Set("/system/bin/app_process64", "/usr/bin/pulseaudio", "fuzzyflakes")
 
 
-  val crossHostDisabled = collection.mutable.Set[HostName]()
+  val crossHostDisabled = collection.mutable.Set[HostName]("trace-3", "clearscope-1")
 
   val sqidFile = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOFile-accumulator")(
     resultHandler = Some({
@@ -534,14 +534,21 @@ object Application extends App {
     }
   }
 
+
+
+  val qdbActorsPerHost: mutable.Map[HostName, List[ActorRef]] = mutable.Map.empty
+
+
   // One of `Either[ADM, EdgeAdm2Adm]`, `PpmObservation`
   def quineSink(hostName: HostName): Sink[Any, NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit q: GraphDSL.Builder[NotUsed]  =>
     import GraphDSL.Implicits._
     val balance = q.add(Balance[Any](parallelism))
-    (0 until parallelism).foreach { idx =>
+    val actorList = (0 until parallelism).toList.map { idx =>
       val quineDBRef = system.actorOf(Props(classOf[QuineDBActor], graph, idx), s"$hostName-QuineDB-$idx")
       balance.out(idx) ~> Sink.actorRefWithAck(quineDBRef, InitMsg, Ack, CompleteMsg, println).async
+      quineDBRef
     }
+    qdbActorsPerHost(hostName) = actorList
     SinkShape(balance.in)
   })
 
@@ -559,7 +566,7 @@ object Application extends App {
 
   // In the gallows sense of the word. ;)
   def executeIngestHost(hostName: HostName): String = {
-    streamsRunning.remove(hostName) match {
+    val s = streamsRunning.remove(hostName) match {
       case Some(dealWithTheDevil) =>
         dealWithTheDevil.trySuccess(Some(KillMe))
         "Removed the stream (the stream had no choice but to fulfill its promise to the devil)"
@@ -567,7 +574,18 @@ object Application extends App {
       case None =>
         "Couldn't find the host to 'execute'"
     }
+
+    system.scheduler.scheduleOnce(10 seconds){
+      qdbActorsPerHost.remove(hostName).map{ l =>
+        l.foreach(ref => system.stop(ref))
+        println(s"Stopped all actors for hostName: $hostName")
+      }.getOrElse(
+        println(s"Could not find a hostName: $hostName to stop the actors!")
+      )
+    }(system.dispatcher)
+    s
   }
+
 
   private var streamCount = new java.util.concurrent.atomic.AtomicLong(0L)
   def runHostIngest(host: IngestHost): Unit = {
@@ -602,6 +620,8 @@ object Application extends App {
       
       ClosedShape
     }).run()
+
+    println(s"Ingest has begun for ${host.hostName}")
 
     streamsRunning += (host.hostName -> dealWithTheDevil)
     standingFetchSinks += (host.hostName -> standingFetchSink)
