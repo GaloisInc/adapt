@@ -39,6 +39,14 @@ case class ProcessDetails(processName: String, pid: Option[Int], hostName: HostN
       "uuid" -> JsString(uuid.rendered)
     )
   }
+
+  def addToName(moreProcessNames: String): ProcessDetails = {
+    if (processName.contains(moreProcessNames)) {
+      this
+    } else {
+      ProcessDetails(processName + ", " + moreProcessNames, pid, hostName, dataTimestamps, uuid)
+    }
+  }
 }
 
 case class AlarmEventMetaData(runID: String, alarmCategory: String)
@@ -182,8 +190,8 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
   //var processRefSet: Set[ProcessDetails] = Set.empty
 //  var alarmProcessRefSet: Map[ProcessDetails, Set[(Long, String)]] = Map.empty[ProcessDetails, Set[(Long, String)]]
 //  var noveltyProcessRefSet: Map[ProcessDetails, Set[(Long, String)]] = Map.empty[ProcessDetails, Set[(Long, String)]]
-  var alarmProcessRefSet: Map[ProcessName, (ProcessDetails, Set[(Long, String)])] = Map.empty[ProcessName, (ProcessDetails, Set[(Long, String)])]
-  var noveltyProcessRefSet: Map[ProcessName, (ProcessDetails, Set[(Long, String)])] = Map.empty[ProcessName, (ProcessDetails, Set[(Long, String)])]
+  var alarmProcessRefSet: Map[NamespacedUuid, (ProcessDetails, Set[(Long, String)])] = Map.empty[NamespacedUuid, (ProcessDetails, Set[(Long, String)])]
+  var noveltyProcessRefSet: Map[NamespacedUuid, (ProcessDetails, Set[(Long, String)])] = Map.empty[NamespacedUuid, (ProcessDetails, Set[(Long, String)])]
   var alarmCounter: Long = 0
 
   def genAlarmID(): Long = {
@@ -231,21 +239,21 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
     // We take the top k process instances ranked in descending order by weight.
     // Weight is defined to be the sum over all trees of the proportion of tree alarms raised per process instance.
     val priorityProcessesFromNovelties = noveltyProcessRefSet.toList.map {
-      case (pn, (pd: ProcessDetails, alarmIdsAndTreeNames: Set[(Long, String)])) =>
+      case (uuid, (pd: ProcessDetails, alarmIdsAndTreeNames: Set[(Long, String)])) =>
         val treeCounts = alarmIdsAndTreeNames.toList.map(_._2).groupBy(identity).mapValues(_.size)
         val rankValue = treeCounts.map { case (tree: String, count: Int) =>
           count * 1.0 / treeCountsForBatch.getOrElse(tree, 1)
         }.sum
-      pn -> rankValue
+      uuid -> rankValue
     }.sortBy(-_._2).take(numProcessInstancesToTake).map(_._1)
 
     // Send all processes implicated by novelty trees to splunk as aggregated alarms.
     val aggregatedAlarmEventsFromNovelties: List[Future[Option[AlarmEvent]]] = noveltyProcessRefSet
-      .map { case (pn, (pd, alarmIDsAndTreeNames)) =>
+      .map { case (uuid, (pd, alarmIDsAndTreeNames)) =>
 
       // Include alarmID references to alarm trees here too.
       val alarmIDs: Set[Long] = alarmIDsAndTreeNames.map(_._1)
-        .union(alarmProcessRefSet.get(pn).map{case (_, a) => a}.getOrElse(Set.empty[(Long, String)]).map(_._1))
+        .union(alarmProcessRefSet.get(uuid).map{case (_, a) => a}.getOrElse(Set.empty[(Long, String)]).map(_._1))
 
       Future.successful(Some(AlarmEvent.fromBatchedAlarm(AggregatedAlarm, pd, "", alarmIDs, runID, System.currentTimeMillis)))
     }.toList
@@ -253,10 +261,10 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
     // Send only processes implicated by novelty trees that are highly ranked to as prioritized alarms to Splunk.
     val priorityAlarmEventsFromNovelties: List[Future[Option[AlarmEvent]]] = noveltyProcessRefSet
       .filterKeys(priorityProcessesFromNovelties.contains(_))
-      .map { case (pn, (pd, alarmIDsAndTreeNames)) =>
+      .map { case (uuid, (pd, alarmIDsAndTreeNames)) =>
         // Include references to alarmIDs from alarm trees here too.
         val alarmIDs: Set[Long] = alarmIDsAndTreeNames.map(_._1)
-          .union(alarmProcessRefSet.get(pn).map{case (_, a) => a}.getOrElse(Set.empty[(Long, String)]).map(_._1))
+          .union(alarmProcessRefSet.get(uuid).map{case (_, a) => a}.getOrElse(Set.empty[(Long, String)]).map(_._1))
 
         val prioritizedEvent: Future[Option[AlarmEvent]] = {
           PpmSummarizer.summarize(AdmUUID(pd.uuid.uuid, pd.uuid.namespace) /*pd.processName, Some(pd.hostName), pd.pid*/).map { s =>
@@ -271,13 +279,13 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
     // Only include processes that we weren't already implicated by novelty trees.
     val alarmEventsFromAlarms: List[Future[Option[AlarmEvent]]] = alarmProcessRefSet
         .filterKeys(!priorityProcessesFromNovelties.contains(_))
-        .map { case (pn, (pd, alarmIDsAndTreeNames)) =>
+        .map { case (uuid, (pd, alarmIDsAndTreeNames)) =>
 
           val alarmIDs: Set[Long] = alarmIDsAndTreeNames.map(_._1)
-            .union(alarmProcessRefSet.get(pn).map{case (_, a) => a}.getOrElse(Set.empty[(Long, String)]).map(_._1))
+            .union(alarmProcessRefSet.get(uuid).map{case (_, a) => a}.getOrElse(Set.empty[(Long, String)]).map(_._1))
 
           // Don't send two aggregated alarms for the same process
-          val aggregatedEvent = if (!noveltyProcessRefSet.contains(pn)) {
+          val aggregatedEvent = if (!noveltyProcessRefSet.contains(uuid)) {
             Future.successful(Some(AlarmEvent.fromBatchedAlarm(AggregatedAlarm, pd, "", alarmIDs, runID, System.currentTimeMillis)))
           } else {Future.successful(None)}
 
@@ -321,13 +329,21 @@ class AlarmReporterActor(runID: String, maxbufferlength: Long, splunkHecClient: 
     alarmDetails.processDetailsSet.foreach { pd =>
       val pn = ProcessName(pd.processName, pd.pid, pd.hostName)
       if (alarmDetails.shouldApplyThreshold) {
-        val (processDetails, alarmIDsAndTrees) = noveltyProcessRefSet.getOrElse(pn, (pd, Set.empty[(Long, String)]))
-        val newAlarmIDsAndTrees = alarmIDsAndTrees + ((alarmID, tree))
-        noveltyProcessRefSet += (pn -> (processDetails, newAlarmIDsAndTrees))
+
+        val (newProcessDetails, newAlarmIDsAndTrees) = noveltyProcessRefSet.get(pd.uuid) match {
+          case Some((processDetails, alarmIDsAndTrees)) => (processDetails.addToName(pd.processName), alarmIDsAndTrees + ((alarmID, tree)))
+          case None => (pd, Set((alarmID, tree)))
+        }
+
+        noveltyProcessRefSet += (pd.uuid -> (newProcessDetails, newAlarmIDsAndTrees))
       } else {
-        val (processDetails, alarmIDsAndTrees) = noveltyProcessRefSet.getOrElse(pn, (pd, Set.empty[(Long, String)]))
-        val newAlarmIDsAndTrees = alarmIDsAndTrees + ((alarmID, tree))
-        alarmProcessRefSet += (pn -> (processDetails, newAlarmIDsAndTrees))
+
+        val (newProcessDetails, newAlarmIDsAndTrees) = alarmProcessRefSet.get(pd.uuid) match {
+          case Some((processDetails, alarmIDsAndTrees)) => (processDetails.addToName(pd.processName), alarmIDsAndTrees + ((alarmID, tree)))
+          case None => (pd, Set((alarmID, tree)))
+        }
+
+        alarmProcessRefSet += (pd.uuid -> (newProcessDetails, newAlarmIDsAndTrees))
       }
     }
 
