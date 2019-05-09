@@ -155,6 +155,7 @@ object Application extends App {
     persistor = as =>
 //      LMDBSnapshotPersistor(
 //        "data/persistence-lmdb.db",
+
 //        mapSizeBytes = {
 //          val size: Long = runtimeConfig.lmdbgigabytes * 1024L * 1024L * 1024L
 //          println("LMDB size: " + NumberFormat.getInstance().format(size))
