@@ -153,16 +153,15 @@ object Application extends App {
   implicit val graph = GraphService.clustered(
     config = ConfigFactory.parseString(clusterConfigSrc),
     persistor = as =>
-//      LMDBSnapshotPersistor(
-//        "data/persistence-lmdb.db",
-
-//        mapSizeBytes = {
-//          val size: Long = runtimeConfig.lmdbgigabytes * 1024L * 1024L * 1024L
-//          println("LMDB size: " + NumberFormat.getInstance().format(size))
-//          size
-//        }
-//      )(as),
-      TimelessMapDBMultimap("data/persistence-multimap_by_event.db", shardCount = 14, shouldUseWAL = false)(as),
+      LMDBSnapshotPersistor(
+        "data/persistence-lmdb.db",
+        mapSizeBytes = {
+          val size: Long = runtimeConfig.lmdbgigabytes * 1024L * 1024L * 1024L
+          println("LMDB size: " + NumberFormat.getInstance().format(size))
+          size
+        }
+      )(as),
+//      TimelessMapDBMultimap("data/persistence-multimap_by_event.db", shardCount = 14, shouldUseWAL = false)(as),
 //    MapDBMultimap()(as),
 //    EmptyPersistor()(as),
     idProvider = AdmUuidProvider,
