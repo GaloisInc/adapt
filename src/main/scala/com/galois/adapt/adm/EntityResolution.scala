@@ -108,17 +108,17 @@ object EntityResolution {
       .filter {                                                               // Filter out events outside of business hours
         case timed @ (_, Timed(t, cdm: Event)) =>
           val date = new Date(t.nanos / (1000 * 1000))
-          val afterHours = List(
-            date.after(new Date(2019, 4, 7,  18, 0)) && date.before(new Date(2019, 4, 8,  8, 0)), // after tues 18:00, before wed 8:00
-            date.after(new Date(2019, 4, 8,  18, 0)) && date.before(new Date(2019, 4, 9,  8, 0)), // after wed 18:00, before thurs 8:00
-            date.after(new Date(2019, 4, 9,  18, 0)) && date.before(new Date(2019, 4, 10, 8, 0)), // after thurs 18:00, before fri 8:00
-            date.after(new Date(2019, 4, 10, 18, 0)) && date.before(new Date(2019, 4, 13, 8, 0)), // after fri 18:00, before mon 8:00
-            date.after(new Date(2019, 4, 13, 18, 0)) && date.before(new Date(2019, 4, 14, 8, 0)), // after mon 18:00, before tues 8:00
-            date.after(new Date(2019, 4, 14, 18, 0)) && date.before(new Date(2019, 4, 15, 8, 0)), // after tues 18:00, before wed 8:00
-            date.after(new Date(2019, 4, 15, 18, 0)) && date.before(new Date(2019, 4, 16, 8, 0)), // after wed 18:00, before thurs 8:00
-            date.after(new Date(2019, 4, 16, 18, 0)) && date.before(new Date(2019, 4, 17, 8, 0)), // after thurs 18:00, before fri 8:00
-            date.after(new Date(2019, 4, 17, 18, 0)) && date.before(new Date(2019, 4, 18, 8, 0)), // after fri 18:00, before mon 8:00
-          ).exists(identity[Boolean])
+
+          val afterHours =
+            date.after(new Date(2019, 4, 7,  18, 0)) && date.before(new Date(2019, 4, 8,  8, 0)) || // after tues 18:00, before wed 8:00
+            date.after(new Date(2019, 4, 8,  18, 0)) && date.before(new Date(2019, 4, 9,  8, 0)) || // after wed 18:00, before thurs 8:00
+            date.after(new Date(2019, 4, 9,  18, 0)) && date.before(new Date(2019, 4, 10, 8, 0)) || // after thurs 18:00, before fri 8:00
+            date.after(new Date(2019, 4, 10, 18, 0)) && date.before(new Date(2019, 4, 13, 8, 0)) || // after fri 18:00, before mon 8:00
+            date.after(new Date(2019, 4, 13, 18, 0)) && date.before(new Date(2019, 4, 14, 8, 0)) || // after mon 18:00, before tues 8:00
+            date.after(new Date(2019, 4, 14, 18, 0)) && date.before(new Date(2019, 4, 15, 8, 0)) || // after tues 18:00, before wed 8:00
+            date.after(new Date(2019, 4, 15, 18, 0)) && date.before(new Date(2019, 4, 16, 8, 0)) || // after wed 18:00, before thurs 8:00
+            date.after(new Date(2019, 4, 16, 18, 0)) && date.before(new Date(2019, 4, 17, 8, 0)) || // after thurs 18:00, before fri 8:00
+            date.after(new Date(2019, 4, 17, 18, 0)) && date.before(new Date(2019, 4, 18, 8, 0))    // after fri 18:00, before mon 8:00
 
           ! afterHours
 
