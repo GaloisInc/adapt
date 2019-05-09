@@ -155,9 +155,9 @@ case class PpmDefinition[DataShape](
     }
     else false
 
-  type AlarmBuffer = ListBuffer[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]
+  type AlarmBuffer = List[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]
   var alarmQueue: AtomicReference[AlarmBuffer]
-    = new AtomicReference(new ListBuffer)
+    = new AtomicReference(List())
 
 
   // ConcurrentSkipListMap because is concurrent _and_ sorted
@@ -167,9 +167,15 @@ case class PpmDefinition[DataShape](
     val noveltyLPs =
       Try({
         val noveltyLPsBuilder = collection.mutable.Map.empty[Float, Int]
+        var somethingWorked = false
         for (line <- scala.io.Source.fromFile(inputAlarmFilePath).getLines) {
-          val (_, (_, _, alarm, _, _)) = line.parseJson.convertTo[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]
-          noveltyLPsBuilder += alarm.last.localProb -> (noveltyLPsBuilder.getOrElse(alarm.last.localProb, 0) + 1)
+          Try {
+            val (_, (_, _, alarm, _, _)) = line.parseJson.convertTo[(List[ExtractedValue], (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int]))]
+            noveltyLPsBuilder += alarm.last.localProb -> (noveltyLPsBuilder.getOrElse(alarm.last.localProb, 0) + 1)
+          } match {
+            case Success(_) => somethingWorked = true
+            case Failure(f) => if (! somethingWorked) { throw f }
+          }
         }
         noveltyLPsBuilder.toMap
       }).orElse(Try({
@@ -244,11 +250,11 @@ case class PpmDefinition[DataShape](
   def putAlarm(extractedValues: List[ExtractedValue], info: (Set[Long], Long, Alarm, Set[NamespacedUuidDetails], Map[String, Int])): Unit = {
     val sizeEstimate = alarmQueue.updateAndGet(new UnaryOperator[AlarmBuffer] {
       def apply(buf: AlarmBuffer): AlarmBuffer = {
-        buf += (extractedValues -> info)
+        (extractedValues -> info) :: buf
       }
     }).length
 
-    if (sizeEstimate > 50) {
+    if (sizeEstimate > 100) {
       flushAlarms()
     }
   }
@@ -262,14 +268,10 @@ case class PpmDefinition[DataShape](
 
   // Flush all alarms in the buffer to the file
   def flushAlarms(): Unit = {
-    alarmQueue.updateAndGet(new UnaryOperator[AlarmBuffer] {
-      def apply(buf: AlarmBuffer): AlarmBuffer = {
-        buf.foreach { a => alarmPw.println(a.toJson.compactPrint )}
-        alarmPw.flush()
-        buf.clear()
-        buf
-      }
-    })
+    val prevBuffer = alarmQueue.getAndSet(List.empty)
+
+    prevBuffer.foreach { a => alarmPw.println(a.toJson.compactPrint )} /// already synchronized around `alarmPw`
+    alarmPw.flush()
   }
 
 //  def recordNovelty(hostname: String, treeName: String, novelty: Novelty[_]): Unit = Try {

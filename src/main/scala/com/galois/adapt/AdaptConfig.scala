@@ -221,7 +221,7 @@ object AdaptConfig extends Utils {
           for {
             // prevent extra fields
             _ <- cur.asMap.right.flatMap { kvs =>
-              kvs.keySet.diff(Set("type", "paths", "namespace")).toList match {
+              kvs.keySet.diff(Set("type", "paths", "namespace", "range")).toList match {
                 case Nil => Right(())
                 case key :: _ => Left(ConfigReaderFailures(ConvertFailure(UnknownKey(key), cur)))
               }
@@ -238,7 +238,7 @@ object AdaptConfig extends Utils {
           for {
             // prevent extra fields
             _ <- cur.asMap.right.flatMap { kvs =>
-              kvs.keySet.diff(Set("type", "topicname", "namespace")).toList match {
+              kvs.keySet.diff(Set("type", "topicname", "namespace", "range")).toList match {
                 case Nil => Right(())
                 case key :: _ => Left(ConfigReaderFailures(ConvertFailure(UnknownKey(key), cur)))
               }
