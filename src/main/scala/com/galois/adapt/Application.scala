@@ -279,7 +279,7 @@ object Application extends App {
   val processNamesToDrop = Set("/system/bin/app_process64", "/usr/bin/pulseaudio", "fuzzyflakes")
 
 
-  val crossHostDisabled = collection.mutable.Set[HostName]("trace-3", "clearscope-1")
+  val crossHostEnabled = collection.mutable.Set[HostName]() //"trace-3", "clearscope-1")
 
   val sqidFile = Some(StandingQueryId(sqidHostPrefix + "_standing-fetch_ESOFile-accumulator")(
     resultHandler = Some({

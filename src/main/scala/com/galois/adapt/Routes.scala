@@ -161,7 +161,7 @@ object Routes {
           path("getCrossHostNetflowStatus") {
             parameters('hostName.as[AdaptConfig.HostName]) { hostName: AdaptConfig.HostName =>
               complete {
-                s"$hostName is ${if (Application.crossHostDisabled.contains(hostName)) "disabled" else "enabled"}"
+                s"$hostName is ${if (Application.crossHostEnabled.contains(hostName)) "disabled" else "enabled"}"
               }
             }
           } ~
@@ -378,11 +378,11 @@ object Routes {
           pathPrefix("setCrossHostNetflowStatus") {
             formField('hostName.as[String], 'enabled.as[Boolean]) { (hostName: HostName, enabled: Boolean) =>
               complete {
-                if (enabled) {
-                  Application.crossHostDisabled -= hostName
+                if ( ! enabled) {
+                  Application.crossHostEnabled -= hostName
                   StatusCodes.Created -> s"Cross host trees enabled for '$hostName'"
                 } else {
-                  Application.crossHostDisabled += hostName
+                  Application.crossHostEnabled += hostName
                   StatusCodes.Created -> s"Cross host trees disabled for '$hostName'"
                 }
               }
