@@ -1,6 +1,6 @@
 package com.galois.adapt.adm
 
-import java.util.UUID
+import java.util.{Date, UUID}
 
 import akka.NotUsed
 import akka.event.LoggingAdapter
@@ -10,6 +10,7 @@ import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.adm.ERStreamComponents.{EventResolution, _}
 import com.galois.adapt.adm.UuidRemapper.{JustTime, UuidRemapperInfo}
 import com.galois.adapt.cdm20._
+
 import scala.collection.mutable.{Map => MutableMap}
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -104,6 +105,15 @@ object EntityResolution {
         case _ => true
       }
       .via(annotateTime(maxTimeJump))                                         // Annotate with a monotonic time
+      .filter {                                                               // Filter out events outside of business hours
+        case timed @ (_, Timed(t, cdm: Event)) =>
+          val date = new Date(t.nanos / (1000 * 1000))
+          val hours = date.getHours
+          val day = date.getDay
+          hours > 8 && hours < 18 && day != 0 && day != 6  // in working hours (8am to 6pm) not sunday or saturday
+
+        case _ => true
+      }
       .buffer(2000, OverflowStrategy.backpressure)
       .concat(Source.fromIterator(() => Iterator(maxTimeMarker)))             // Expire everything in UuidRemapper
       .via(erWithoutRemaps(eventExpiryTime, maxEventsMerged, host)) // Entity resolution without remaps
