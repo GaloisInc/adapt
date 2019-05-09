@@ -127,7 +127,7 @@ object Application extends App {
         |""".stripMargin
 
   var edgeSetLimit = 1000
-  settings.newSetBuilder = new {
+  settings.edgeCollectionsSetBuilder = new {
     def empty[A]: mutable.Set[A] = new mutable.Set[A] {
       
       // Cache of least recently added edges
