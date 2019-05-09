@@ -77,7 +77,7 @@ def convertQueryRes2Dict(json,obj_name,att_names,count_name):
 def extractQueryRes(spec,db,provider):
 	# plug in the hole with provider name if available
 	if provider != None:
-		query = spec['query'] % ('n.provider = "' + spec['provider'] + '"')
+		query = spec['query'] % ('n.provider = "' + provider + '"')
 	else:
 		query = spec['query'] % ('TRUE')
 	# run the query
