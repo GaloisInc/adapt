@@ -126,22 +126,27 @@ object Application extends App {
         |host-shard-ranges = ${hostConfigSrcs.mkString("[\n",",","]\n")}
         |""".stripMargin
 
-  var edgeSetLimit = 1000
-  settings.edgeCollectionsSetBuilder = new {
-    def empty[A]: mutable.Set[A] = new mutable.Set[A] {
-      
-      // Cache of least recently added edges
-      val lra = new java.util.LinkedHashMap[A, None.type]() {
-        override def removeEldestEntry(e: java.util.Map.Entry[A, None.type]): Boolean
+  var edgeSetLimit = 10000
+  settings = new {
+    def edgeCollectionsSetBuilder(edgeType: Symbol) =
+      if (edgeType.name.contains("∫")) {
+        mutable.Set
+      } else new {
+      def empty[A]: mutable.Set[A] = new mutable.Set[A] {
+
+        // Cache of least recently added edges
+        val lra = new java.util.LinkedHashMap[A, None.type]() {
+          override def removeEldestEntry(e: java.util.Map.Entry[A, None.type]): Boolean
           = this.size > edgeSetLimit
+        }
+
+        import collection.JavaConverters._
+
+        override def +=(e: A): this.type = { lra.put(e, None); this }
+        override def -=(e: A): this.type = { lra.remove(e); this }
+        override def contains(e: A): Boolean = lra.containsKey(e)
+        override def iterator: Iterator[A] = lra.keySet().iterator.asScala
       }
-
-      import collection.JavaConverters._
-
-      override def +=(e: A): this.type = { lra.put(e, None); this }
-      override def -=(e: A): this.type = { lra.remove(e); this }
-      override def contains(e: A): Boolean = lra.containsKey(e)
-      override def iterator: Iterator[A] = lra.keySet().iterator.asScala
     }
   }
 
