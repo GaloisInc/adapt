@@ -153,15 +153,11 @@ object Application extends App {
   implicit val graph = GraphService.clustered(
     config = ConfigFactory.parseString(clusterConfigSrc),
     persistor = as =>
-      new LMDBSnapshotPersistor(
-        path = "data/persistence-lmdb.db",
-        mapSizeBytes = {
-          val size: Long = runtimeConfig.lmdbgigabytes * 1024L * 1024L * 1024L
-          println("LMDB size: " + NumberFormat.getInstance().format(size))
-          size
-        }
+      new TimelessMapDBMultimap(
+        "data/persistence-multimap.db",
+        shardCount = 14, shouldUseWAL = false
       )(as) {
-        val lmdb: PersistenceAgent = this
+        val parent: PersistenceAgent = this
 
         override def forNode(node: NodeActor[_]): InNodePersistor = new InNodePersistor {
           implicit val ec = node.context.system.dispatchers.lookup("quine.actor.persistor-blocking-dispatcher")
@@ -171,15 +167,15 @@ object Application extends App {
           def persistSnapshot(atTime: Long, state: Array[Byte]): Future[Unit] = if (nodeReference.properties.contains('eventType)) {
             Future.successful(())
           } else {
-            lmdb.persistSnapshot(node.qid, atTime, state)
+            parent.persistSnapshot(node.qid, atTime, state)
           }
 
-          def enumerateAllNodeIds: Future[Set[QuineId]] = lmdb.enumerateAllNodeIds
-          def getJournal(startingAt: Option[Milliseconds] = None, inReverseChronologicalOrder: Boolean = true) = lmdb.getJournal(node.qid, startingAt, inReverseChronologicalOrder)
-          def persistEvent(event: NodeChangeEvent) = lmdb.persistEvent(node.qid, event)
-          val persistorParent = lmdb  // Use with caution!
-          def getLatestSnapshot(upToTime: Option[Long]): Future[Option[(Long, Array[Byte])]] = lmdb.getLatestSnapshot(node.qid, upToTime)
-          val shouldSaveSnapshots: Boolean = lmdb.shouldSaveSnapshots
+          def enumerateAllNodeIds: Future[Set[QuineId]] = parent.enumerateAllNodeIds
+          def getJournal(startingAt: Option[Milliseconds] = None, inReverseChronologicalOrder: Boolean = true) = parent.getJournal(node.qid, startingAt, inReverseChronologicalOrder)
+          def persistEvent(event: NodeChangeEvent) = parent.persistEvent(node.qid, event)
+          val persistorParent = parent  // Use with caution!
+          def getLatestSnapshot(upToTime: Option[Long]): Future[Option[(Long, Array[Byte])]] = parent.getLatestSnapshot(node.qid, upToTime)
+          val shouldSaveSnapshots: Boolean = parent.shouldSaveSnapshots
         }
       },
 //      TimelessMapDBMultimap("data/persistence-quine-lmdb.db", shardCount = 14, shouldUseWAL = false)(as),
