@@ -18,9 +18,12 @@ e5: extract klmeansfastbatchdescribe krimpbatchdescribe rarebatchdescribe fcabat
 
 basecontexts = ProcessEvent ProcessExec ProcessParent ProcessNetflow
 
+jsoncontexts = ProcessEvent ProcessExec ProcessParent ProcessChild ProcessNetflow
+
 contexts = $(basecontexts) ProcessUniform ProcessMax ProcessCombined  ProcessGeometric ProcessAverage ProcessMin ProcessMedian
 
 extract: $(foreach context,$(basecontexts), contexts/$(context).csv)
+json: $(foreach context,$(jsoncontexts), contexts/$(context).json)
 dat: $(foreach context,$(contexts), contexts/$(context).dat)
 mat: $(foreach context,$(contexts), contexts/$(context).mat)
 
@@ -60,9 +63,12 @@ fcabatchdescribe: results/ProcessGeometric.fca.batch.described.csv
 contexts/ProcessTimes.csv:
 	python3 times.py --url $(URL) --port $(PORT) --database $(DATABASE) $(PROVIDER) -o contexts/ProcessTimes.csv
 
-contexts/%.csv: specifications/%.json contexts/ProcessTimes.csv
-	python3 extract.py --url $(URL) --port $(PORT) --database $(DATABASE) $(PROVIDER) -i specifications/$*.json -o contexts/$*Raw.csv
+contexts/%.csv: specifications/%.json contexts/%.json contexts/ProcessTimes.csv
+	python3 extract.py --database json -j contexts/$*.json -i specifications/$*.json -o contexts/$*Raw.csv
 	python3 timesort.py -i contexts/$*Raw.csv -t contexts/ProcessTimes.csv -o contexts/$*.csv
+
+contexts/%.json: specifications/%.json
+	python3 extract.py -f json --url $(URL) --port $(PORT) --database $(DATABASE) $(PROVIDER) -i specifications/$*.json -o contexts/$*.json
 
 contexts/%.dat: contexts/%.csv
 	python3 convert.py -i contexts/$*.csv -o contexts/$*.dat
@@ -143,19 +149,19 @@ results/%.rasp.stream.scored.csv: contexts/%.csv
 results/%.klmeans.stream.scored.csv: contexts/%.csv
 	python3 klmeans.py -m stream -i contexts/$*.csv -o results/$*.klmeans.stream.scored.csv
 
-results/ProcessCombined.%.described.csv: results/ProcessCombined.%.scored.csv
-	python3 describe.py --url $(URL) --port $(PORT) --database $(DATABASE) -i results/ProcessCombined.$*.scored.csv -o results/ProcessCombined.$*.described.csv -r
+results/ProcessCombined.%.described.csv: json results/ProcessCombined.%.scored.csv
+	python3 describe.py --database json -k 20 -i results/ProcessCombined.$*.scored.csv -o results/ProcessCombined.$*.described.csv -r
 
 
-results/ProcessGeometric.%.described.csv: results/ProcessGeometric.%.scored.csv
-	python3 describe.py --url $(URL) --port $(PORT) --database $(DATABASE) -i results/ProcessGeometric.$*.scored.csv -o results/ProcessGeometric.$*.described.csv
+results/ProcessGeometric.%.described.csv: json results/ProcessGeometric.%.scored.csv
+	python3 describe.py --database json -k 20 -i results/ProcessGeometric.$*.scored.csv -o results/ProcessGeometric.$*.described.csv
 
-results/ProcessMax.%.described.csv: results/ProcessMax.%.scored.csv
-	python3 describe.py --url $(URL) --port $(PORT) --database $(DATABASE) -i results/ProcessMax.$*.scored.csv -o results/ProcessMax.$*.described.csv -r
+results/ProcessMax.%.described.csv: json results/ProcessMax.%.scored.csv
+	python3 describe.py --database json -k 20 -i results/ProcessMax.$*.scored.csv -o results/ProcessMax.$*.described.csv -r
 
 
 clean:
 	rm -rf test/*ranked.csv test/*scored.csv results/*.ranked.csv results/*.scored.csv results/*.described.csv
 
 spotless: clean
-	rm -rf contexts/*.csv contexts/*.dat contexts/*.mat contexts/*.rcf
+	rm -rf contexts/*.csv contexts/*.dat contexts/*.mat contexts/*.rcf contexts/*.json

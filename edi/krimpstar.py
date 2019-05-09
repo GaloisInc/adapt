@@ -28,14 +28,14 @@ parser.add_argument('--epsilon', '-e', help='improvement threshold',default=0.01
 # plus frequency count
 def codeSize1(cte,numattrs,numtrans):
 	size = 0
-	size = size + np.log2(numtrans)
+	size = size + np.log2(numtrans+1)
 	if len(cte['attributes']) > 1: 
 		 size = size + numattrs
 	return size
 # a more sophisticated encoding for sparse code tables
 def codeSize2(cte,numattrs,numtrans):
 	size = 0
-	size = size + np.log2(numtrans)
+	size = size + np.log2(numtrans+1)
 	for att in cte['attributes']:
 	        if len(cte['attributes']) > 1: 
 	                 size = size + np.log2(numattrs)
@@ -89,7 +89,7 @@ def reassignCategories(data,models,k):
         return d
 
 def getClassScores(d):
-	freqs = {i: len(d[i]) for i in d.keys()}
+	freqs = {i: len(d[i])+1 for i in d.keys()}
 	s = sum(freqs.values())
 	class_scores = {i : -np.log2(freqs[i]/s) for i in freqs.keys()}
 	return class_scores
@@ -163,15 +163,16 @@ if __name__ == '__main__':
                         writeSplits(d,ctxt,filestem)
                         scoreSplitsKrimp(d,filestem)
                         models = getModels(filestem,k)
-                        d = reassignCategories(data,models,k)
                         (sc,class_scores) = mergeSplits(d,filestem)
                         total = totalCost(sc,class_scores)
                         print('%f' % total)
                         if lastcost != None and total > lastcost * (1-args.epsilon):
                                 break
                         lastcost = total
+                        d = reassignCategories(data,models,k)
                         
-                modelCost = sum([codeTableSize(model,m,n) for model in models])
+                modelCost = sum([codeTableSize(model,m,len(d[cl])) 
+                                 for (model,cl) in zip(models,d.keys())])
                 print('Model cost: %f' % modelCost)
                 total_cost = modelCost + total
                 print('Total cost: %f' % total_cost)

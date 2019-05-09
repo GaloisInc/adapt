@@ -28,7 +28,7 @@ if __name__ == '__main__':
     pc = db.getQuery("MATCH (c:AdmSubject)-->(p:AdmSubject) RETURN  c.uuid as child, p.uuid as parent", endpoint="cypher")
 
     with open(args.input) as infile:
-        scores = check.Scores(csv.reader(infile),True)
+        scores = check.Scores(csv.reader(infile))
 
     scoreDict = {}
     sumScores = 0.0

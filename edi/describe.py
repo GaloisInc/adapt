@@ -19,10 +19,14 @@ parser.add_argument('--url','-u',
 					type = str,
 					default = 'http://localhost')
 parser.add_argument('--database','-d',
-					choices = ['neo4j','adapt'],
-					help = 'neo4j or adapt',
+					choices = ['neo4j','adapt','json'],
+					help = 'neo4j or adapt or json',
 					default = 'adapt')
 
+parser.add_argument('--json_path',
+                    '-j',
+                    help='path to JSON context files',
+					default='contexts/')
 parser.add_argument('--input',
                     '-i',
                     help='input score file')
@@ -48,8 +52,19 @@ if __name__ == '__main__':
 	args = parser.parse_args()
 	if args.database == 'adapt':
 		database = db.AdaptDatabase(url=args.url,port=args.port)
+		getSummary = lambda x: describe.getSummary(database,x)
 	elif args.database == 'neo4j':
 		database = db.Neo4jDatabase(url=args.url,port=args.port)
+		getSummary = lambda x: describe.getSummary(database,x)
+	elif args.database == 'json':
+		# todo: specify these externally
+		summaries = describe.loadSummaries('%s/ProcessEvent.json' % args.json_path,
+										   '%s/ProcessExec.json' % args.json_path,
+										   '%s/ProcessParent.json' % args.json_path,
+										   '%s/ProcessChild.json' % args.json_path,
+										   '%s/ProcessNetflow.json' % args.json_path)
+		getSummary = lambda x: describe.getSummaryFromFiles(summaries,x)
+
 	if args.topk != None and args.input != None:
 		scores = check.getScores(args.input,reverse=args.reverse)
 		with open(args.output, 'w') as outfile:
@@ -59,7 +74,7 @@ if __name__ == '__main__':
 				outfile.write('uuid: %s, score: %f\n' % (scores.data[i][0],scores.data[i][1]))
 				outfile.write('======================================================================\n')
 
-				describe.writeSummary(outfile,describe.getSummary(database,scores.data[i][0]))
+				describe.writeSummary(outfile,getSummary(scores.data[i][0]))
 
 	elif args.groundtruth != None:
 		gt = groundtruth.getGroundTruth(args.groundtruth,args.ty)
@@ -69,4 +84,4 @@ if __name__ == '__main__':
 				outfile.write('======================================================================\n')
 				outfile.write('uuid: %s\n' % (scores.data[i][0],scores.data[i][1]))
 				outfile.write('======================================================================\n')
-				describe.writeSummary(outfile,describe.getSummary(database,x))
+				describe.writeSummary(outfile,getSummary(x))

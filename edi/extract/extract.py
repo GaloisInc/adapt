@@ -56,7 +56,12 @@ def parseQuerySpec(spec):
 	timeout = 600
 	if 'timeout' in spec.keys():
 		timeout = int(spec['timeout'])
-	return (query,obj_name,att_names,count_name,endpoint,timeout)
+	return {'query':query,
+			'obj_name':obj_name,
+			'att_names':att_names,
+			'count_name':count_name,
+			'endpoint':endpoint,
+			'timeout':timeout}
 
 def convertQueryRes2Dict(json,obj_name,att_names,count_name):
 	dct = collections.defaultdict(list)
@@ -69,20 +74,45 @@ def convertQueryRes2Dict(json,obj_name,att_names,count_name):
 		sys.exit('Expected list of attribute names in specification')
 	return dct
 
-def convert2InputCSV(spec_file,output_file,db,provider,counts):
-	spec = loadSpec(spec_file)
-	# extract the query from specification file and get the results
-	(query,obj_name,att_names,count_name,endpoint,timeout) = parseQuerySpec(spec)
+def extractQueryRes(spec,db,provider):
 	# plug in the hole with provider name if available
 	if provider != None:
-		query = query % ('n.provider = "' + provider + '"')
+		query = spec['query'] % ('n.provider = "' + spec['provider'] + '"')
 	else:
-		query = query % ('TRUE')
+		query = spec['query'] % ('TRUE')
 	# run the query
-	query_res = db.getQuery(query,endpoint=endpoint,timeout=timeout)
+	return db.getQuery(query,endpoint=spec['endpoint'],timeout=spec['timeout'])
 	# convert query to a dictionary grouping by object ids
-	dict = convertQueryRes2Dict(query_res,obj_name,att_names,count_name)
+
+def convert2CSV(spec_file,output_file,db,provider):
+	spec = loadSpec(spec_file)
+	# extract the query from specification file and get the results
+	spec = parseQuerySpec(spec)
+	query_res = extractQueryRes(spec,db,provider)
+	d = convertQueryRes2Dict(query_res,
+								spec['obj_name'],spec['att_names'],spec['count_name'])
 	# write out the dictionary to a context csv file
-	convertDict2CSVFile(dict,output_file)
+	convertDict2CSVFile(d,output_file)
 	print('Extraction successful. File '+output_file+' created.')
 
+def convert2JSON(spec_file,output_file,db,provider):
+	spec = loadSpec(spec_file)
+	# extract the query from specification file and get the results
+	spec = parseQuerySpec(spec)
+	query_res = extractQueryRes(spec,db,provider)
+	# write out the dictionary to a json file
+	with open(output_file,'w') as f:
+		json.dump(query_res,f)
+	print('Extraction successful. File '+output_file+' created.')
+
+def convertJSON2CSV(spec_file,output_file,json_file):
+	spec = loadSpec(spec_file)
+	# extract the query from specification file and get the results
+	spec = parseQuerySpec(spec)
+	with open(json_file,'r') as f:
+		query_res = json.load(f)
+	d = convertQueryRes2Dict(query_res,
+								spec['obj_name'],spec['att_names'],spec['count_name'])
+	# write out the dictionary to a context csv file
+	convertDict2CSVFile(d,output_file)
+	print('Extraction successful. File '+output_file+' created.')
