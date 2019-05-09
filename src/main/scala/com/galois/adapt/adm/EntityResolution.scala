@@ -1,6 +1,6 @@
 package com.galois.adapt.adm
 
-import java.util.UUID
+import java.util.{Date, UUID}
 
 import akka.NotUsed
 import akka.event.LoggingAdapter
@@ -10,6 +10,7 @@ import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.adm.ERStreamComponents.{EventResolution, _}
 import com.galois.adapt.adm.UuidRemapper.{JustTime, UuidRemapperInfo}
 import com.galois.adapt.cdm20._
+
 import scala.collection.mutable.{Map => MutableMap}
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -88,6 +89,24 @@ object EntityResolution {
       readTypes.union(writeTypes).union(execTypes).union(deleteTypes)
     }
 
+    val tue7Afternoon  = new Date(2019, 4, 6,  18, 0)
+    val wed8Afternoon  = new Date(2019, 4, 7,  18, 0)
+    val thu9Afternoon  = new Date(2019, 4, 8,  18, 0)
+    val fri10Afternoon = new Date(2019, 4, 9,  18, 0)
+    val mon13Afternoon = new Date(2019, 4, 12, 18, 0)
+    val tue14Afternoon = new Date(2019, 4, 13, 18, 0)
+    val wed15Afternoon = new Date(2019, 4, 14, 18, 0)
+    val thu16Afternoon = new Date(2019, 4, 15, 18, 0)
+
+    val wed8Morning  = new Date(2019, 4, 7,  8, 0)
+    val thu9Morning  = new Date(2019, 4, 8,  8, 0)
+    val fri10Morning = new Date(2019, 4, 9,  8, 0)
+    val mon13Morning = new Date(2019, 4, 12, 8, 0)
+    val tue14Morning = new Date(2019, 4, 13, 8, 0)
+    val wed15Morning = new Date(2019, 4, 14, 8, 0)
+    val thu16Morning = new Date(2019, 4, 15, 8, 0)
+    val fri17Morning = new Date(2019, 4, 16, 8, 0)
+
     Flow[(String, CurrentCdm)]
       .filter {
         case (_, cdm: Host) => cdm.uuid != badUuid
@@ -104,6 +123,24 @@ object EntityResolution {
         case _ => true
       }
       .via(annotateTime(maxTimeJump))                                         // Annotate with a monotonic time
+      .filter {                                                               // Filter out events outside of business hours
+        case timed @ (_, Timed(t, cdm: Event)) =>
+          val date = new Date(t.nanos / (1000 * 1000))
+
+          val afterHours =
+            date.after(tue7Afternoon)  && date.before(wed8Morning)  || // after tues 18:00, before wed 8:00
+            date.after(wed8Afternoon)  && date.before(thu9Morning)  || // after wed 18:00, before thurs 8:00
+            date.after(thu9Afternoon)  && date.before(fri10Morning) || // after thurs 18:00, before fri 8:00
+            date.after(fri10Afternoon) && date.before(mon13Morning) || // after fri 18:00, before mon 8:00
+            date.after(mon13Afternoon) && date.before(tue14Morning) || // after mon 18:00, before tues 8:00
+            date.after(tue14Afternoon) && date.before(wed15Morning) || // after tues 18:00, before wed 8:00
+            date.after(wed15Afternoon) && date.before(thu16Morning) || // after wed 18:00, before thurs 8:00
+            date.after(thu16Afternoon) && date.before(fri17Morning)    // after thurs 18:00, before fri 8:00
+
+          ! afterHours
+
+        case _ => true
+      }
       .buffer(2000, OverflowStrategy.backpressure)
       .concat(Source.fromIterator(() => Iterator(maxTimeMarker)))             // Expire everything in UuidRemapper
       .via(erWithoutRemaps(eventExpiryTime, maxEventsMerged, host)) // Entity resolution without remaps

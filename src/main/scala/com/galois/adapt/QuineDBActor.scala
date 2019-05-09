@@ -347,7 +347,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         anAdm.create(Some(anAdm.uuid)).map { x =>
 //          graphService.standingFetchWithBranch[CommunicatingNetflows](anAdm.uuid, Application.communicatingNetflowsBranch, Application.sqidCommunicatingNetflows)(wrongFunc)
 
-          StandingFetches.proactiveAddReciprocalEdge(anAdm)  // Choosing not to wait on/sequence the future returned here.
+//          StandingFetches.proactiveAddReciprocalEdge(anAdm)  // Choosing not to wait on/sequence the future returned here.
           x
         }
 
