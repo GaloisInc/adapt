@@ -164,7 +164,21 @@ object Routes {
                 s"$hostName is ${if (Application.crossHostDisabled.contains(hostName)) "disabled" else "enabled"}"
               }
             }
+          } ~
+          path("setEdgeSetLimit") {
+            parameters('limit.as[Int]) { limit: Int =>
+              complete {
+                Application.edgeSetLimit = limit
+                s"Updated edge set size limit to ${Application.edgeSetLimit}"
+              }
+            }
+          } ~
+          path("getEdgeSetLimit") {
+            complete {
+              s"Edge set size limit is set to ${Application.edgeSetLimit}"
+            }
           }
+
       //    pathPrefix("ppm") {
       //      path("listTrees") {
       //        complete(

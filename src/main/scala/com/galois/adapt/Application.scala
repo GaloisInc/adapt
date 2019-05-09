@@ -2,6 +2,8 @@ package com.galois.adapt
 
 import java.io._
 import java.text.NumberFormat
+import java.util
+
 import akka.actor.{ActorRef, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.RouteResult._
@@ -22,6 +24,7 @@ import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.NoveltyDetection.{Event => _, _}
 import com.galois.adapt.cdm20._
+
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -122,6 +125,25 @@ object Application extends App {
         |port = 2551
         |host-shard-ranges = ${hostConfigSrcs.mkString("[\n",",","]\n")}
         |""".stripMargin
+
+  var edgeSetLimit = 1000
+  settings.newSetBuilder = new {
+    def empty[A]: mutable.Set[A] = new mutable.Set[A] {
+      
+      // Cache of least recently added edges
+      val lra = new java.util.LinkedHashMap[A, None.type]() {
+        override def removeEldestEntry(e: java.util.Map.Entry[A, None.type]): Boolean
+          = this.size > edgeSetLimit
+      }
+
+      import collection.JavaConverters._
+
+      override def +=(e: A): this.type = { lra.put(e, None); this }
+      override def -=(e: A): this.type = { lra.remove(e); this }
+      override def contains(e: A): Boolean = lra.containsKey(e)
+      override def iterator: Iterator[A] = lra.keySet().iterator.asScala
+    }
+  }
 
   implicit val graph = GraphService.clustered(
     config = ConfigFactory.parseString(clusterConfigSrc),
