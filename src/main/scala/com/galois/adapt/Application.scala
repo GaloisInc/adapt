@@ -155,7 +155,7 @@ object Application extends App {
     persistor = as =>
       new TimelessMapDBMultimap(
         "data/persistence-multimap.db",
-        shardCount = 14, shouldUseWAL = false
+        shouldUseWAL = false
       )(as) {
         val parent: PersistenceAgent = this
 
@@ -178,7 +178,7 @@ object Application extends App {
           val shouldSaveSnapshots: Boolean = parent.shouldSaveSnapshots
         }
       },
-//      TimelessMapDBMultimap("data/persistence-quine-lmdb.db", shardCount = 14, shouldUseWAL = false)(as),
+//      TimelessMapDBMultimap("data/persistence-lmdb.db", shardCount = 14, shouldUseWAL = false)(as),
 //    MapDBMultimap()(as),
 //    EmptyPersistor()(as),
     idProvider = AdmUuidProvider,
