@@ -4,7 +4,7 @@ import java.io._
 import java.text.NumberFormat
 import java.util
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.RouteResult._
 import akka.pattern.ask
@@ -31,7 +31,7 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.language.postfixOps
 import scala.util.{Failure, Random, Success, Try}
 import sys.process._
-import com.rrwright.quine.runtime._
+import com.rrwright.quine.runtime.{Milliseconds, _}
 import com.rrwright.quine.language._
 //import com.rrwright.quine.language.JavaObjectSerializationScheme._
 import com.rrwright.quine.language.BoopickleScheme._
@@ -153,15 +153,32 @@ object Application extends App {
   implicit val graph = GraphService.clustered(
     config = ConfigFactory.parseString(clusterConfigSrc),
     persistor = as =>
-      LMDBSnapshotPersistor(
-        "data/persistence-lmdb.db",
-        mapSizeBytes = {
-          val size: Long = runtimeConfig.lmdbgigabytes * 1024L * 1024L * 1024L
-          println("LMDB size: " + NumberFormat.getInstance().format(size))
-          size
+      new TimelessMapDBMultimap(
+        "data/persistence-multimap.db",
+        shouldUseWAL = false
+      )(as) {
+        val parent: PersistenceAgent = this
+
+        override def forNode(node: NodeActor[_]): InNodePersistor = new InNodePersistor {
+          implicit val ec = node.context.system.dispatchers.lookup("quine.actor.persistor-blocking-dispatcher")
+
+          // THIS IS THE CRUCIAL BIT:
+          private val nodeReference = node
+          def persistSnapshot(atTime: Long, state: Array[Byte]): Future[Unit] = if (nodeReference.properties.contains('eventType)) {
+            Future.successful(())
+          } else {
+            parent.persistSnapshot(node.qid, atTime, state)
+          }
+
+          def enumerateAllNodeIds: Future[Set[QuineId]] = parent.enumerateAllNodeIds
+          def getJournal(startingAt: Option[Milliseconds] = None, inReverseChronologicalOrder: Boolean = true) = parent.getJournal(node.qid, startingAt, inReverseChronologicalOrder)
+          def persistEvent(event: NodeChangeEvent) = parent.persistEvent(node.qid, event)
+          val persistorParent = parent  // Use with caution!
+          def getLatestSnapshot(upToTime: Option[Long]): Future[Option[(Long, Array[Byte])]] = parent.getLatestSnapshot(node.qid, upToTime)
+          val shouldSaveSnapshots: Boolean = parent.shouldSaveSnapshots
         }
-      )(as),
-//      TimelessMapDBMultimap("data/persistence-multimap_by_event.db", shardCount = 14, shouldUseWAL = false)(as),
+      },
+//      TimelessMapDBMultimap("data/persistence-lmdb.db", shardCount = 14, shouldUseWAL = false)(as),
 //    MapDBMultimap()(as),
 //    EmptyPersistor()(as),
     idProvider = AdmUuidProvider,
