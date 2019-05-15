@@ -20,34 +20,34 @@ lazy val adapt = (project in file(".")).settings(
   libraryDependencies ++= Seq(
     "org.scala-lang" % "scala-library" % scalaV,
 //    "com.typesafe" % "config" % "1.3.1",
-    "com.github.pureconfig" %% "pureconfig" % "0.9.2",
-    "org.scalatest" %% "scalatest" % "3.0.0",
+//    "com.github.pureconfig" %% "pureconfig" % "0.9.2",
+//    "org.scalatest" %% "scalatest" % "3.0.0",
     "org.apache.avro" % "avro" % "1.8.2",
     "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0",
 
     "com.typesafe.akka" %% "akka-actor"           % akkaV,
     "com.typesafe.akka" %% "akka-stream"          % akkaV,
-    "com.typesafe.akka" %% "akka-cluster"         % akkaV,
-    "com.typesafe.akka" %% "akka-http"            % akkaHttpV,
-    "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV,
+//    "com.typesafe.akka" %% "akka-cluster"         % akkaV,
+//    "com.typesafe.akka" %% "akka-http"            % akkaHttpV,
+//    "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV,
 
-    "com.rrwright" %% "quine"           % quineV,
-    "com.rrwright" %% "quine-boopickle" % quineV,
-    "com.rrwright" %% "quine-gremlin"   % quineV,
+//    "com.rrwright" %% "quine"           % quineV,
+//    "com.rrwright" %% "quine-boopickle" % quineV,
+//    "com.rrwright" %% "quine-gremlin"   % quineV,
 
-    "org.lmdbjava" % "lmdbjava" % "0.6.3",
+//    "org.lmdbjava" % "lmdbjava" % "0.6.3",
 
-    "com.typesafe.akka" %% "akka-stream-kafka" % "0.22",  // "1.0.1",
-    "com.github.alexandrnikitin" %% "bloom-filter" % "0.10.1",
-    "org.mapdb" % "mapdb" % "3.0.7",
-    "com.github.blemale" %% "scaffeine" % "2.6.0",
-    "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.3.3",
+    "com.typesafe.akka" %% "akka-stream-kafka" % "0.22"  // "1.0.1",
+//    "com.github.alexandrnikitin" %% "bloom-filter" % "0.10.1",
+//    "org.mapdb" % "mapdb" % "3.0.7",
+//    "com.github.blemale" %% "scaffeine" % "2.6.0",
+//    "org.apache.tinkerpop" % "tinkergraph-gremlin" % "3.3.3",
 
 //  , "com.bbn" % "tc-avro" % "1.0-SNAPSHOT"
-    "com.univocity" % "univocity-parsers" % "2.6.1",
-    "com.github.felfert" % "cidrutils" % "1.1",  // For testing IP address ranges in the policy enforcement demo.
+//    "com.univocity" % "univocity-parsers" % "2.6.1",
+//    "com.github.felfert" % "cidrutils" % "1.1",  // For testing IP address ranges in the policy enforcement demo.
 
-    "com.lihaoyi" % "ammonite-sshd" % "1.6.3" cross CrossVersion.full
+//    "com.lihaoyi" % "ammonite-sshd" % "1.6.3" cross CrossVersion.full
   ),
 
   offline := true,
