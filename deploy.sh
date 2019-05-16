@@ -6,7 +6,7 @@ PROG_NAME=$0
 usage ()
 {
   echo "Usage: $0 [-h] [-i ssh-key] folder"
-  echo "  -i path    : Use this public key for autheticating to 'gw.tc.bbn.com'"
+  echo "  -i path    : Use this public key for autheticating to the machines"
   echo "  -k         : Kill all other java processes before starting this up"
   echo "  -d path    : File to clear before running quine-adapt"
   echo "  -s         : Skip assembly."
@@ -17,18 +17,19 @@ usage ()
 
 SSH_AUTH=""
 FOLDER=""
-DELETEME="persistence-multimap_by_event.db"
+DELETEME="data/persistence-multimap_by_event.db"
 KILLALL="NO"
 SKIPASSEMBLY="NO"
 OUTSTUFF=/dev/null
 
 JVM_OPTS=()
-JVM_OPTS[pi1]="-Xmx800M -Xloggc:gc.log -XX:+PrintGC -XX:+PrintGCTimeStamps"
-JVM_OPTS[pi2]="-Xmx800M -Xloggc:gc.log -XX:+PrintGC -XX:+PrintGCTimeStamps"
-JVM_OPTS[pi3]="-Xmx800M -Xloggc:gc.log -XX:+PrintGC -XX:+PrintGCTimeStamps"
-JVM_OPTS[pi4]="-Xmx800M -Xloggc:gc.log -XX:+PrintGC -XX:+PrintGCTimeStamps"
-JVM_OPTS[pi5]="-Xmx800M -Xloggc:gc.log -XX:+PrintGC -XX:+PrintGCTimeStamps"
-JVM_OPTS[pi6]="-Xmx800M -Xloggc:gc.log -XX:+PrintGC -XX:+PrintGCTimeStamps"
+JVM_OPTS[1]="-Xmx800M -Xloggc:gc.log -XX:+PrintGC -XX:+PrintGCTimeStamps"
+JVM_OPTS[2]="-Xmx800M -Xloggc:gc.log -XX:+PrintGC -XX:+PrintGCTimeStamps"
+JVM_OPTS[3]="-Xmx800M -Xloggc:gc.log -XX:+PrintGC -XX:+PrintGCTimeStamps"
+JVM_OPTS[4]="-Xmx800M -Xloggc:gc.log -XX:+PrintGC -XX:+PrintGCTimeStamps"
+JVM_OPTS[5]="-Xmx800M -Xloggc:gc.log -XX:+PrintGC -XX:+PrintGCTimeStamps"
+JVM_OPTS[6]="-Xmx800M -Xloggc:gc.log -XX:+PrintGC -XX:+PrintGCTimeStamps"
+JVM_OPTS[7]="-Xmx800M -Xloggc:gc.log -XX:+PrintGC -XX:+PrintGCTimeStamps"
 
 # Options
 while getopts "hi:ksd:v" OPT; do
@@ -88,7 +89,7 @@ for NODENUM in ${MACHINES_INVOLVED[@]}; do
 
     # Run the JAR on the node
     NODECMD="./vvm_java.sh $(echo ${JVM_OPTS[$NODENUM]} | sed 's/\</-/g') -Dconfig.file=$FOLDER.conf -jar ./quine-adapt.jar"
-    ssh $SSH_AUTH gw.tc.bbn.com "$NODECMD"                  &> $OUTSTUFF
+    ssh $SSH_AUTH $NODENUM "$NODECMD"                  &> $OUTSTUFF
 
     echo " Done."
   fi
