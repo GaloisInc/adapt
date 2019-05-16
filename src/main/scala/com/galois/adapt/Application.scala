@@ -12,8 +12,8 @@ import com.bbn.tc.schema.avro.{cdm20 => bbnCdm20}
 import com.typesafe.config.ConfigFactory
 import org.apache.avro.file.DataFileReader
 import org.apache.avro.specific.{SpecificDatumReader, SpecificDatumWriter}
-import org.apache.kafka.clients.producer.ProducerRecord
-import org.apache.kafka.common.serialization.ByteArraySerializer
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
+import org.apache.kafka.common.serialization.{ByteArraySerializer, StringSerializer}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
@@ -37,18 +37,12 @@ object Application extends App {
 
   def writeTCCDatumKafka(topicName: String): Sink[bbnCdm20.TCCDMDatum, Future[Done]] = {
     val tcDatumWriter = new SpecificDatumWriter(classOf[bbnCdm20.TCCDMDatum])
+
     Producer
-      .plainSink(ProducerSettings(
-          ConfigFactory.parseString(
-            s"""kafka-clients {
-               |  bootstrap.servers = "localhost:9092"
-               |  client.id = "ADAPT-kafka-producer"
-               |}
-             """.stripMargin
-          ),
-          new ByteArraySerializer,
-          new ByteArraySerializer
-      ))
+      .plainSink(
+        ProducerSettings(system, new ByteArraySerializer, new ByteArraySerializer)
+          .withBootstrapServers("localhost:9092")
+      )
       .contramap { datum: bbnCdm20.TCCDMDatum =>
         import org.apache.avro.io.EncoderFactory
 
@@ -80,7 +74,7 @@ object Application extends App {
         }))
         .runWith(writeTCCDatumKafka(topicName))
 
-      println(s"Done ingesting $file into kafka.")
+      newAcc.onComplete(_ => println(s"Done ingesting $file into kafka."))
 
       newAcc
     }
