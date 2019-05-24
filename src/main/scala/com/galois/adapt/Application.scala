@@ -24,6 +24,7 @@ import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
 import com.galois.adapt.NoveltyDetection.{Event => _, _}
 import com.galois.adapt.cdm20._
+import com.github.blemale.scaffeine.{Cache, Scaffeine}
 
 import scala.collection.mutable
 import scala.concurrent.duration._
@@ -482,6 +483,10 @@ object Application extends App {
 
 
   val parallelism = quineConfig.quineactorparallelism
+  val recentIdCache: Cache[AdmUUID, None.type] = Scaffeine()
+    .maximumSize(100)
+    .build[AdmUUID, None.type]()
+
   val uiDBInterface = system.actorOf(Props(classOf[QuineDBActor], graph, -1), s"QuineDB-UI")
 //    system.actorOf(Props(classOf[QuineRouter], parallelism, graph))
 
@@ -589,7 +594,15 @@ object Application extends App {
     val balance = q.add(Balance[Any](parallelism))
     val actorList = (0 until parallelism).toList.map { idx =>
       val quineDBRef = system.actorOf(Props(classOf[QuineDBActor], graph, idx), s"$hostName-QuineDB-$idx")
-      balance.out(idx) ~> Sink.actorRefWithAck(quineDBRef, InitMsg, Ack, CompleteMsg, println).async
+      balance.out(idx) ~>
+        Flow.fromFunction[Any,Any] {
+          case adm @ Left(a: AdmSubject)        => recentIdCache.put(a.uuid, None); adm
+          case adm @ Left(a: AdmPathNode)       => recentIdCache.put(a.uuid, None); adm
+          case adm @ Left(a: AdmNetFlowObject)  => recentIdCache.put(a.uuid, None); adm
+          case adm @ Left(a: AdmPrincipal)      => recentIdCache.put(a.uuid, None); adm
+          case other => other
+        } ~>
+        Sink.actorRefWithAck(quineDBRef, InitMsg, Ack, CompleteMsg, println).async
       quineDBRef
     }
     qdbActorsPerHost(hostName) = actorList
