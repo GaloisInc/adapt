@@ -673,7 +673,14 @@ object Application extends App {
       feedbackLoopMerge.out.via(printCounter(host.hostName + " Quine", statusActor)) ~> killMerge.in(0)
       killSource ~> killMerge.preferred
 
-      killMerge.out ~> quineSink(host.hostName + "-" + streamCount.incrementAndGet()).async
+      if (AdaptConfig.publishadmintokafka) {
+        killMerge.out.via(Flow[Any].collect[Either[ADM, EdgeAdm2Adm]] {
+          case Left(a: ADM) => Left(a)
+          case Right(r: EdgeAdm2Adm) => Right(r)
+        }) ~> AdmKafkaStreamComponents.kafkaAdmSink(host.hostName + "-adm")
+      } else {
+        killMerge.out ~> quineSink(host.hostName + "-" + streamCount.incrementAndGet()).async
+      }
       
       ClosedShape
     }).run()
@@ -684,6 +691,10 @@ object Application extends App {
     standingFetchSinks += (host.hostName -> standingFetchSink)
   }
 
+  for (admTopicName <- AdaptConfig.kafkaadmsources)
+    AdmKafkaStreamComponents.kafkaAdmSource(admTopicName)
+      .via(printCounter(admTopicName+" Kafka-ADM", statusActor))
+      .runWith(quineSink(admTopicName + "-" + streamCount.incrementAndGet()).async)
 
   for (host <- ingestConfig.hosts)
     runHostIngest(host)

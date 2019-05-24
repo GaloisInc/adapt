@@ -45,6 +45,8 @@ object AdaptConfig extends Utils {
     ppm: PpmConfig,
     test: TestConfig,
     alarms: AlarmsConfig,
+    publishadmintokafka: Boolean,
+    kafkaadmsources: List[KakfaTopicName],
     skipshutdown: SkipActorSystemShutdown = false
   )
 
@@ -276,6 +278,8 @@ object AdaptConfig extends Utils {
   val ppmConfig: PpmConfig = adaptConfig.ppm
   val testWebUi: TestConfig = adaptConfig.test
   val alarmConfig: AlarmsConfig = adaptConfig.alarms
+  val publishadmintokafka: Boolean = adaptConfig.publishadmintokafka
+  val kafkaadmsources: List[KakfaTopicName] = adaptConfig.kafkaadmsources
   val skipshutdown: SkipActorSystemShutdown = adaptConfig.skipshutdown
 
   trait ErrorHandler {
