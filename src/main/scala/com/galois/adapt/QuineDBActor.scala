@@ -397,6 +397,10 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
     new java.util.LinkedHashMap[Long, None.type](10000, 1F, true) {
       override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
     }
+  
+  var totalNodeCount = new AtomicLong(0L)
+  var totalEdgeCount = new AtomicLong(0L)
+  var totalObsCount = new AtomicLong(0L)
 
   var nodeCount = new AtomicLong(0L)
   var edgeCount = new AtomicLong(0L)
@@ -563,6 +567,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         .map(t => if (shouldRecordDBWriteTimes) {
           Try(nodeTimes.put(t, None)) // Not a big deal if it fails sometimes
           nodeCount.incrementAndGet()
+          totalNodeCount.incrementAndGet()
         } else t)
         .recoveryMessage("Writing NODE failed at ID: {} for ADM Node: {}", a.uuid, a)
         .ackOnComplete(s)
@@ -574,6 +579,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         .map(t => if (shouldRecordDBWriteTimes) {
           Try(edgeTimes.put(t, None)) // Not a big deal if it fails sometimes
           edgeCount.incrementAndGet()
+          totalEdgeCount.incrementAndGet()
         } else t)
         .recoveryMessage("Writing EDGE failed at IDs: {} and: {} with label: {}", e.src, e.tgt, e.label)
         .ackOnComplete(s)
@@ -591,6 +597,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
           val t = System.nanoTime() - startTime
           Try(obsTimes.put(t, None))
           obsCount.incrementAndGet()
+          totalObsCount.incrementAndGet()
         } else u)
         .recoveryMessage("Writing PPM OBS failed at hostname: {} with tree name: {} for extracted values: {} with count: {}", hostName, treeName, extractedValues, observationCount)
         .ackOnComplete(s)
@@ -608,11 +615,17 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       sender() ! Ack
       context.stop(self)
 
+    case GetIngestCount =>
+      sender() ! ReplyIngestCount(
+        totalNodeCount.get(),
+        totalEdgeCount.get(),
+        totalObsCount.get()
+      )
+
     case msg => log.warning(s"Unknown message: $msg")
 
   }
 }
-
 
 case object PrintStats
 

@@ -196,6 +196,7 @@ object Application extends App {
     if (clusterStartupDeadline.isOverdue()) throw new RuntimeException(s"Timeout expired while waiting for cluster hosts to become active.")
     Thread.sleep(1000)
   }
+  val clusterRepresentative = system.actorOf(Props(classOf[ClusterRepresentative]), s"representative-${quineConfig.thishost}")
 
 
   val ppmBaseDirFile = new File(ppmConfig.basedir)
@@ -699,11 +700,45 @@ object Application extends App {
   for (host <- ingestConfig.hosts)
     runHostIngest(host)
 
-//  def addNewIngestStream(host: IngestHost): Unit = ???
 
-//  def terminateIngestStream(hostName: HostName): Unit = ???
+  // Total cluster wide ingest counts
+  if (quineConfig.hosts.headOption.map(_.ip) == Some(quineConfig.thishost)) {
+    system.scheduler.schedule(10.seconds, 10.seconds, {
+      import akka.pattern._
 
+      val nf = NumberFormat.getInstance()
+      implicit val timeout = Timeout(1 minute)
+      implicit val ec = system.dispatcher
+    
+      val originalStartTime = System.nanoTime()
+      var lastTimestampNanos = originalStartTime
+      var lastCounter = 0L
+      
+      new Runnable {
+        override def run(): Unit = {
+          Future
+            .traverse(quineConfig.hosts) { host: QuineHost =>
+              (system.actorSelection(
+                s"akka://adapt-cluster@${host.ip}:2551/user/representative-${host.ip}"
+              ) ? GetTotalIngestCount).mapTo[ReplyIngestCount]
+            }
+            .map(_.foldLeft(ReplyIngestCount.empty)(_ + _))
+            .onComplete {
+              case Success(ReplyIngestCount(n,e,o)) =>
+                val nowNanos = System.nanoTime()
+                val durationSeconds = (nowNanos - lastTimestampNanos) / 1e9
+                val totalSeconds = (nowNanos - originalStartTime) / 1e9
+                val counter = n + e + o
+                println(s"Cluster ingested: ${nf.format(counter)} (nodes: $n, edges $e, observations: $o) Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${nf.format(((counter - lastCounter) / durationSeconds).toInt)} /s.  Overall rate: ${nf.format((counter / totalSeconds).toInt)} /s.")
+                lastTimestampNanos = nowNanos
+                lastCounter = counter
 
+              case Failure(e) => e.printStackTrace
+            }
+        }
+      }
+    })(system.dispatcher)
+  }
 
   Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
     override def run(): Unit = if  (!AdaptConfig.skipshutdown) {
