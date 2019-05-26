@@ -397,6 +397,10 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
     new java.util.LinkedHashMap[Long, None.type](10000, 1F, true) {
       override def removeEldestEntry(eldest: java.util.Map.Entry[Long, None.type]) = this.size() >= 10000
     }
+  
+  var totalNodeCount = new AtomicLong(0L)
+  var totalEdgeCount = new AtomicLong(0L)
+  var totalObsCount = new AtomicLong(0L)
 
   var nodeCount = new AtomicLong(0L)
   var edgeCount = new AtomicLong(0L)
@@ -496,6 +500,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
     lastSent.set(now)
   }
 
+  def recentNodes(): String = Application.recentIdCache.asMap.keys.iterator.map(_.rendered).mkString("[",",","]")
 
   override def receive = {
 
@@ -505,7 +510,8 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       sender() ! gremlin.query(q).map(_.toStream)
 
     // Run the query without specifying what the output type will be. This is the variant used by 'cmdline_query.py'
-    case StringQuery(q, shouldParse) =>
+    case StringQuery(qRaw, shouldParse) =>
+      val q = qRaw.replaceAll("recent_nodes", recentNodes())
 //      log.debug(s"Received string query: $q")
 //      println(s"Received string query: $q")
       sender() ! {
@@ -521,7 +527,8 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       }
 
     // Run a query that returns vertices
-    case NodeQuery(q, shouldParse) =>
+    case NodeQuery(qRaw, shouldParse) =>
+      val q = qRaw.replaceAll("recent_nodes", recentNodes())
 //      log.debug(s"Received node query: $q")
 //      println(s"Received node query: $q")
       sender() ! {
@@ -539,7 +546,8 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       }
 
     // Run a query that returns edges
-    case EdgeQuery(q, shouldParse) =>
+    case EdgeQuery(qRaw, shouldParse) =>
+      val q = qRaw.replaceAll("recent_nodes", recentNodes())
 //      log.debug(s"Received new edge query: $q")
 //      println(s"Received new edge query: $q")
       sender() ! {
@@ -559,6 +567,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         .map(t => if (shouldRecordDBWriteTimes) {
           Try(nodeTimes.put(t, None)) // Not a big deal if it fails sometimes
           nodeCount.incrementAndGet()
+          totalNodeCount.incrementAndGet()
         } else t)
         .recoveryMessage("Writing NODE failed at ID: {} for ADM Node: {}", a.uuid, a)
         .ackOnComplete(s)
@@ -570,6 +579,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
         .map(t => if (shouldRecordDBWriteTimes) {
           Try(edgeTimes.put(t, None)) // Not a big deal if it fails sometimes
           edgeCount.incrementAndGet()
+          totalEdgeCount.incrementAndGet()
         } else t)
         .recoveryMessage("Writing EDGE failed at IDs: {} and: {} with label: {}", e.src, e.tgt, e.label)
         .ackOnComplete(s)
@@ -587,6 +597,7 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
           val t = System.nanoTime() - startTime
           Try(obsTimes.put(t, None))
           obsCount.incrementAndGet()
+          totalObsCount.incrementAndGet()
         } else u)
         .recoveryMessage("Writing PPM OBS failed at hostname: {} with tree name: {} for extracted values: {} with count: {}", hostName, treeName, extractedValues, observationCount)
         .ackOnComplete(s)
@@ -604,11 +615,17 @@ class QuineDBActor(graphService: GraphService[AdmUUID], idx: Int) extends DBQuer
       sender() ! Ack
       context.stop(self)
 
+    case GetIngestCount =>
+      sender() ! ReplyIngestCount(
+        totalNodeCount.get(),
+        totalEdgeCount.get(),
+        totalObsCount.get()
+      )
+
     case msg => log.warning(s"Unknown message: $msg")
 
   }
 }
-
 
 case object PrintStats
 
