@@ -31,7 +31,7 @@ class MapProxy(
 ) {
 
   // In memory DB
-  private val memoryDb: DB = DBMaker.memoryDirectDB().make()
+  private val memoryDb: DB = DBMaker.memoryDirectDB().closeOnJvmShutdown().make()
 
   // File DB
   private val fileDb: DB = fileDbPath match {
@@ -44,7 +44,7 @@ class MapProxy(
         case _ => { }
       }
 
-      var maker = DBMaker.fileDB(p).fileMmapEnable()
+      var maker = DBMaker.fileDB(p).fileMmapEnable().closeOnJvmShutdown()
 
       if (fileDbBypassChecksum) maker = maker.checksumHeaderBypass()
       if (fileDbTransactions) maker = maker.transactionEnable()
