@@ -485,7 +485,7 @@ object Application extends App {
 
   val parallelism = quineConfig.quineactorparallelism
   val recentIdCache: Cache[AdmUUID, None.type] = Scaffeine()
-    .maximumSize(100)
+    .maximumSize(99)
     .build[AdmUUID, None.type]()
 
   val uiDBInterface = system.actorOf(Props(classOf[QuineDBActor], graph, -1), s"QuineDB-UI")
