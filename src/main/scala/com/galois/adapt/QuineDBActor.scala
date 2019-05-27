@@ -69,21 +69,8 @@ object AdmUuidProvider extends QuineIdProvider[AdmUUID] {
 
 
   override def qidDistribution(qid: QuineId): (HostIdx, LocalShardIdx) = {
-    customIdFromQid(qid) match {
-      case Success(admUuid) =>
-        // Host index is defined with the first match of:
-        //   1.) saved Idx for hostname,
-        //   2.) first saved Idx for `admUuid.hostname` PREFIX,
-        //   3.) random according to hashcode  (includes namespace: "synthesized")
-        val h = Math.abs(admUuid.hashCode)
-        lazy val prefixMatchOrHash = namespaceIdx.keys.find(k => admUuid.namespace.startsWith(k))   // TODO: Consider adding new entries in namespaceIdx to speed this up.
-          .fold(h)(matchedKey => namespaceIdx(matchedKey))
-        namespaceIdx.getOrElse(admUuid.namespace, prefixMatchOrHash) -> h
-
-      case Failure(_) =>
-        val randomIdx = Math.abs(ByteBuffer.wrap(hashToLength(qid.array, 4)).getInt())
-        randomIdx -> randomIdx
-    }
+    val randomIdx = Math.abs(ByteBuffer.wrap(hashToLength(qid.array, 4)).getInt())
+    randomIdx -> randomIdx
   }
 }
 

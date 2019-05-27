@@ -677,8 +677,7 @@ object Application extends App {
       if (AdaptConfig.publishadmintokafka) {
         val partitionKafkaTopics = b.add(Balance[Either[ADM, EdgeAdm2Adm]](
           outputPorts = AdaptConfig.numberadmtopicsinkafka,
-          waitForAllDownstreams = false,
-          eagerComplete = true  
+          waitForAllDownstreams = false
         ))
 
         killMerge.out.via(Flow[Any].collect[Either[ADM, EdgeAdm2Adm]] {
