@@ -675,10 +675,21 @@ object Application extends App {
       killSource ~> killMerge.preferred
 
       if (AdaptConfig.publishadmintokafka) {
+        val partitionKafkaTopics = b.add(Balance[Either[ADM, EdgeAdm2Adm]](
+          outputPorts = AdaptConfig.numberadmtopicsinkafka,
+          waitForAllDownstreams = false,
+          eagerComplete = true  
+        ))
+
         killMerge.out.via(Flow[Any].collect[Either[ADM, EdgeAdm2Adm]] {
           case Left(a: ADM) => Left(a)
           case Right(r: EdgeAdm2Adm) => Right(r)
-        }) ~> AdmKafkaStreamComponents.kafkaAdmSink(host.hostName + "-adm")
+        }) ~> partitionKafkaTopics.in
+
+        (0 until AdaptConfig.numberadmtopicsinkafka).foreach { idx: Int =>
+          partitionKafkaTopics.out(idx) ~> AdmKafkaStreamComponents.kafkaAdmSink(s"${host.hostName}-adm-$idx")
+        }
+
       } else {
         killMerge.out ~> quineSink(host.hostName + "-" + streamCount.incrementAndGet()).async
       }

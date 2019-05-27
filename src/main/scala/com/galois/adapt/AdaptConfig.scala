@@ -46,6 +46,7 @@ object AdaptConfig extends Utils {
     test: TestConfig,
     alarms: AlarmsConfig,
     publishadmintokafka: Boolean,
+    numberadmtopicsinkafka: Int,
     kafkaadmsources: List[KakfaTopicName],
     skipshutdown: SkipActorSystemShutdown = false
   )
@@ -279,6 +280,7 @@ object AdaptConfig extends Utils {
   val testWebUi: TestConfig = adaptConfig.test
   val alarmConfig: AlarmsConfig = adaptConfig.alarms
   val publishadmintokafka: Boolean = adaptConfig.publishadmintokafka
+  val numberadmtopicsinkafka: Int = adaptConfig.numberadmtopicsinkafka
   val kafkaadmsources: List[KakfaTopicName] = adaptConfig.kafkaadmsources
   val skipshutdown: SkipActorSystemShutdown = adaptConfig.skipshutdown
 
