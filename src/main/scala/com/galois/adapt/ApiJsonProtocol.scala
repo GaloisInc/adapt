@@ -288,6 +288,11 @@ object ApiJsonProtocol extends SprayJsonSupport with DefaultJsonProtocol {
     JsObject(
       vertexTypeTuple,
       "id" -> anyToJson(selected("id")),
+      "host_idx" -> anyToJson {
+        val bytes: Array[Byte] = AdmUuidProvider.customIdToBytes(selected("id").asInstanceOf[AdmUUID])
+        val (hostIdx, shardIdx) = AdmUuidProvider.qidDistribution(new collection.mutable.WrappedArray.ofByte(bytes))
+        hostIdx
+      },
       "label" -> JsString(propertiesVal.get("type_of").fold("UNKNOWN")(_.asInstanceOf[String])),
       "properties" -> JsObject(
         propertiesVal.filterKeys(_ != "type_of").mapValues(v => JsArray(JsObject("value" -> anyToJson(v))))
