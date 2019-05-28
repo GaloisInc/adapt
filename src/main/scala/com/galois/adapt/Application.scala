@@ -266,9 +266,6 @@ object Application extends App {
 //    host.hostName -> ref
 //  }.toMap // + (hostNameForAllHosts -> system.actorOf(Props(classOf[PpmManager], hostNameForAllHosts, "<no-name>", false, graph), s"ppm-actor-$hostNameForAllHosts"))
 
-  val ppmManagers: Map[HostName, PpmManager] = ingestConfig.hosts.map(host =>
-    host.hostName -> new PpmManager(host.hostName, host.simpleTa1Name, host.isWindows, graph)
-  ).toMap
 
 
 
@@ -513,7 +510,7 @@ object Application extends App {
 
   def startWebServer(dbActor: ActorRef): Http.ServerBinding = {
     println(s"Starting the web server at: http://${runtimeConfig.webinterface}:${runtimeConfig.port}")
-    val route = Routes.mainRoute(dbActor, statusActor, ppmManagers, graph)
+    val route = Routes.mainRoute(dbActor, statusActor, graph)
     val httpServer = Http().bindAndHandle(route, runtimeConfig.webinterface, runtimeConfig.port)
     Await.result(httpServer, 10 seconds)
   }
@@ -759,23 +756,9 @@ object Application extends App {
 
       implicit val executionContext: ExecutionContext = system.dispatchers.lookup("quine.actor.node-dispatcher")
 
-      val alarmsF = if (ppmConfig.shouldsavealarms) {
-        println(s"Flushing alarms to disk...")
-        ppmManagers.values.toList.foldLeft(Future.successful( () ))((a, b) =>
-          a.flatMap(_ => b.saveAlarms()) // (b ? SaveTrees(true)).mapTo[Ack.type]))
-        )
-      } else {
-        Future.successful( Ack )
-      }
+      val alarmsF = Future.successful( Ack )
 
-      val saveF = if (ppmConfig.shouldsaveppmtrees) {
-        println(s"Saving PPM trees to disk...")
-        ppmManagers.values.toList.foldLeft(Future.successful( () ))((a, b) =>
-          a.flatMap(_ => b.saveTrees()) // (b ? SaveTrees(true)).mapTo[Ack.type]))
-        )
-      } else {
-        Future.successful( Ack )
-      }
+      val saveF = Future.successful( Ack )
 
       val shutdownF = alarmsF.flatMap(_ => saveF.flatMap { _ =>
         println("Shutting down the actor system")

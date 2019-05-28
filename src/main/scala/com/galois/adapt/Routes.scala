@@ -71,7 +71,6 @@ object Routes {
   def mainRoute(
     dbActor: ActorRef,
     statusActor: ActorRef,
-    ppmManagers: Map[HostName, PpmManager],
     graph: GraphService[_]
   )(implicit system: ActorSystem, materializer: Materializer) = {
 
@@ -262,38 +261,6 @@ object Routes {
               complete(
                 PpmSummarizer.summarize(AdmUUID.fromRendered(renderedAdmUuid))
 
-              )
-            }
-          } ~
-          pathPrefix("ppm") {
-            pathPrefix("saveTrees") {
-              path(Segment) { hostName =>
-                complete(
-                  ppmManagers(hostName).saveTrees()
-//                    ? SaveTrees(true)).mapTo[Ack.type]
-                    .map(_ => s"you saved all the tree reprs and their alarms for $hostName")
-                )
-              } ~
-              complete(
-                ppmManagers.values.toList.foldLeft(
-                  Future.successful( () )
-                )((a, b) => a.flatMap(
-                  _ => b.saveTrees()   // (b ? SaveTrees(true)).mapTo[Ack.type]
-                )).map(_ => "you saved all the trees for all the hosts")
-              )
-            } ~
-            pathPrefix("listTrees") {
-              path(Segment) { hostName =>
-                complete(
-                  ppmManagers(hostName).ppmList.map(_.treeName)  // TODO: And counts?
-//                  (ppmManagers(hostName) ? ListPpmTrees).mapTo[Future[PpmTreeNames]].flatMap(_.map(_.namesAndCounts))
-                )
-              } ~
-              complete(
-                ppmManagers.mapValues(_.ppmList.map(_.treeName))
-//                Future.sequence(
-//                  ppmActors.map{ case (hostName,ref) => (ref ? ListPpmTrees).mapTo[Future[PpmTreeNames]].flatMap(_.map(treeNames => hostName -> treeNames.namesAndCounts)) }
-//                ).map(_.toMap)
               )
             }
           } ~

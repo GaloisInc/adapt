@@ -29,6 +29,7 @@ BBN_JVM_OPTS[3]="-XX:+UseConcMarkSweepGC -Xmx140G -Xloggc:gc.log -XX:+PrintGC -X
 BBN_JVM_OPTS[4]="-XX:+UseConcMarkSweepGC -Xmx140G -Xloggc:gc.log -XX:+PrintGC -XX:+PrintGCTimeStamps"  # Total mem: 161195
 BBN_JVM_OPTS[5]="-XX:+UseConcMarkSweepGC -Xmx24G  -Xloggc:gc.log -XX:+PrintGC -XX:+PrintGCTimeStamps"  # Total mem: 28142
 BBN_JVM_OPTS[6]="-XX:+UseConcMarkSweepGC -Xmx24G  -Xloggc:gc.log -XX:+PrintGC -XX:+PrintGCTimeStamps"  # Total mem: 28142
+BBN_JVM_OPTS[7]="-XX:+UseConcMarkSweepGC -Xmx140G -Xloggc:gc.log -XX:+PrintGC -XX:+PrintGCTimeStamps"  # Total mem: 161195
 
 # Options
 while getopts "hi:ksd:v" OPT; do

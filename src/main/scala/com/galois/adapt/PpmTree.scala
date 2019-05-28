@@ -28,7 +28,7 @@ import scala.concurrent.duration._
 import scala.collection.{GenSeq, SortedMap, mutable}
 import scala.util.{Failure, Random, Success, Try}
 import AdaptConfig._
-import Application.{hostNameForAllHosts, ppmManagers}
+import Application.{hostNameForAllHosts}
 import spray.json._
 import ApiJsonProtocol._
 import com.rrwright.quine.language.QuineId
@@ -331,21 +331,6 @@ case class PpmDefinition[DataShape](
         }
 
         if (lowerBoundQueueLength.get() > 0) {
-          for  {
-            sink <- Application.standingFetchSinks.get(hostName).orElse{ logger.error(s"Cannot find host tree for observation with host name: {}", hostName); None}
-            ppmMgr <- ppmManagers.get(hostName).orElse{ logger.error(s"Cannot find PPM manager for observation with host name: {}", hostName); None}
-          } {
-            sink ! PpmObservation(
-              treeRootQid,
-              treeName,
-              hostName,
-              extractedValues,
-              uuidsNew,
-              timestampsNew,
-              (hostName: String, nov: Novelty[Set[NamespacedUuidDetails]]) => ppmMgr.novelty(nov),
-              countNew
-            )
-          }
           totalEmitted += 1
         } else {
           queuedObservations.addLast((extracted, uuidsNew, timestampsNew, countNew, 0L))
