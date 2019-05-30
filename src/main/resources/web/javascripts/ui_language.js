@@ -3,7 +3,7 @@ var starting_queries = [
     {
         name : "Get recent nodes",
         base_query : "g.V(recent_nodes).limit({_})",
-        default_values : [50]
+        default_values : [20]
     }, {
         name : "Get a few random nodes",
         base_query : "g.V().limit({_})",
@@ -36,6 +36,106 @@ var starting_queries = [
 ]
 
 var node_appearance = [
+// ADM:
+    {
+        name: "Host",
+        is_relevant: function(n) { return n.db_label === "Host" || n.db_label === "AdmHost" },
+        icon_unicode: "\uf390",
+        size: 40,
+        make_node_label: function(node) {
+            var hostName = node['properties'].hasOwnProperty('hostName') ? node['properties']['hostName'] : "???"
+            var hostType = node['properties'].hasOwnProperty('hostType') ? node['properties']['hostType'] : "(???)"
+            return hostName + "\n" + hostType
+        }
+    }, {
+        name : "ADM Path Node",
+        is_relevant : function(n) { return n.db_label === "AdmPathNode" },
+        icon_unicode : "\uf3fb",
+        size: 40,
+        make_node_label : function(node) {
+            return node['properties'].hasOwnProperty('path') ? node['properties']['path'] : "???"
+        }
+    }, {
+       name : "ADM Subject",
+        is_relevant : function(n) { return n.db_label === "AdmSubject" },
+        icon_unicode : "\uf375",
+        make_node_label : function(node) {
+            var cid = node['properties'].hasOwnProperty('cid') ? node['properties']['cid'] : "None"
+            var timestamp = node['properties'].hasOwnProperty('startTimestampNanos') ? ("\n" + new Date(node['properties']['startTimestampNanos']/1000000).toGMTString().replace(" GMT","")) : ""
+            return "Process: " + cid + timestamp
+        }
+    }, {
+        name : "ADM File",
+        is_relevant : function(n) { return n.db_label === "AdmFileObject" },
+        icon_unicode : "\uf41b",
+        size: 40,
+        make_node_label : function(node) {
+            console.log(node.properties)
+            return node['properties'].hasOwnProperty('fileObjectType') ? node['properties']['fileObjectType'] : "UNKNOWN TYPE"
+        }
+    }, {
+        name : "ADM Event",
+        is_relevant : function(n) { return n.db_label === "AdmEvent" },
+        icon_unicode : "\uf29a",
+        make_node_label : function(node) {
+            var firstTime = node['properties'].hasOwnProperty('earliestTimestampNanos') ? new Date(node['properties']['earliestTimestampNanos']/1000000).toGMTString() : "???"
+            // var lastTime = (node['properties'].hasOwnProperty('latestTimestampNanos') ? new Date(node['properties']['latestTimestampNanos']/1000000).toGMTString() : "???")
+            var type = node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'] : "None"
+            return type + "\n" + firstTime //+ " - " + lastTime
+        }
+    }, {
+       name : "ADM Principal",
+        is_relevant : function(n) { return n.db_label === "AdmPrincipal" },
+        icon_unicode : "\uf419",
+        size : 50,
+        make_node_label : function(node) {
+            var username = (node['properties'].hasOwnProperty('username') ? node['properties']['username'] : "")
+            var userId = (node['properties'].hasOwnProperty('userId') ? " #" + node['properties']['userId'] : "")
+            return username + userId
+        }
+    }, {
+        name : "ADM NetFlowObject",
+        is_relevant : function(n) { return n.db_label === "AdmNetFlowObject" },
+        icon_unicode : "\uf262",
+        make_node_label : function(node) {
+            var localA = node['properties'].hasOwnProperty('localAddress') ? node['properties']['localAddress'] : "None"
+            var localP = node['properties'].hasOwnProperty('localPort') ? node['properties']['localPort'] : "None"
+            var remoteA = node['properties'].hasOwnProperty('remoteAddress') ? node['properties']['remoteAddress'] : "None"
+            var remoteP = node['properties'].hasOwnProperty('remotePort') ? node['properties']['remotePort'] : "None"
+            return "Local: " + localA + ":" + localP + "\nRemote: " + remoteA + ":" + remoteP
+        }
+    }, {
+        name : "ADM SrcSink",
+        is_relevant : function(n) { return n.db_label === "AdmSrcSinkObject" },
+        icon_unicode : "\uf313",
+        make_node_label : function(node) {
+            return node['properties'].hasOwnProperty('srcSinkType') ? node['properties']['srcSinkType'] : "??"
+        }
+    }, {
+        name : "ADM Provenance Tag Node",
+        is_relevant : function(n) { return n.db_label === "AdmProvenanceTagNode" },
+        icon_unicode : "\uf48e",
+        make_node_label : function(node) {
+            return node['properties'].hasOwnProperty('programPoint') ? node['properties']['programPoint'] : "??"
+        }
+    }, {
+        name : "ADM Address",
+        is_relevant : function(n) { return n.db_label === "AdmAddress" },
+        icon_unicode : "\uf448",
+        make_node_label : function(node) {
+            return node['properties'].hasOwnProperty('address') ? node['properties']['address'] : "??"
+        }
+    }, {
+        name : "ADM Port",
+        is_relevant : function(n) { return n.db_label === "AdmPort" },
+        icon_unicode : "\uf447",
+        make_node_label : function(node) {
+            return node['properties'].hasOwnProperty('port') ? node['properties']['port'] : "??"
+        }
+    },
+
+
+// CDM:
     {   // Icon codes:  https://ionicons.com/v2/cheatsheet.html
         // NOTE: the insertion of 'u' is required to make code prefixes of '\uf...' as below; because javascript.
         name : "Cluster",
@@ -165,106 +265,6 @@ var node_appearance = [
             }
         }
     }, 
-
-
-// ADM:
-    {
-        name: "Host",
-        is_relevant: function(n) { return n.db_label === "Host" || n.db_label === "AdmHost" },
-        icon_unicode: "\uf390",
-        size: 40,
-        make_node_label: function(node) {
-            var hostName = node['properties'].hasOwnProperty('hostName') ? node['properties']['hostName'] : "???"
-            var hostType = node['properties'].hasOwnProperty('hostType') ? node['properties']['hostType'] : "(???)"
-            return hostName + "\n" + hostType
-        }
-    }, {
-        name : "ADM Path Node",
-        is_relevant : function(n) { return n.db_label === "AdmPathNode" },
-        icon_unicode : "\uf3fb",
-        size: 40,
-        make_node_label : function(node) {
-            return node['properties'].hasOwnProperty('path') ? node['properties']['path'] : "???"
-        }
-    }, {
-       name : "ADM Subject",
-        is_relevant : function(n) { return n.db_label === "AdmSubject" },
-        icon_unicode : "\uf375",
-        make_node_label : function(node) {
-            var cid = node['properties'].hasOwnProperty('cid') ? node['properties']['cid'] : "None"
-            var timestamp = node['properties'].hasOwnProperty('startTimestampNanos') ? ("\n" + new Date(node['properties']['startTimestampNanos']/1000000).toGMTString().replace(" GMT","")) : ""
-            return "Process: " + cid + timestamp
-        }
-    }, {
-        name : "ADM File",
-        is_relevant : function(n) { return n.db_label === "AdmFileObject" },
-        icon_unicode : "\uf41b",
-        size: 40,
-        make_node_label : function(node) {
-            return node['properties'].hasOwnProperty('fileObjectType') ? node['properties']['fileObjectType'] : "UNKNOWN TYPE"
-        }
-    }, {
-        name : "ADM Event",
-        is_relevant : function(n) { return n.db_label === "AdmEvent" },
-        icon_unicode : "\uf29a",
-        make_node_label : function(node) {
-            var firstTime = node['properties'].hasOwnProperty('earliestTimestampNanos') ? new Date(node['properties']['earliestTimestampNanos']/1000000).toGMTString() : "???"
-            // var lastTime = (node['properties'].hasOwnProperty('latestTimestampNanos') ? new Date(node['properties']['latestTimestampNanos']/1000000).toGMTString() : "???")
-            var type = node['properties'].hasOwnProperty('eventType') ? node['properties']['eventType'] : "None"
-            return type + "\n" + firstTime //+ " - " + lastTime
-        }
-    }, {
-       name : "ADM Principal",
-        is_relevant : function(n) { return n.db_label === "AdmPrincipal" },
-        icon_unicode : "\uf419",
-        size : 50,
-        make_node_label : function(node) {
-            var username = (node['properties'].hasOwnProperty('username') ? node['properties']['username'] : "")
-            var userId = (node['properties'].hasOwnProperty('userId') ? " #" + node['properties']['userId'] : "")
-            return username + userId
-        }
-    }, {
-        name : "ADM NetFlowObject",
-        is_relevant : function(n) { return n.db_label === "AdmNetFlowObject" },
-        icon_unicode : "\uf262",
-        make_node_label : function(node) {
-            var localA = node['properties'].hasOwnProperty('localAddress') ? node['properties']['localAddress'] : "None"
-            var localP = node['properties'].hasOwnProperty('localPort') ? node['properties']['localPort'] : "None"
-            var remoteA = node['properties'].hasOwnProperty('remoteAddress') ? node['properties']['remoteAddress'] : "None"
-            var remoteP = node['properties'].hasOwnProperty('remotePort') ? node['properties']['remotePort'] : "None"
-            return "Local: " + localA + ":" + localP + "\nRemote: " + remoteA + ":" + remoteP
-        }
-    }, {
-        name : "ADM SrcSink",
-        is_relevant : function(n) { return n.db_label === "AdmSrcSinkObject" },
-        icon_unicode : "\uf313",
-        make_node_label : function(node) {
-            return node['properties'].hasOwnProperty('srcSinkType') ? node['properties']['srcSinkType'] : "??"
-        }
-    }, {
-        name : "ADM Provenance Tag Node",
-        is_relevant : function(n) { return n.db_label === "AdmProvenanceTagNode" },
-        icon_unicode : "\uf48e",
-        make_node_label : function(node) {
-            return node['properties'].hasOwnProperty('programPoint') ? node['properties']['programPoint'] : "??"
-        }
-    }, {
-        name : "ADM Address",
-        is_relevant : function(n) { return n.db_label === "AdmAddress" },
-        icon_unicode : "\uf448",
-        make_node_label : function(node) {
-            return node['properties'].hasOwnProperty('address') ? node['properties']['address'] : "??"
-        }
-    }, {
-        name : "ADM Port",
-        is_relevant : function(n) { return n.db_label === "AdmPort" },
-        icon_unicode : "\uf447",
-        make_node_label : function(node) {
-            return node['properties'].hasOwnProperty('port') ? node['properties']['port'] : "??"
-        }
-    },
-
-
 
 
 // DEFAULT:

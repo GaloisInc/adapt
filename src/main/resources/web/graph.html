@@ -72,7 +72,7 @@
     		function(es, ns) { return _.map(es, function(e){ e['from'] = e.outV; e['to'] = e.inV; return e })}
 
 
-        var node_color_choices = ["red", "orange", "yellow", "green", "blue", "purple", "black"]
+        var host_color_choices = ["red", "orange", "yellow", "green", "blue", "purple", "black"]
 
 
     	// ********** END EDITABLE VARIABLES ********** //
@@ -153,8 +153,9 @@
                         UI.foundEdges(edge_results.length)
                         var colored_nodes = _.map(node_results, function(n) { 
                             if (n.hasOwnProperty('host_idx')) {
-                                var color_idx = n.host_idx % node_color_choices.length
-                                n.icon = {"color": node_color_choices[color_idx]}
+                                var color_idx = n.host_idx % host_color_choices.length
+                                n.icon = {"color": host_color_choices[color_idx]}
+                                n.properties['Served from Host'] = color_idx + 1
                             } else {
                                 n.icon = {"color": query_color}
                             }
