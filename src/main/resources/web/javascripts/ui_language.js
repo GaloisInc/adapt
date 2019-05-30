@@ -1,7 +1,11 @@
 
 var starting_queries = [
     {
-        name : "Get a few nodes",
+        name : "Get recent nodes",
+        base_query : "g.V(recent_nodes).limit({_})",
+        default_values : [50]
+    }, {
+        name : "Get a few random nodes",
         base_query : "g.V().limit({_})",
         default_values : [10]
     }, {

@@ -72,6 +72,9 @@
     		function(es, ns) { return _.map(es, function(e){ e['from'] = e.outV; e['to'] = e.inV; return e })}
 
 
+        var node_color_choices = ["red", "orange", "yellow", "green", "blue", "purple", "black"]
+
+
     	// ********** END EDITABLE VARIABLES ********** //
 
 
@@ -119,7 +122,7 @@
             $.post(hostPrefix + nodeApiPath, {"query": query_string}, function(raw_node_results) {
             	var node_results = nodeApiResultTransform(raw_node_results)
                 var node_results_count = node_results.length
-                var node_result_size_limit = 50
+                var node_result_size_limit = 100
                 var confirm_msg = "You are about to render " + node_results_count + " nodes.\n How many do you want to render?"
                 node_results_count <= node_result_size_limit || function() { 
                 	var limit_result = prompt(confirm_msg, node_results_count)
@@ -148,7 +151,15 @@
                     	})
 
                         UI.foundEdges(edge_results.length)
-                        var colored_nodes = _.map(node_results, function(n) { n.icon = {"color": query_color}; return n})
+                        var colored_nodes = _.map(node_results, function(n) { 
+                            if (n.hasOwnProperty('host_idx')) {
+                                var color_idx = n.host_idx % node_color_choices.length
+                                n.icon = {"color": node_color_choices[color_idx]}
+                            } else {
+                                n.icon = {"color": query_color}
+                            }
+                            return n
+                        })
                         var colored_edges = _.map(edge_results, function(e) { e.color = query_color; return e}) // TODO: Why doesn't edge coloring work?  Answer: https://github.com/almende/vis/issues/1706
                         var data = { "type" : "add", "nodes" : colored_nodes, "edges" : colored_edges }
                         if (query_object.is_collapsed) {
