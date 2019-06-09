@@ -326,9 +326,7 @@ object AdaptConfig extends Utils {
 
 
     def toCdmSource(handler: ErrorHandler = ErrorHandler.print): Source[(Namespace,CDM20), NotUsed] = {
-      val linearized = parallel
-        .foldLeft(Source.empty[(Namespace,CDM20)])((acc, li: LinearIngest) => acc.merge(li.toCdmSource(handler, updateHost _)))
-        .via(FlowComponents.printCounter(hostName+" RAW-CDM", Application.statusActor, every = 1000000))
+      val linearized = parallel.foldLeft(Source.empty[(Namespace,CDM20)])((acc, li: LinearIngest) => acc.merge(li.toCdmSource(handler, updateHost _)))
       val offsetApplied = startatoffset.fold(linearized){offset => println(s"Starting at offset: $offset"); linearized.drop(offset)}
       val limitApplied = loadlimit.fold(offsetApplied){limit => offsetApplied.take(limit)} //.take(loadlimit.getOrElse(Long.MaxValue))
       selectHost match {
@@ -340,7 +338,7 @@ object AdaptConfig extends Utils {
           limitApplied
             .filter { case (_, cdm: CDM20) => filter.fold(true)(applyFilter(cdm, _)) }
             .statefulMapConcat { () =>
-              var hosts = collection.mutable.Map.empty[java.util.UUID, Int]
+              val hosts = collection.mutable.Map.empty[java.util.UUID, Int]
               def isOurHost(uuid: java.util.UUID): Boolean = {
                 if (uuid == new java.util.UUID(0L, 0L))
                   false
@@ -354,7 +352,7 @@ object AdaptConfig extends Utils {
 
               {
                 case r @ (_, c: cdm20.Subject) => if (isOurHost(c.host)) List(r) else List.empty
-                case r @ (_, c: cdm20.Event) => if (isOurHost(c.host)) List(r) else List.empty
+                case r @ (_, c: cdm20.Event) => if (isOurHost(c.host.target)) List(r) else List.empty
                 case r @ (_, c: cdm20.FileObject) => if (isOurHost(c.host)) List(r) else List.empty
                 case r @ (_, c: cdm20.NetFlowObject) => if (isOurHost(c.host)) List(r) else List.empty
                 case r @ (_, c: cdm20.IpcObject) => if (isOurHost(c.host)) List(r) else List.empty

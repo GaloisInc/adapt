@@ -1,7 +1,7 @@
 package com.galois.adapt.cdm20
+
 import com.bbn.tc.schema.avro.cdm20
 import com.galois.adapt.DBWritable
-
 import scala.util.Try
 
 

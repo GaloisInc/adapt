@@ -1,13 +1,12 @@
 package com.galois.adapt.cdm20
 
 import java.util.UUID
-
 import com.bbn.tc.schema.avro.cdm20
 import com.galois.adapt.{DBNodeable, DBWritable}
-// import scala.collection.JavaConverters._
+import com.rrwright.quine.language.NoConstantsDomainNode
 import scala.language.implicitConversions
-
 import scala.util.Try
+
 
 case class Host (
   uuid: UUID, // universally unique identifier for the host
@@ -17,7 +16,7 @@ case class Host (
   osDetails: Option[String], // OS level details revealed by tools such as uname -a
   hostType: HostType, // host's role or device type, such as mobile, server, desktop
   interfaces: Seq[Interface] // names and addresses of network interfaces
-) extends CDM20 with DBWritable with DBNodeable[CDM20.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode with CDM20 with DBWritable with DBNodeable[CDM20.EdgeTypes.EdgeTypes] {
   def asDBKeyValues: List[(String, Any)] = List(
     ("uuid", uuid.toString),
     ("hostName", hostName),

@@ -1,22 +1,21 @@
 package com.galois.adapt.cdm20
 
-import java.io
-
 import com.galois.adapt.{DBNodeable, DBWritable}
 
 import scala.util.{Failure, Try}
 import java.util.UUID
 
 import com.bbn.tc.schema.avro.cdm20
+import com.rrwright.quine.language.EdgeDirections._
+import com.rrwright.quine.language.NoConstantsDomainNode
 
-import scala.collection.JavaConverters._
 
 case class Event(
   uuid: UUID,
   sequence: Option[Long] = None,
   eventType: EventType,
   threadId: Option[Int] = None,
-  host: UUID,
+  host: -->[UUID],
   subjectUuid: Option[UUID] = None, // required for all events, except the EVENT_ADD_OBJECT_ATTRIBUTE and EVENT_FLOWS_TO event.
   timestampNanos: Long,
   predicateObject: Option[UUID] = None,
@@ -29,7 +28,7 @@ case class Event(
   size: Option[Long] = None,
   programPoint: Option[String] = None,
   properties: Option[Map[String,String]] = None
-) extends CDM20 with DBWritable with Comparable[Event] with Ordering[Event] with DBNodeable[CDM20.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode with CDM20 with DBWritable with Comparable[Event] with Ordering[Event] with DBNodeable[CDM20.EdgeTypes.EdgeTypes] {
   val foldedParameters: List[Value] = parameters.fold[List[Value]](List.empty)(_.toList)
 
   def asDBKeyValues: List[(String, Any)] = List(
@@ -82,7 +81,7 @@ case class Event(
 
   def getUuid: UUID = uuid
 
-  override def getHostId: Option[UUID] = Some(host)
+  override def getHostId: Option[UUID] = Some(host.target)
 
   def compare(x: Event, y: Event) = x.timestampNanos compare y.timestampNanos
 
@@ -121,7 +120,7 @@ case object Event extends CDM20Constructor[Event] {
       AvroOpt.long(cdm.getSequence),
       cdm.getType,
       AvroOpt.int(cdm.getThreadId),
-      cdm.getHostId.get,
+      Outgoing(cdm.getHostId.get),
       AvroOpt.uuid(cdm.getSubject),
       cdm.getTimestampNanos,
       AvroOpt.uuid(cdm.getPredicateObject),

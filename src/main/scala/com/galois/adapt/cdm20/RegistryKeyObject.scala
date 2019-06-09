@@ -1,12 +1,12 @@
 package com.galois.adapt.cdm20
 
 import java.util.UUID
-
 import com.bbn.tc.schema.avro.cdm20
-import com.galois.adapt.{DBWritable, DBNodeable}
+import com.galois.adapt.{DBNodeable, DBWritable}
+import com.rrwright.quine.language.NoConstantsDomainNode
 import scala.util.Try
 
-// No change
+
 case class RegistryKeyObject(
   uuid: UUID,
   host: UUID,
@@ -14,7 +14,7 @@ case class RegistryKeyObject(
   key: String,
   value: Option[Value] = None,
   size: Option[Long] = None
-) extends CDM20 with DBWritable with DBNodeable[CDM20.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode with CDM20 with DBWritable with DBNodeable[CDM20.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues: List[(String, Any)] = List(
     ("uuid", uuid),

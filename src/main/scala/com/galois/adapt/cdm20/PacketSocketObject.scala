@@ -1,13 +1,12 @@
 package com.galois.adapt.cdm20
 
 import java.util.UUID
-
 import com.bbn.tc.schema.avro.cdm20
 import com.galois.adapt.{DBNodeable, DBWritable}
-
+import com.rrwright.quine.language.NoConstantsDomainNode
 import scala.util.Try
 
-// Represents a packet socket. Instantiates an AbstractObject.
+
 case class PacketSocketObject(
   uuid: UUID,
   host: UUID,
@@ -18,7 +17,7 @@ case class PacketSocketObject(
   haType: FixedShort, // ARP hardware type
   pktType: FixedByte, // Packet type
   addr: Seq[Byte] // Physical-layer address
-) extends CDM20 with DBWritable with DBNodeable[CDM20.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode with CDM20 with DBWritable with DBNodeable[CDM20.EdgeTypes.EdgeTypes] {
   override def asDBKeyValues: List[(String, Any)] = List(
     ("proto", proto.toString),
     ("ifIndex", ifIndex),

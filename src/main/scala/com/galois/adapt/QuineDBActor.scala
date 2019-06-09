@@ -22,7 +22,7 @@ import scala.util.{Failure, Success, Try}
 import scala.collection.JavaConverters._
 import com.rrwright.quine.runtime.{FutureRecoverWith, GraphService, Novelty, QuineIdProvider}
 import com.rrwright.quine.gremlin.{GremlinQueryRunner, TypeAnnotationFieldReader}
-import com.rrwright.quine.language.{DomainNodeSetSingleton, NoConstantsDomainNode, PickleReader, PickleScheme, Queryable, QuineId}
+import com.rrwright.quine.language.{DomainNodeSetSingleton, NoConstantsDomainNode, PickleReader, PickleScheme, Queryable, QuineId, ToDomainGraphBranch}
 import com.rrwright.quine.language.EdgeDirections._
 import com.rrwright.quine.language.BoopickleScheme._
 //import com.rrwright.quine.language.JavaObjectSerializationScheme._
@@ -655,6 +655,54 @@ class QuineRouter(count: Int, graph: GraphService[AdmUUID]) extends Actor with A
     case InitMsg => (0 until count).foreach(_ => sender() ! Ack )
     case CompleteMsg => println("CompleteMsg at QuineRouter"); sender() ! Ack
     case x => router.route(WithSender(sender(), x), sender())
+  }
+}
+
+
+case class CDMIngest(implicit graph: GraphService[UUID]) {
+  import cdm20._
+
+  implicit val timeout = Timeout(2 seconds)
+
+  implicit val osvPs = new PickleScheme[Option[Seq[Value]]] {
+    def read(bytes: Array[Byte]): Option[Seq[Value]] = None
+    def write(obj: Option[Seq[Value]]): Array[Byte] = Array.emptyByteArray
+  }
+
+  implicit val ovPs = new PickleScheme[Option[Value]] {
+    def read(bytes: Array[Byte]): Option[Value] = None
+    def write(obj: Option[Value]): Array[Byte] = Array.emptyByteArray
+  }
+
+  implicitly[PickleScheme[UUID]]
+  implicitly[PickleScheme[Long]]
+  implicitly[PickleScheme[Option[Int]]]
+  implicitly[PickleScheme[Option[Long]]]
+  implicitly[PickleScheme[Option[UUID]]]
+  implicitly[PickleScheme[Option[String]]]
+  implicitly[PickleScheme[List[String]]]
+  implicitly[PickleScheme[Option[Seq[Value]]]]
+  implicitly[PickleScheme[Option[Map[String,String]]]]
+
+
+
+//  implicitly[Queryable[Event]]
+
+  def cdm20Ingest: PartialFunction[CDM20, Unit] = {
+    case e: Event => e.create(Some(e.getUuid))
+    case f: FileObject => f.create(Some(f.getUuid))
+    case s: Subject => s.create(Some(s.getUuid))
+    case s: SrcSinkObject => s.create(Some(s.getUuid))
+    case h: Host => h.create(Some(h.getUuid))
+    case i: IpcObject => i.create(Some(i.getUuid))
+    case m: MemoryObject => m.create(Some(m.getUuid))
+    case n: NetFlowObject => n.create(Some(n.getUuid))
+    case p: PacketSocketObject => p.create(Some(p.getUuid))
+    case p: Principal => p.create(Some(p.getUuid))
+    case p: ProvenanceTagNode => p.create(Some(p.getUuid))
+    case r: RegistryKeyObject => r.create(Some(r.getUuid))
+    case u: UnknownProvenanceNode => u.create(Some(u.getUuid))
+    case _ => ()
   }
 }
 

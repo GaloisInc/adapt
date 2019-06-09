@@ -899,7 +899,7 @@ object CSV extends App {
   for (host <- ingestConfig.hosts) {
     println(s"Running CSV flow for: $host")
     val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
-    val source = host.toCdmSource(ErrorHandler.print)
+    val source = host.toCdmSource()
     source.async
       .via(printCounter(host.hostName+" CDM CSV", statusActor))
       .via(Application.erMap(host.hostName).async).async
@@ -907,4 +907,64 @@ object CSV extends App {
 //      .via(printCounter(host.hostName+" ADM CSV", statusActor))
       .runWith(admCsvWriter("/Users/ryan/Desktop/csvs"))
   }
+}
+
+
+object CDM extends App {
+  Application  // delayed init.
+
+  val hostConfigSrcs: List[String] = quineConfig.hosts
+    .zipWithIndex
+    .map { case (QuineHost(ip, shardCount, _), idx) =>
+      s"""|  {
+          |    hostname = $ip
+          |    port = 2551
+          |    first-shard = ${ quineConfig.hosts.take(idx).map(_.shardcount).sum }
+          |    last-shard = ${  quineConfig.hosts.take(idx).map(_.shardcount).sum + shardCount - 1 }
+          |  }
+          |""".stripMargin
+    }
+
+  val clusterConfigSrc =
+    s"""|name = "adapt-cluster"
+        |hostname = "${quineConfig.thishost}"
+        |port = 2551
+        |host-shard-ranges = ${hostConfigSrcs.mkString("[\n",",","]\n")}
+        |""".stripMargin
+
+  implicit val graph = GraphService.clustered(
+    config = ConfigFactory.parseString(clusterConfigSrc),
+    persistor = as => EmptyPersistor()(as),
+    idProvider = AdmUuidProvider,
+    indexer = Indexer.currentIndex(EmptyIndex), //InMemoryIndex(Some(Set('cid, 'path)))),
+    inMemorySoftNodeLimit = Some(quineConfig.inmemsoftlimit),
+    inMemoryHardNodeLimit = Some(quineConfig.inmemhardlimit),
+    uiPort = None
+  )
+  implicit val system = graph.system
+
+
+  implicit val materializer = ActorMaterializer(
+    ActorMaterializerSettings(system)
+      .withSupervisionStrategy(streamErrorStrategy)
+      .withDispatcher("stream-dispatcher")
+  )
+  val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
+
+  for (host <- ingestConfig.hosts) {
+    host.toCdmSource()
+      .via(printCounter(host.hostName + " CDM", statusActor))
+      .runWith(quineSink(host.hostName))
+  }
+
+
+  def quineSink(hostName: HostName): Sink[Any, NotUsed] = Sink.fromGraph(GraphDSL.create() { implicit q: GraphDSL.Builder[NotUsed]  =>
+    import GraphDSL.Implicits._
+    val balance = q.add(Balance[Any](quineConfig.quineactorparallelism))
+      (0 until quineConfig.quineactorparallelism).foreach { idx =>
+      val quineDBRef = system.actorOf(Props(classOf[QuineDBActor], graph, idx), s"$hostName-QuineDB-$idx")
+      balance.out(idx) ~> Sink.actorRefWithAck(quineDBRef, InitMsg, Ack, CompleteMsg, println).async
+    }
+    SinkShape(balance.in)
+  })
 }

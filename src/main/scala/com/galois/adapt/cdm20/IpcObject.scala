@@ -2,7 +2,8 @@ package com.galois.adapt.cdm20
 
 import java.util.UUID
 import com.bbn.tc.schema.avro.cdm20
-import com.galois.adapt.{DBWritable, DBNodeable}
+import com.galois.adapt.{DBNodeable, DBWritable}
+import com.rrwright.quine.language.NoConstantsDomainNode
 import scala.util.Try
 
 
@@ -18,7 +19,7 @@ case class IpcObject(
   uuid2: Option[UUID] = None,
   fd1: Option[Int] = None,
   fd2: Option[Int] = None
-) extends CDM20 with DBWritable with DBNodeable[CDM20.EdgeTypes.EdgeTypes] {
+) extends NoConstantsDomainNode with CDM20 with DBWritable with DBNodeable[CDM20.EdgeTypes.EdgeTypes] {
 
   def asDBKeyValues = List(
       ("uuid", uuid)

@@ -3,6 +3,8 @@ package com.galois.adapt.cdm20
 import com.galois.adapt.cdm19
 import com.galois.adapt.cdm20
 import java.util.UUID
+import com.rrwright.quine.language.EdgeDirections._
+
 
 // This object provides implicit conversions from CDM17 to CDM20 Scala case classes
 object Cdm19to20 {
@@ -65,7 +67,7 @@ object Cdm19to20 {
     e.sequence,
     e.eventType,
     e.threadId,
-    e.host,
+    Outgoing(e.host),
     e.subjectUuid,
     e.timestampNanos,
     e.predicateObject,
