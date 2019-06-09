@@ -19,6 +19,7 @@ import shapeless._
 import shapeless.syntax.singleton._
 import AdaptConfig._
 import akka.routing.RoundRobinPool
+import com.galois.adapt.Application.{streamErrorStrategy, system}
 import com.typesafe.config.ConfigFactory
 import com.galois.adapt.FilterCdm.Filter
 import com.galois.adapt.MapSetUtils.{AlmostMap, AlmostSet}
@@ -41,7 +42,7 @@ import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.Promise
 
 
-object Application extends App {
+object Application /*extends App*/ {
   org.slf4j.LoggerFactory.getILoggerFactory  // This is here just to make SLF4j shut up and not log lots of error messages when instantiating the Kafka producer.
   runFlow match { case "quine" => (); case _ => wrongRunFlow() }
 
@@ -692,89 +693,93 @@ object Application extends App {
     standingFetchSinks += (host.hostName -> standingFetchSink)
   }
 
-  for (admTopicName <- AdaptConfig.kafkaadmsources)
-    AdmKafkaStreamComponents.kafkaAdmSource(admTopicName)
-      .via(printCounter(admTopicName+" Kafka-ADM", statusActor))
-      .runWith(quineSink(admTopicName + "-" + streamCount.incrementAndGet()).async)
+  def run() = {
+    for (admTopicName <- AdaptConfig.kafkaadmsources)
+      AdmKafkaStreamComponents.kafkaAdmSource(admTopicName)
+        .via(printCounter(admTopicName+" Kafka-ADM", statusActor))
+        .runWith(quineSink(admTopicName + "-" + streamCount.incrementAndGet()).async)
 
-  for (host <- ingestConfig.hosts)
-    runHostIngest(host)
+    for (host <- ingestConfig.hosts)
+      runHostIngest(host)
 
 
-  // Total cluster wide ingest counts
-  if (quineConfig.hosts.headOption.map(_.ip) == Some(quineConfig.thishost)) {
-    system.scheduler.schedule(10.seconds, 10.seconds, {
-      import akka.pattern._
+//  Total cluster wide ingest counts
+    if (quineConfig.hosts.headOption.map(_.ip) == Some(quineConfig.thishost)) {
+      system.scheduler.schedule(10.seconds, 10.seconds, {
+        import akka.pattern._
 
-      val nf = NumberFormat.getInstance()
-      implicit val timeout = Timeout(1 minute)
-      implicit val ec = system.dispatcher
-    
-      val originalStartTime = System.nanoTime()
-      var lastTimestampNanos = originalStartTime
-      var lastCounter = 0L
-      
-      new Runnable {
-        override def run(): Unit = {
-          Future
-            .traverse(quineConfig.hosts) { host: QuineHost =>
-              (system.actorSelection(
-                s"akka://adapt-cluster@${host.ip}:2551/user/representative-${host.ip}"
-              ) ? GetTotalIngestCount).mapTo[ReplyIngestCount]
-            }
-            .map(_.foldLeft(ReplyIngestCount.empty)(_ + _))
-            .onComplete {
-              case Success(ReplyIngestCount(n,e,o)) =>
-                val nowNanos = System.nanoTime()
-                val durationSeconds = (nowNanos - lastTimestampNanos) / 1e9
-                val totalSeconds = (nowNanos - originalStartTime) / 1e9
-                val counter = n + e + o
-                println(s"Cluster ingested: ${nf.format(counter)} (nodes: $n, edges $e, observations: $o) Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${nf.format(((counter - lastCounter) / durationSeconds).toInt)} /s.  Overall rate: ${nf.format((counter / totalSeconds).toInt)} /s.")
-                lastTimestampNanos = nowNanos
-                lastCounter = counter
+        val nf = NumberFormat.getInstance()
+        implicit val timeout = Timeout(1 minute)
+        implicit val ec = system.dispatcher
 
-              case Failure(e) => e.printStackTrace
-            }
+        val originalStartTime = System.nanoTime()
+        var lastTimestampNanos = originalStartTime
+        var lastCounter = 0L
+
+        new Runnable {
+          override def run(): Unit = {
+            Future
+              .traverse(quineConfig.hosts) { host: QuineHost =>
+                (system.actorSelection(
+                  s"akka://adapt-cluster@${host.ip}:2551/user/representative-${host.ip}"
+                ) ? GetTotalIngestCount).mapTo[ReplyIngestCount]
+              }
+              .map(_.foldLeft(ReplyIngestCount.empty)(_ + _))
+              .onComplete {
+                case Success(ReplyIngestCount(n,e,o)) =>
+                  val nowNanos = System.nanoTime()
+                  val durationSeconds = (nowNanos - lastTimestampNanos) / 1e9
+                  val totalSeconds = (nowNanos - originalStartTime) / 1e9
+                  val counter = n + e + o
+                  println(s"Cluster ingested: ${nf.format(counter)} (nodes: $n, edges $e, observations: $o) Elapsed: ${f"$durationSeconds%.3f"} seconds.  Rate: ${nf.format(((counter - lastCounter) / durationSeconds).toInt)} /s.  Overall rate: ${nf.format((counter / totalSeconds).toInt)} /s.")
+                  lastTimestampNanos = nowNanos
+                  lastCounter = counter
+
+                case Failure(e) => e.printStackTrace
+              }
+          }
         }
+      })(system.dispatcher)
+    }
+
+    Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
+      override def run(): Unit = if  (!AdaptConfig.skipshutdown) {
+        implicit val timeout = Timeout(48 hours)
+
+        println(s"Stopping ammonite...")
+        replServer.stopImmediately()
+
+        implicit val executionContext: ExecutionContext = system.dispatchers.lookup("quine.actor.node-dispatcher")
+
+        val alarmsF = if (ppmConfig.shouldsavealarms) {
+          println(s"Flushing alarms to disk...")
+          ppmManagers.values.toList.foldLeft(Future.successful( () ))((a, b) =>
+            a.flatMap(_ => b.saveAlarms()) // (b ? SaveTrees(true)).mapTo[Ack.type]))
+          )
+        } else {
+          Future.successful( Ack )
+        }
+
+        val saveF = if (ppmConfig.shouldsaveppmtrees) {
+          println(s"Saving PPM trees to disk...")
+          ppmManagers.values.toList.foldLeft(Future.successful( () ))((a, b) =>
+            a.flatMap(_ => b.saveTrees()) // (b ? SaveTrees(true)).mapTo[Ack.type]))
+          )
+        } else {
+          Future.successful( Ack )
+        }
+
+        val shutdownF = alarmsF.flatMap(_ => saveF.flatMap { _ =>
+          println("Shutting down the actor system")
+          system.terminate()
+        }.flatMap(_ => Future { mapProxy.closeSync() }))
+
+        Await.result(shutdownF, timeout.duration)
       }
-    })(system.dispatcher)
+    }))
   }
 
-  Runtime.getRuntime.addShutdownHook(new Thread(new Runnable() {
-    override def run(): Unit = if  (!AdaptConfig.skipshutdown) {
-      implicit val timeout = Timeout(48 hours)
-
-      println(s"Stopping ammonite...")
-      replServer.stopImmediately()
-
-      implicit val executionContext: ExecutionContext = system.dispatchers.lookup("quine.actor.node-dispatcher")
-
-      val alarmsF = if (ppmConfig.shouldsavealarms) {
-        println(s"Flushing alarms to disk...")
-        ppmManagers.values.toList.foldLeft(Future.successful( () ))((a, b) =>
-          a.flatMap(_ => b.saveAlarms()) // (b ? SaveTrees(true)).mapTo[Ack.type]))
-        )
-      } else {
-        Future.successful( Ack )
-      }
-
-      val saveF = if (ppmConfig.shouldsaveppmtrees) {
-        println(s"Saving PPM trees to disk...")
-        ppmManagers.values.toList.foldLeft(Future.successful( () ))((a, b) =>
-          a.flatMap(_ => b.saveTrees()) // (b ? SaveTrees(true)).mapTo[Ack.type]))
-        )
-      } else {
-        Future.successful( Ack )
-      }
-
-      val shutdownF = alarmsF.flatMap(_ => saveF.flatMap { _ =>
-        println("Shutting down the actor system")
-        system.terminate()
-      }.flatMap(_ => Future { mapProxy.closeSync() }))
-
-      Await.result(shutdownF, timeout.duration)
-    }
-  }))
+  def main(args: Array[String]): Unit = run()
 
 
   def wrongRunFlow(): Unit = {
@@ -819,3 +824,149 @@ Unknown runflow argument. Quitting. (Did you mean: quine?)
   }
 }
 
+
+
+object CSV extends App {
+
+  implicit val system = ActorSystem("csv-maker")
+
+  implicit val materializer = ActorMaterializer(
+    ActorMaterializerSettings(system)
+      .withSupervisionStrategy(streamErrorStrategy)
+      .withDispatcher("stream-dispatcher")
+  )
+
+  var didWriteHeader = Set.empty[PrintWriter]
+
+  for (host <- ingestConfig.hosts) {
+    val source = host.toCdmSource(ErrorHandler.print)
+    val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
+
+    val lruDedup = Flow[Either[ADM, EdgeAdm2Adm]].statefulMapConcat{ () =>
+      // This is meant only to decrease the number of duplicates, not perfectly eliminate dupes. Viz. meant to help performance, not correctness.
+      // Some duplication isn't so bad--it results in a no-op on the graph, and a duplicate standing fetch.
+      val seenPaths = new java.util.LinkedHashMap[AdmPathNode, None.type](500, 1F, true) {
+        override def removeEldestEntry(eldest: java.util.Map.Entry[AdmPathNode, None.type]) = this.size() >= 500
+      }
+      val seenSubjects = new java.util.LinkedHashMap[AdmSubject, None.type](200, 1F, true) {
+        override def removeEldestEntry(eldest: java.util.Map.Entry[AdmSubject, None.type]) = this.size() >= 200
+      }
+      val seenPorts = new java.util.LinkedHashMap[AdmPort, None.type](200, 1F, true) {
+        override def removeEldestEntry(eldest: java.util.Map.Entry[AdmPort, None.type]) = this.size() >= 200
+      }
+      val seenAddresses = new java.util.LinkedHashMap[AdmAddress, None.type](200, 1F, true) {
+        override def removeEldestEntry(eldest: java.util.Map.Entry[AdmAddress, None.type]) = this.size() >= 200
+      }
+      val seenNetflows = new java.util.LinkedHashMap[AdmNetFlowObject, None.type](200, 1F, true) {
+        override def removeEldestEntry(eldest: java.util.Map.Entry[AdmNetFlowObject, None.type]) = this.size() >= 200
+      }
+      val seenEdges = new java.util.LinkedHashMap[EdgeAdm2Adm, None.type](10000, 1F, true) {
+        override def removeEldestEntry(eldest: java.util.Map.Entry[EdgeAdm2Adm, None.type]) = this.size() >= 10000
+      }
+
+      {
+        case a @ Left(adm: AdmPathNode) =>
+          val result = if (seenPaths.containsKey(adm)) Nil else List(a)
+          seenPaths.put(adm, None)
+          result
+
+        case a @ Left(adm: AdmSubject) =>
+          val result = if (seenSubjects.containsKey(adm)) Nil else List(a)
+          seenSubjects.put(adm, None)
+          result
+
+        case a @ Left(adm: AdmPort) =>
+          val result = if (seenPorts.containsKey(adm)) Nil else List(a)
+          seenPorts.put(adm, None)
+          result
+
+        case a @ Left(adm: AdmAddress) =>
+          val result = if (seenAddresses.containsKey(adm)) Nil else List(a)
+          seenAddresses.put(adm, None)
+          result
+
+        case a @ Left(adm: AdmNetFlowObject) =>
+          val result = if (seenNetflows.containsKey(adm)) Nil else List(a)
+          seenNetflows.put(adm, None)
+          result
+
+        case a @ Right(edge) =>
+          val result = if (seenEdges.containsKey(edge)) Nil else List(a)
+          seenEdges.put(edge, None)
+          result
+
+        case a => List(a)
+      }
+    }
+
+    Application
+
+    source.async
+      .via(printCounter(host.hostName+" CDM CSV", statusActor))
+      .via(Application.erMap(host.hostName).async).async
+      .via(lruDedup)
+//      .via(printCounter(host.hostName+" ADM CSV", statusActor))
+      .runWith(admCsvWriter("/Users/ryan/Desktop/csvs"))
+
+    println(s"Running CSV flow for: $host")
+  }
+
+
+  def writeAdmString(a: ADM, printWriter: PrintWriter): Unit = {
+    def makeRenderable(z: Any): Any = z match {
+      case s: Seq[_] => s.map(i => makeRenderable(i)).mkString("+")
+      case HostIdentifier(idType, idValue) => s"$idType-$idValue"
+      case i: Interface => i.toString.replace(",","-")
+      case Some(x) => x
+      case s: String => s.replace(",","-")
+      case x => makeRenderable(x.toString)
+    }
+
+    val removedKeys = List("originalCdmUuids", "provider")
+
+    if ( ! didWriteHeader.contains(printWriter)) {
+      printWriter.println("adm_uuid," + removedKeys.foldLeft(a.toMap){case (acc, k) => acc.-(k)}.toList.sortBy(_._1).map(x => x._1).mkString(","))
+      didWriteHeader = didWriteHeader + printWriter
+    }
+
+    printWriter.println(
+      a.uuid.rendered + "," + removedKeys.foldLeft(a.toMap){case (acc, k) => acc.-(k)}.toList.sortBy(_._1).map(x =>
+        makeRenderable(x._2)
+      ).mkString(",")
+    )
+    printWriter.flush()
+  }
+
+  def admCsvWriter(directoryPath: String) = {
+    val admPathNodeWriter = new PrintWriter(new File(directoryPath + "/AdmPathNode.csv"))
+    val admEventWriter = new PrintWriter(new File(directoryPath + "/AdmEvent.csv"))
+    val admSubjectWriter = new PrintWriter(new File(directoryPath + "/AdmSubject.csv"))
+    val admFileObjectWriter = new PrintWriter(new File(directoryPath + "/AdmFileObject.csv"))
+    val admNetFlowObjectWriter = new PrintWriter(new File(directoryPath + "/AdmNetFlowObject.csv"))
+    val admAddressWriter = new PrintWriter(new File(directoryPath + "/AdmAddress.csv"))
+    val admPortWriter = new PrintWriter(new File(directoryPath + "/AdmPort.csv"))
+    val admPrincipalWriter = new PrintWriter(new File(directoryPath + "/AdmPrincipal.csv"))
+    val admProvenanceTagNodeWriter = new PrintWriter(new File(directoryPath + "/AdmProvenanceTagNode.csv"))
+    val admSrcSinkObjectWriter = new PrintWriter(new File(directoryPath + "/AdmSrcSinkObject.csv"))
+    val admHostWriter = new PrintWriter(new File(directoryPath + "/AdmHost.csv"))
+    val edgeAdm2AdmWriter = new PrintWriter(new File(directoryPath + "/EdgeAdm2Adm.csv"))
+    edgeAdm2AdmWriter.println("src_adm_uuid,tgt_adm_uuid,label")
+    didWriteHeader = didWriteHeader + edgeAdm2AdmWriter
+
+    Sink.foreach[Either[ADM, EdgeAdm2Adm]] {
+      case Left(a: AdmPathNode) => writeAdmString(a, admPathNodeWriter)
+      case Left(a: AdmEvent) => writeAdmString(a, admEventWriter)
+      case Left(a: AdmSubject) => writeAdmString(a, admSubjectWriter)
+      case Left(a: AdmFileObject) => writeAdmString(a, admFileObjectWriter)
+      case Left(a: AdmNetFlowObject) => writeAdmString(a, admNetFlowObjectWriter)
+      case Left(a: AdmAddress) => writeAdmString(a, admAddressWriter)
+      case Left(a: AdmPort) => writeAdmString(a, admPortWriter)
+      case Left(a: AdmPrincipal) => writeAdmString(a, admPrincipalWriter)
+      case Left(a: AdmProvenanceTagNode) => writeAdmString(a, admProvenanceTagNodeWriter)
+      case Left(a: AdmSrcSinkObject) => writeAdmString(a, admSrcSinkObjectWriter)
+      case Left(a: AdmHost) => writeAdmString(a, admHostWriter)
+      case Right(e: EdgeAdm2Adm) => edgeAdm2AdmWriter.println(s"${e.src.rendered},${e.tgt.rendered},${e.label}"); edgeAdm2AdmWriter.flush()
+      case _ => ()
+    }
+  }
+}
