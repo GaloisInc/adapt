@@ -827,9 +827,8 @@ Unknown runflow argument. Quitting. (Did you mean: quine?)
 
 
 object CSV extends App {
-
+  Application  // delayed init.
   implicit val system = ActorSystem("csv-maker")
-
   implicit val materializer = ActorMaterializer(
     ActorMaterializerSettings(system)
       .withSupervisionStrategy(streamErrorStrategy)
@@ -837,80 +836,6 @@ object CSV extends App {
   )
 
   var didWriteHeader = Set.empty[PrintWriter]
-
-  for (host <- ingestConfig.hosts) {
-    val source = host.toCdmSource(ErrorHandler.print)
-    val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
-
-    val lruDedup = Flow[Either[ADM, EdgeAdm2Adm]].statefulMapConcat{ () =>
-      // This is meant only to decrease the number of duplicates, not perfectly eliminate dupes. Viz. meant to help performance, not correctness.
-      // Some duplication isn't so bad--it results in a no-op on the graph, and a duplicate standing fetch.
-      val seenPaths = new java.util.LinkedHashMap[AdmPathNode, None.type](500, 1F, true) {
-        override def removeEldestEntry(eldest: java.util.Map.Entry[AdmPathNode, None.type]) = this.size() >= 500
-      }
-      val seenSubjects = new java.util.LinkedHashMap[AdmSubject, None.type](200, 1F, true) {
-        override def removeEldestEntry(eldest: java.util.Map.Entry[AdmSubject, None.type]) = this.size() >= 200
-      }
-      val seenPorts = new java.util.LinkedHashMap[AdmPort, None.type](200, 1F, true) {
-        override def removeEldestEntry(eldest: java.util.Map.Entry[AdmPort, None.type]) = this.size() >= 200
-      }
-      val seenAddresses = new java.util.LinkedHashMap[AdmAddress, None.type](200, 1F, true) {
-        override def removeEldestEntry(eldest: java.util.Map.Entry[AdmAddress, None.type]) = this.size() >= 200
-      }
-      val seenNetflows = new java.util.LinkedHashMap[AdmNetFlowObject, None.type](200, 1F, true) {
-        override def removeEldestEntry(eldest: java.util.Map.Entry[AdmNetFlowObject, None.type]) = this.size() >= 200
-      }
-      val seenEdges = new java.util.LinkedHashMap[EdgeAdm2Adm, None.type](10000, 1F, true) {
-        override def removeEldestEntry(eldest: java.util.Map.Entry[EdgeAdm2Adm, None.type]) = this.size() >= 10000
-      }
-
-      {
-        case a @ Left(adm: AdmPathNode) =>
-          val result = if (seenPaths.containsKey(adm)) Nil else List(a)
-          seenPaths.put(adm, None)
-          result
-
-        case a @ Left(adm: AdmSubject) =>
-          val result = if (seenSubjects.containsKey(adm)) Nil else List(a)
-          seenSubjects.put(adm, None)
-          result
-
-        case a @ Left(adm: AdmPort) =>
-          val result = if (seenPorts.containsKey(adm)) Nil else List(a)
-          seenPorts.put(adm, None)
-          result
-
-        case a @ Left(adm: AdmAddress) =>
-          val result = if (seenAddresses.containsKey(adm)) Nil else List(a)
-          seenAddresses.put(adm, None)
-          result
-
-        case a @ Left(adm: AdmNetFlowObject) =>
-          val result = if (seenNetflows.containsKey(adm)) Nil else List(a)
-          seenNetflows.put(adm, None)
-          result
-
-        case a @ Right(edge) =>
-          val result = if (seenEdges.containsKey(edge)) Nil else List(a)
-          seenEdges.put(edge, None)
-          result
-
-        case a => List(a)
-      }
-    }
-
-    Application
-
-    source.async
-      .via(printCounter(host.hostName+" CDM CSV", statusActor))
-      .via(Application.erMap(host.hostName).async).async
-      .via(lruDedup)
-//      .via(printCounter(host.hostName+" ADM CSV", statusActor))
-      .runWith(admCsvWriter("/Users/ryan/Desktop/csvs"))
-
-    println(s"Running CSV flow for: $host")
-  }
-
 
   def writeAdmString(a: ADM, printWriter: PrintWriter): Unit = {
     def makeRenderable(z: Any): Any = z match {
@@ -950,6 +875,7 @@ object CSV extends App {
     val admSrcSinkObjectWriter = new PrintWriter(new File(directoryPath + "/AdmSrcSinkObject.csv"))
     val admHostWriter = new PrintWriter(new File(directoryPath + "/AdmHost.csv"))
     val edgeAdm2AdmWriter = new PrintWriter(new File(directoryPath + "/EdgeAdm2Adm.csv"))
+
     edgeAdm2AdmWriter.println("src_adm_uuid,tgt_adm_uuid,label")
     didWriteHeader = didWriteHeader + edgeAdm2AdmWriter
 
@@ -968,5 +894,17 @@ object CSV extends App {
       case Right(e: EdgeAdm2Adm) => edgeAdm2AdmWriter.println(s"${e.src.rendered},${e.tgt.rendered},${e.label}"); edgeAdm2AdmWriter.flush()
       case _ => ()
     }
+  }
+
+  for (host <- ingestConfig.hosts) {
+    println(s"Running CSV flow for: $host")
+    val statusActor = system.actorOf(Props[StatusActor], name = "statusActor")
+    val source = host.toCdmSource(ErrorHandler.print)
+    source.async
+      .via(printCounter(host.hostName+" CDM CSV", statusActor))
+      .via(Application.erMap(host.hostName).async).async
+      .via(Application.lruDedup)
+//      .via(printCounter(host.hostName+" ADM CSV", statusActor))
+      .runWith(admCsvWriter("/Users/ryan/Desktop/csvs"))
   }
 }
