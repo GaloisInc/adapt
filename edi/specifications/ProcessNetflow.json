@@ -1,5 +1,5 @@
 {"context specification":{
-     "query":"MATCH (e:AdmEvent)-->(p:AdmSubject) MATCH (e:AdmEvent)-->(n:AdmNetFlowObject) WHERE n.remotePort <= 10000  AND %s RETURN DISTINCT p.uuid AS id, n.remotePort AS po, n.remoteAddress AS ip",
+     "query":"MATCH (e:AdmEvent)-->(p:AdmSubject) MATCH (e:AdmEvent)-->(n:AdmNetFlowObject) WHERE n.remotePort <= 10000  AND n.remotePort <> -1  AND %s RETURN DISTINCT p.uuid AS id, n.remotePort AS po, n.remoteAddress AS ip",
      "endpoint":"cypher",
 "objects":"id",
 "attributes":["ip","po"]

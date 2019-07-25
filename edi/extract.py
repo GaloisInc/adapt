@@ -24,9 +24,15 @@ parser.add_argument('--output','-o',
 					help = 'Output context filename. ',
 					type = str,
 					required = True)
+parser.add_argument('--format', '-f',
+					choices = ['csv','json'],
+					help = 'output format CSV or JSON',
+					default = 'csv')
+parser.add_argument('--json', '-j',
+					help = 'JSON input filename')
 parser.add_argument('--database','-d',
-					choices = ['neo4j','adapt'],
-					help = 'neo4j or adapt',
+					choices = ['neo4j','adapt', 'json'],
+					help = 'neo4j or adapt or json',
 					default = 'adapt')
 parser.add_argument('--provider','-r',
 					help = 'provider name',
@@ -43,17 +49,33 @@ if __name__ == '__main__':
 	spec_file = args.input
 	provider = args.provider
 	output_file = args.output
+	json_file = args.json
 	if args.verbose:
 		print('URL: %s' % url)
 		print('Port: %d' % port)
 		print('Specification: %s' % spec_file)
 		print('Provider: ' + str(provider))
 		print('Context output: %s' % output_file)
+		print('JSON input: %s' % json_file)
 	if not(os.path.exists(spec_file)):
 		sys.exit('Context specification file not found: %s' % spec_file)
-	if args.database == 'adapt':
+	if args.database == 'json':
+		if args.json == None:
+			sys.exit('If using JSON cached result, must specify JSON file')
+		if args.format != 'csv':
+			sys.exit('If using JSON cached result, output must be CSV')
+
+	def extractFromDB(format,db):
+		if format == 'csv':
+			ext.convert2CSV(spec_file,output_file,db,provider)
+		elif format == 'json':
+			ext.convert2JSON(spec_file,output_file,db,provider)
+
+	if args.database == 'json':
+		ext.convertJSON2CSV(spec_file,output_file,json_file)
+	elif args.database == 'adapt':
 		db = database.AdaptDatabase(url=url,port=port)
+		extractFromDB(args.format,db)
 	elif args.database == 'neo4j':
 		db = database.Neo4jDatabase(url=url,port=port)
-	ext.convert2InputCSV(spec_file,output_file,db,provider)
-
+		extractFromDB(args.format,db)

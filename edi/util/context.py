@@ -1,6 +1,5 @@
-import numpy
 
-
+import csv
 
 # This class reads csv data that is of the following form:
 # header row: A0,A1,...,An
@@ -19,3 +18,10 @@ class Context:
 		self.data = {row[0]:{h : v
 							 for (h,v) in zip(self.header,map(lambda x: int(x),row[1:]))}
 						for row in reader}
+
+
+def getContext(ctxtfile):
+    with open(ctxtfile) as infile:
+        reader = csv.reader(infile)
+        ctxt = Context(reader)
+    return ctxt

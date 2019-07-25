@@ -30,8 +30,8 @@ parser.add_argument('--output', '-o',
 					help='output file',
 					required = True)
 parser.add_argument('--aggr','-a',
-					choices=['uniform','weighted',
-							 'average','geometric','min','median'],
+					choices=['uniform','weighted', 'maxscore',
+							 'average','geometric','minrank','median'],
 					help='form of aggregation',
 					default='uniform')
 
@@ -47,6 +47,15 @@ def combineWeighted(dicts,probs,allkeys):
 				penalty = -(1-probs[i])*numpy.log2(1-probs[i]) 
 				output[k] =  output[k] + penalty
 
+	return output
+
+def combineMax(dicts,allkeys):
+	output = {}
+	for k in allkeys:
+		output[k] = 0.0
+		for i in range(n):
+			if k in dicts[i].keys():
+				output[k] = max(output[k], dicts[i][k])
 	return output
 
 def geometricMean(l):
@@ -65,7 +74,8 @@ def combine(ranks,allkeys,f):
 
 def readScores(file):
 	with open(file) as scorefile:
-		scores = check.Scores(csv.reader(scorefile),reverse=args.reverse)
+		scores = check.Scores(csv.reader(scorefile))
+		scores.sort(reverse=args.reverse)
 	d = {k : v for (k,v) in scores.data}
 	r = {k : i+1 for i,(k,v) in enumerate(scores.data)}
 	return(d,r)
@@ -110,11 +120,14 @@ if __name__ == '__main__':
 		print("Weighted encoding")
 		probs = [len(dicts[i])/m for i in range(n)]
 		output = combineWeighted(dicts,probs,allkeys)
+	elif args.aggr == 'maxscore':
+		print("Weighted encoding")
+		output = combineMax(dicts,allkeys)
 	elif args.aggr == 'geometric':
 		output = combine(ranks,allkeys,geometricMean)
 	elif args.aggr == 'average':
 		output = combine(ranks,allkeys,numpy.average)
-	elif args.aggr == 'min':
+	elif args.aggr == 'minrank':
 		output = combine(ranks,allkeys,min)
 	elif args.aggr == 'median':
 		output = combine(ranks,allkeys,numpy.median)

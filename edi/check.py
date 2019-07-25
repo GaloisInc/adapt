@@ -21,12 +21,18 @@ parser.add_argument('--groundtruth', '-g',
 parser.add_argument('--ty', '-t',
                     help='type of ground truth to use',
                     default=None)
+parser.add_argument('--reference', '-f',
+                    help='reference scorefile to use (for total number of transactions)',
+                    default=None)
 parser.add_argument('--reverse','-r',
 					help='sort anomaly scores in increasing order',
+					action='store_true')
+parser.add_argument('--verbose', '-v',
+					help="print detailed messages",
 					action='store_true')
 
 if __name__ == '__main__':
     args = parser.parse_args()
 
     check.main(args.input,args.output,args.groundtruth,
-		 args.ty,reverse=args.reverse)
+		 args.ty,reference=args.reference,reverse=args.reverse,debug=args.verbose)
